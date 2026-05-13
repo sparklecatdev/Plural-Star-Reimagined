@@ -1,17 +1,21 @@
 // src/screens/MembersScreen.tsx
-import React, {useState, useEffect} from 'react';
+import React, {useState} from 'react';
 import {View, Text, ScrollView, TouchableOpacity, TextInput, StyleSheet, Image, Alert} from 'react-native';
 import {FlashList} from '@shopify/flash-list';
 import {useTranslation} from 'react-i18next';
 import {Fonts, PALETTE} from '../theme';
-import {Member, MemberGroup, FrontState, FrontTierKey, MemberSortMode, CustomFieldDef, getInitials, allFrontMemberIds, uid, isValidHex, normalizeHex, sortMembers} from '../utils';
-import {RichText} from '../components/MarkdownRenderer';
-import {store, KEYS} from '../storage';
+import {Member, MemberGroup, FrontState, FrontTierKey, MemberSortMode, getInitials, allFrontMemberIds, uid, isValidHex, normalizeHex, sortMembers} from '../utils';
 
 const Avatar = ({member, size = 40, pulse = false, T}: {member?: Member | null; size?: number; pulse?: boolean; T: any}) => {
   if (member?.avatar) {
-    return <Image source={{uri: member.avatar}} style={{width: size, height: size, borderRadius: size / 2,
-      shadowColor: pulse ? member.color : 'transparent', shadowOpacity: pulse ? 0.5 : 0, shadowRadius: pulse ? 8 : 0, elevation: pulse ? 4 : 0}} />;
+    // `elevation` lives on ViewStyle, not ImageStyle, in current RN typings.
+    // Wrap the Image so the pulse glow keeps working without a type error.
+    return (
+      <View style={{width: size, height: size, borderRadius: size / 2,
+        shadowColor: pulse ? member.color : 'transparent', shadowOpacity: pulse ? 0.5 : 0, shadowRadius: pulse ? 8 : 0, elevation: pulse ? 4 : 0}}>
+        <Image source={{uri: member.avatar}} style={{width: size, height: size, borderRadius: size / 2}} />
+      </View>
+    );
   }
   return (
     <View style={{width: size, height: size, borderRadius: size / 2, backgroundColor: member?.color || T.toggleOff, alignItems: 'center', justifyContent: 'center',
@@ -38,17 +42,25 @@ const TIER_BADGE_KEY: Record<FrontTierKey, {i18nKey: string; colorKey: string}> 
 interface Props {
   theme: any; members: Member[]; front: FrontState | null; groups: MemberGroup[];
   initialSortMode?: MemberSortMode;
-  onAdd: () => void; onEdit: (member: Member) => void; onSaveGroups: (groups: MemberGroup[]) => void;
+  onAdd: () => void;
+  onEdit: (member: Member) => void;
+  /**
+   * Called when the user taps a member card (not the pencil). Should open a
+   * read-only view of that member. Implemented in App.tsx by opening the
+   * MemberModal with readOnly=true. Falls back to onEdit if not provided so
+   * the screen stays usable.
+   */
+  onView?: (member: Member) => void;
+  onSaveGroups: (groups: MemberGroup[]) => void;
   onSaveSortMode?: (mode: MemberSortMode) => void;
   onReorderMember?: (id: string, direction: 'up' | 'down') => void;
 }
 
-export const MembersScreen = ({theme: T, members, front, groups, initialSortMode, onAdd, onEdit, onSaveGroups, onSaveSortMode, onReorderMember}: Props) => {
+export const MembersScreen = ({theme: T, members, front, groups, initialSortMode, onAdd, onEdit, onView, onSaveGroups, onSaveSortMode, onReorderMember}: Props) => {
   const {t} = useTranslation();
   const fs = (s: number) => Math.round(s * (T.textScale || 1));
   const [memberTab, setMemberTab] = useState<'active' | 'archived'>('active');
   const [query, setQuery] = useState('');
-  const [expanded, setExpanded] = useState<string | null>(null);
   const [activeGroup, setActiveGroup] = useState<string | null>(null);
   const [activeTag, setActiveTag] = useState<string | null>(null);
   const [showManageGroups, setShowManageGroups] = useState(false);
@@ -57,11 +69,8 @@ export const MembersScreen = ({theme: T, members, front, groups, initialSortMode
   const [newGroupColor, setNewGroupColor] = useState(PALETTE[0]);
   const [editGroupId, setEditGroupId] = useState<string | null>(null);
   const [editGroupName, setEditGroupName] = useState('');
-  const [fieldDefs, setFieldDefs] = useState<CustomFieldDef[]>([]);
-
-  useEffect(() => {
-    store.get<CustomFieldDef[]>(KEYS.customFieldDefs, []).then(d => setFieldDefs(d || []));
-  }, [expanded]);
+  // (Custom field defs are now loaded by MemberModal directly when it opens.
+  // We don't need to mirror them here anymore.)
 
   const tabMembers = members.filter(m => memberTab === 'archived' ? m.archived : !m.archived);
   const allFrontIds = new Set(allFrontMemberIds(front));
@@ -108,7 +117,7 @@ export const MembersScreen = ({theme: T, members, front, groups, initialSortMode
     const isLast = index === filtered.length - 1;
     return (
       <TouchableOpacity activeOpacity={0.75} style={[s.card, {backgroundColor: T.card, borderColor: isFronting ? `${m.color}60` : T.border, marginBottom: 8}]}
-        onPress={() => setExpanded(expanded === m.id ? null : m.id)}>
+        onPress={() => (onView || onEdit)(m)}>
         <View style={{flexDirection: 'row', alignItems: 'center', gap: 14}}>
           {showReorder && (
             <View style={{justifyContent: 'center', gap: 2, marginRight: -6}}>
@@ -132,64 +141,10 @@ export const MembersScreen = ({theme: T, members, front, groups, initialSortMode
                 {memberGroups.map(g => (<View key={g.id} style={{flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 6, paddingVertical: 1, borderRadius: 999, backgroundColor: `${g.color || T.accent}15`}}><View style={{width: 5, height: 5, borderRadius: 2.5, backgroundColor: g.color || T.accent}} /><Text style={{fontSize: fs(10), color: g.color || T.accent}}>{g.name}</Text></View>))}
               </View>
             )}
-            {m.description && expanded !== m.id ? <Text style={{fontSize: fs(11), color: T.muted, marginTop: 3}} numberOfLines={1}>{m.description}</Text> : null}
+            {m.description ? <Text style={{fontSize: fs(11), color: T.muted, marginTop: 3}} numberOfLines={1}>{m.description}</Text> : null}
           </View>
           <TouchableOpacity onPress={() => onEdit(m)} hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}><Text style={{fontSize: fs(14), color: T.muted}}>✎</Text></TouchableOpacity>
         </View>
-        {expanded === m.id && (
-          <View style={{marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: T.border}}>
-            {m.banner ? (
-              <Image source={{uri: m.banner}} style={{width: '100%', aspectRatio: 3, borderRadius: 8, marginBottom: 12, backgroundColor: T.surface}} resizeMode="cover" />
-            ) : null}
-            {(m.tags || []).length > 0 && (
-              <View style={{flexDirection: 'row', flexWrap: 'wrap', gap: 5, marginBottom: m.description ? 10 : 0}}>
-                {(m.tags || []).map(tag => (<View key={tag} style={{paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999, backgroundColor: `${T.info}12`, borderWidth: 1, borderColor: `${T.info}30`}}><Text style={{fontSize: fs(11), color: T.info}}>{tag}</Text></View>))}
-              </View>
-            )}
-            {m.description ? <RichText text={m.description} T={T} /> : null}
-            {/* Custom field values, read-only */}
-            {(() => {
-              const cfValues = (m.customFields || []).filter(cv => cv.value !== '' && cv.value !== null && cv.value !== undefined);
-              if (cfValues.length === 0 || fieldDefs.length === 0) return null;
-              const visible = cfValues
-                .map(cv => ({def: fieldDefs.find(fd => fd.id === cv.fieldId), value: cv.value}))
-                .filter(x => x.def);
-              if (visible.length === 0) return null;
-              return (
-                <View style={{marginTop: m.description ? 12 : 0, paddingTop: 10, borderTopWidth: 1, borderTopColor: `${T.border}80`}}>
-                  <Text style={{fontSize: fs(10), letterSpacing: 1, textTransform: 'uppercase', color: T.dim, fontWeight: '600', marginBottom: 8}}>{t('customFields.title')}</Text>
-                  {visible.map(({def, value}) => {
-                    const fd = def!;
-                    const isMarkdown = fd.type === 'markdown' || (fd.type === 'text' && fd.markdown);
-                    const isToggle = fd.type === 'toggle';
-                    const isColor = fd.type === 'color';
-                    return (
-                      <View key={fd.id} style={{marginBottom: 8}}>
-                        <Text style={{fontSize: fs(10), color: T.dim, fontWeight: '600', marginBottom: 2}}>{fd.name}</Text>
-                        {isMarkdown ? (
-                          <RichText text={String(value)} T={T} />
-                        ) : isToggle ? (
-                          <Text style={{fontSize: fs(13), color: T.text}}>{value ? '✓' : '—'}</Text>
-                        ) : isColor ? (
-                          <View style={{flexDirection: 'row', alignItems: 'center', gap: 8}}>
-                            <View style={{width: 16, height: 16, borderRadius: 4, backgroundColor: String(value), borderWidth: 1, borderColor: T.border}} />
-                            <Text style={{fontSize: fs(13), color: T.text, fontFamily: 'monospace'}}>{String(value)}</Text>
-                          </View>
-                        ) : (
-                          <Text style={{fontSize: fs(13), color: T.text}}>{String(value)}</Text>
-                        )}
-                      </View>
-                    );
-                  })}
-                </View>
-              );
-            })()}
-            <TouchableOpacity onPress={() => onEdit(m)} activeOpacity={0.7}
-              style={{alignSelf: 'flex-start', marginTop: 12, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6, borderWidth: 1, borderColor: `${T.accent}40`, backgroundColor: T.accentBg}}>
-              <Text style={{fontSize: fs(12), color: T.accent, fontWeight: '500'}}>✎ {t('common.edit', {defaultValue: 'Edit'})}</Text>
-            </TouchableOpacity>
-          </View>
-        )}
       </TouchableOpacity>
     );
   };
@@ -323,8 +278,7 @@ export const MembersScreen = ({theme: T, members, front, groups, initialSortMode
       data={filtered}
       renderItem={renderMember}
       keyExtractor={(m: Member) => m.id}
-      estimatedItemSize={120}
-      extraData={{expanded, T, front, groups, showReorder, filteredLength: filtered.length}}
+      extraData={{T, front, groups, showReorder, filteredLength: filtered.length}}
       contentContainerStyle={{padding: 16, paddingBottom: 32, backgroundColor: T.bg}}
       keyboardShouldPersistTaps="handled"
       ListHeaderComponent={ListHeader}

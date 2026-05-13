@@ -54,7 +54,7 @@ const getGPSLocation = (): Promise<string | null> =>
             const {latitude, longitude} = pos.coords;
             const res = await fetch(
               `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json&zoom=10`,
-              {headers: {'User-Agent': 'PluralStar/1.0'}},
+              {headers: {'User-Agent': 'PluralStar/1.7.0'}},
             );
             const data = await res.json();
             const a = data.address || {};
@@ -75,6 +75,10 @@ function MainAppContent() {
   const [firstRun, setFirstRun] = useState(false);
   const [tab, setTab] = useState<Tab>('front');
   const [hubResetKey, setHubResetKey] = useState(0);
+  // When the user taps Edit on a front-history row in the History tab, we jump
+  // to Hub > Retroactive in edit-mode for that index. Cleared on back-out or
+  // tab change so we don't snap back into the edit screen unexpectedly.
+  const [editHistoryIndex, setEditHistoryIndex] = useState<number | null>(null);
   const [system, setSystem] = useState<SystemInfo>({name: '', description: ''});
   const [members, setMembers] = useState<Member[]>([]);
   const [front, setFront] = useState<FrontState | null>(null);
@@ -93,6 +97,10 @@ function MainAppContent() {
   const [editTier, setEditTier] = useState<FrontTierKey>('primary');
   const [showMember, setShowMember] = useState(false);
   const [editMember, setEditMember] = useState<Member | null>(null);
+  // viewOnlyMember: when true, the MemberModal opens in read-only mode (tapping
+  // a member card). When false (default), it opens in editable mode (tapping
+  // the pencil ✎ on a card, or pressing "Add Member").
+  const [viewOnlyMember, setViewOnlyMember] = useState(false);
   const [showJournal, setShowJournal] = useState(false);
   const [editJournal, setEditJournal] = useState<JournalEntry | null>(null);
   const [showSystem, setShowSystem] = useState(false);
@@ -567,7 +575,11 @@ function MainAppContent() {
       case 'front':
         return <FrontScreen theme={C} front={front} getMember={getMember} onSetFront={() => setShowSetFront(true)} onEditDetails={handleEditDetails} />;
       case 'members':
-        return <MembersScreen theme={C} members={members} front={front} groups={groups} initialSortMode={appSettings.memberSortMode} onAdd={() => {setEditMember(null); setShowMember(true);}} onEdit={m => {setEditMember(m); setShowMember(true);}} onSaveGroups={saveGroups} onSaveSortMode={async (mode) => {const next = {...appSettings, memberSortMode: mode}; setAppSettings(next); await store.set(KEYS.settings, next);}} onReorderMember={async (id, direction) => {
+        return <MembersScreen theme={C} members={members} front={front} groups={groups} initialSortMode={appSettings.memberSortMode}
+          onAdd={() => {setEditMember(null); setViewOnlyMember(false); setShowMember(true);}}
+          onEdit={m => {setEditMember(m); setViewOnlyMember(false); setShowMember(true);}}
+          onView={m => {setEditMember(m); setViewOnlyMember(true); setShowMember(true);}}
+          onSaveGroups={saveGroups} onSaveSortMode={async (mode) => {const next = {...appSettings, memberSortMode: mode}; setAppSettings(next); await store.set(KEYS.settings, next);}} onReorderMember={async (id, direction) => {
           const active = members.filter(m => !m.archived);
           const archived = members.filter(m => m.archived);
           const needsInit = active.some(m => m.sortOrder === undefined);
@@ -582,11 +594,11 @@ function MainAppContent() {
           await saveMembers([...reindexed, ...archived]);
         }} />;
       case 'hub':
-        return <HubScreen theme={C} members={members} history={history} front={front} onSaveHistory={saveHistory} onSetFront={handleHubSetFront} renderShareScreen={renderShareScreen} renderStatsScreen={renderStatsScreen} renderChatScreen={renderChatScreen} renderCustomFieldsScreen={renderCustomFieldsScreen} renderPollsScreen={renderPollsScreen} resetKey={hubResetKey} />;
+        return <HubScreen theme={C} members={members} history={history} front={front} onSaveHistory={saveHistory} onSetFront={handleHubSetFront} renderShareScreen={renderShareScreen} renderStatsScreen={renderStatsScreen} renderChatScreen={renderChatScreen} renderCustomFieldsScreen={renderCustomFieldsScreen} renderPollsScreen={renderPollsScreen} resetKey={hubResetKey} editHistoryIndex={editHistoryIndex} onClearEditHistory={() => setEditHistoryIndex(null)} />;
       case 'journal':
         return <JournalScreen theme={C} journal={journal} members={members} systemJournalPassword={system.journalPassword} onAdd={() => {setEditJournal(null); setShowJournal(true);}} onEdit={e => {setEditJournal(e); setShowJournal(true);}} onDelete={deleteEntry} />;
       case 'history':
-        return <HistoryScreen theme={C} history={history} journal={journal} getMember={getMember} members={members} onSaveHistory={saveHistory} />;
+        return <HistoryScreen theme={C} history={history} journal={journal} getMember={getMember} members={members} onSaveHistory={saveHistory} onEditEntry={(idx: number) => {setEditHistoryIndex(idx); setTab('hub');}} />;
     }
   };
 
@@ -623,10 +635,11 @@ function MainAppContent() {
           onSave={async (mood: string, location: string, note: string) => {await updateFrontDetails(editTier, mood, location, note); setShowEditFrontDetail(false);}}
           onClose={() => setShowEditFrontDetail(false)} />
       )}
-      <MemberModal key={editMember?.id || 'new-member'} visible={showMember} theme={C} member={editMember} members={members} groups={groups} settings={appSettings}
-        onSave={async (m: Member) => {await saveMember(m); setShowMember(false); setEditMember(null);}}
-        onDelete={async (id: string) => {await deleteMember(id); setShowMember(false); setEditMember(null);}}
-        onClose={() => {setShowMember(false); setEditMember(null);}} />
+      <MemberModal key={`${editMember?.id || 'new-member'}-${viewOnlyMember ? 'view' : 'edit'}`} visible={showMember} theme={C} member={editMember} members={members} groups={groups} settings={appSettings}
+        readOnly={viewOnlyMember}
+        onSave={async (m: Member) => {await saveMember(m); setShowMember(false); setEditMember(null); setViewOnlyMember(false);}}
+        onDelete={async (id: string) => {await deleteMember(id); setShowMember(false); setEditMember(null); setViewOnlyMember(false);}}
+        onClose={() => {setShowMember(false); setEditMember(null); setViewOnlyMember(false);}} />
       <JournalModal visible={showJournal} theme={C} entry={editJournal} members={members}
         onSave={async (e: JournalEntry) => {await saveEntry(e); setShowJournal(false);}}
         onClose={() => setShowJournal(false)} />
@@ -642,7 +655,16 @@ function MainAppContent() {
 }
 
 export default function App() {
-  return (<SafeAreaProvider><MainAppContent /></SafeAreaProvider>);
+  // No GestureHandlerRootView / BottomSheetModalProvider wrappers are needed
+  // anymore — those existed only to feed @gorhom/bottom-sheet, which has been
+  // replaced by @lodev09/react-native-true-sheet (a native sheet that doesn't
+  // touch react-native-gesture-handler or reanimated for its presentation).
+  // SafeAreaProvider stays so useSafeAreaInsets() still works app-wide.
+  return (
+    <SafeAreaProvider>
+      <MainAppContent />
+    </SafeAreaProvider>
+  );
 }
 
 const styles = StyleSheet.create({

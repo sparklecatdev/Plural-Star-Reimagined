@@ -33,9 +33,11 @@ const Avatar = ({
   T: any;
 }) => {
   if (member?.avatar) {
+    // `elevation` is a View-only style in current RN typings, so the pulse-glow
+    // wrapping moved from the Image onto an outer View. Image keeps the
+    // size/shape; the wrapper provides the shadow + Android elevation.
     return (
-      <Image
-        source={{uri: member.avatar}}
+      <View
         style={{
           width: size,
           height: size,
@@ -44,8 +46,12 @@ const Avatar = ({
           shadowOpacity: pulse ? 0.5 : 0,
           shadowRadius: pulse ? 8 : 0,
           elevation: pulse ? 4 : 0,
-        }}
-      />
+        }}>
+        <Image
+          source={{uri: member.avatar}}
+          style={{width: size, height: size, borderRadius: size / 2}}
+        />
+      </View>
     );
   }
 

@@ -1,4 +1,4 @@
-import RNFS from 'react-native-fs';
+import ReactNativeBlobUtil from 'react-native-blob-util';
 import {Image} from 'react-native';
 
 let ImageEditor: any = null;
@@ -8,16 +8,16 @@ try {
   ImageEditor = null;
 }
 
-const AVATAR_DIR = `${RNFS.DocumentDirectoryPath}/ps_avatars`;
-const CHAT_MEDIA_DIR = `${RNFS.DocumentDirectoryPath}/ps_chat_media`;
-const BIO_IMAGE_DIR = `${RNFS.DocumentDirectoryPath}/ps_bio_images`;
+const AVATAR_DIR = `${ReactNativeBlobUtil.fs.dirs.DocumentDir}/ps_avatars`;
+const CHAT_MEDIA_DIR = `${ReactNativeBlobUtil.fs.dirs.DocumentDir}/ps_chat_media`;
+const BIO_IMAGE_DIR = `${ReactNativeBlobUtil.fs.dirs.DocumentDir}/ps_bio_images`;
 
 const BANNER_WIDTH = 900;
 const BANNER_HEIGHT = 300;
 
 const ensureDir = async (dir: string) => {
-  const exists = await RNFS.exists(dir);
-  if (!exists) await RNFS.mkdir(dir);
+  const exists = await ReactNativeBlobUtil.fs.exists(dir);
+  if (!exists) await ReactNativeBlobUtil.fs.mkdir(dir);
 };
 
 export const saveAvatar = async (memberId: string, base64: string): Promise<string> => {
@@ -32,7 +32,7 @@ export const saveAvatar = async (memberId: string, base64: string): Promise<stri
   else if (raw.startsWith('R0lGO')) ext = 'gif';
   else if (raw.startsWith('UklGR')) ext = 'webp';
   const path = `${AVATAR_DIR}/${memberId}.${ext}`;
-  await RNFS.writeFile(path, raw, 'base64');
+  await ReactNativeBlobUtil.fs.writeFile(path, raw, 'base64');
   return `file://${path}?t=${Date.now()}`;
 };
 
@@ -48,7 +48,7 @@ export const saveBannerFromBase64 = async (memberId: string, base64: string): Pr
   else if (raw.startsWith('R0lGO')) ext = 'gif';
   else if (raw.startsWith('UklGR')) ext = 'webp';
   const path = `${BIO_IMAGE_DIR}/banner-${memberId}.${ext}`;
-  await RNFS.writeFile(path, raw, 'base64');
+  await ReactNativeBlobUtil.fs.writeFile(path, raw, 'base64');
   return `file://${path}?t=${Date.now()}`;
 };
 
@@ -59,13 +59,15 @@ export const saveAvatarFromUrl = async (memberId: string, url: string): Promise<
     const urlExt = url.split('?')[0].split('.').pop()?.toLowerCase() || '';
     const ext = ['png', 'gif', 'webp'].includes(urlExt) ? urlExt : 'jpg';
     const path = `${AVATAR_DIR}/${memberId}.${ext}`;
-    const result = await RNFS.downloadFile({fromUrl: url, toFile: path}).promise;
-    if (result.statusCode === 200) return `file://${path}?t=${Date.now()}`;
+    // blob-util's download = config({path}).fetch('GET', url). Status lives on
+    // result.info().status rather than the RNFS-style .statusCode.
+    const result = await ReactNativeBlobUtil.config({path, fileCache: false}).fetch('GET', url);
+    if (result.info().status === 200) return `file://${path}?t=${Date.now()}`;
     return undefined;
   } catch { return undefined; }
 };
 
-const BANNER_DIR = `${RNFS.DocumentDirectoryPath}/ps_banners`;
+const BANNER_DIR = `${ReactNativeBlobUtil.fs.dirs.DocumentDir}/ps_banners`;
 
 export const saveBannerFromUrl = async (memberId: string, url: string): Promise<string | undefined> => {
   if (!url || !url.startsWith('http')) return undefined;
@@ -74,8 +76,8 @@ export const saveBannerFromUrl = async (memberId: string, url: string): Promise<
     const urlExt = url.split('?')[0].split('.').pop()?.toLowerCase() || '';
     const ext = ['png', 'gif', 'webp'].includes(urlExt) ? urlExt : 'jpg';
     const path = `${BANNER_DIR}/${memberId}.${ext}`;
-    const result = await RNFS.downloadFile({fromUrl: url, toFile: path}).promise;
-    if (result.statusCode === 200) return `file://${path}?t=${Date.now()}`;
+    const result = await ReactNativeBlobUtil.config({path, fileCache: false}).fetch('GET', url);
+    if (result.info().status === 200) return `file://${path}?t=${Date.now()}`;
     return undefined;
   } catch { return undefined; }
 };
@@ -84,8 +86,8 @@ export const deleteAvatar = async (memberId: string): Promise<void> => {
   try {
     for (const ext of ['jpg', 'png', 'gif', 'webp']) {
       const path = `${AVATAR_DIR}/${memberId}.${ext}`;
-      const exists = await RNFS.exists(path);
-      if (exists) { await RNFS.unlink(path); break; }
+      const exists = await ReactNativeBlobUtil.fs.exists(path);
+      if (exists) { await ReactNativeBlobUtil.fs.unlink(path); break; }
     }
   } catch {}
 };
@@ -95,7 +97,7 @@ export const saveChatMedia = async (messageId: string, base64: string, ext: stri
   const raw = base64.includes(',') ? base64.split(',')[1] : base64;
   const safeExt = ext.replace(/[^a-zA-Z0-9]/g, '') || 'bin';
   const path = `${CHAT_MEDIA_DIR}/${messageId}.${safeExt}`;
-  await RNFS.writeFile(path, raw, 'base64');
+  await ReactNativeBlobUtil.fs.writeFile(path, raw, 'base64');
   return `file://${path}?t=${Date.now()}`;
 };
 
@@ -119,7 +121,7 @@ export const saveBioImage = async (
   const raw = base64.includes(',') ? base64.split(',')[1] : base64;
   const safeExt = ext.replace(/[^a-zA-Z0-9]/g, '') || 'bin';
   const path = `${BIO_IMAGE_DIR}/${imageId}.${safeExt}`;
-  await RNFS.writeFile(path, raw, 'base64');
+  await ReactNativeBlobUtil.fs.writeFile(path, raw, 'base64');
   return `file://${path}?t=${Date.now()}`;
 };
 
@@ -134,7 +136,7 @@ export const saveBannerImage = async (
 ): Promise<string> => {
   await ensureDir(BIO_IMAGE_DIR);
   const destPath = `${BIO_IMAGE_DIR}/${imageId}.png`;
-  try { await RNFS.unlink(destPath); } catch {}
+  try { await ReactNativeBlobUtil.fs.unlink(destPath); } catch {}
   try {
     if (!ImageEditor || !ImageEditor.cropImage) throw new Error('ImageEditor unavailable');
     const {width: srcW, height: srcH} = await getImageSize(sourceUri);
@@ -161,13 +163,13 @@ export const saveBannerImage = async (
       quality: 0.9,
     });
     const croppedPath = (cropped as any).uri ? (cropped as any).uri.replace('file://', '') : String(cropped).replace('file://', '');
-    await RNFS.copyFile(croppedPath, destPath);
-    try { await RNFS.unlink(croppedPath); } catch {}
+    await ReactNativeBlobUtil.fs.cp(croppedPath, destPath);
+    try { await ReactNativeBlobUtil.fs.unlink(croppedPath); } catch {}
     return `file://${destPath}?t=${Date.now()}`;
   } catch {
     const readPath = sourceUri.replace('file://', '');
-    const raw = await RNFS.readFile(readPath, 'base64');
-    await RNFS.writeFile(destPath, raw, 'base64');
+    const raw = await ReactNativeBlobUtil.fs.readFile(readPath, 'base64');
+    await ReactNativeBlobUtil.fs.writeFile(destPath, raw, 'base64');
     return `file://${destPath}?t=${Date.now()}`;
   }
 };
@@ -222,16 +224,16 @@ export const migrateInlineChatMedia = async (messages: any[]): Promise<{messages
 
 export const clearAllMedia = async (): Promise<void> => {
   try {
-    const avatarExists = await RNFS.exists(AVATAR_DIR);
-    if (avatarExists) await RNFS.unlink(AVATAR_DIR);
-    const chatExists = await RNFS.exists(CHAT_MEDIA_DIR);
-    if (chatExists) await RNFS.unlink(CHAT_MEDIA_DIR);
-    const bioExists = await RNFS.exists(BIO_IMAGE_DIR);
-    if (bioExists) await RNFS.unlink(BIO_IMAGE_DIR);
+    const avatarExists = await ReactNativeBlobUtil.fs.exists(AVATAR_DIR);
+    if (avatarExists) await ReactNativeBlobUtil.fs.unlink(AVATAR_DIR);
+    const chatExists = await ReactNativeBlobUtil.fs.exists(CHAT_MEDIA_DIR);
+    if (chatExists) await ReactNativeBlobUtil.fs.unlink(CHAT_MEDIA_DIR);
+    const bioExists = await ReactNativeBlobUtil.fs.exists(BIO_IMAGE_DIR);
+    if (bioExists) await ReactNativeBlobUtil.fs.unlink(BIO_IMAGE_DIR);
     // Also wipe ps_banners. saveBannerFromUrl writes here when a member's banner
     // comes in via PluralKit/SP import, and prior to this fix Delete Account
     // left those banner files on disk — a privacy regression vs the user's intent.
-    const bannerExists = await RNFS.exists(BANNER_DIR);
-    if (bannerExists) await RNFS.unlink(BANNER_DIR);
+    const bannerExists = await ReactNativeBlobUtil.fs.exists(BANNER_DIR);
+    if (bannerExists) await ReactNativeBlobUtil.fs.unlink(BANNER_DIR);
   } catch {}
 };

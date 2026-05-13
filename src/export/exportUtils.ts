@@ -1,6 +1,6 @@
 // src/export/exportUtils.ts
 import {Alert, Linking, Platform} from 'react-native';
-import RNFS from 'react-native-fs';
+import ReactNativeBlobUtil from 'react-native-blob-util';
 import Share from 'react-native-share';
 import i18n from '../i18n/i18n';
 import {
@@ -83,7 +83,7 @@ export const buildExportPayload = async (
       } else {
         try {
           const filePath = m.avatar.replace(/\?.*$/, '').replace(/^file:\/\//, '');
-          const b64 = await RNFS.readFile(filePath, 'base64');
+          const b64 = await ReactNativeBlobUtil.fs.readFile(filePath, 'base64');
           let mime = 'image/jpeg';
           if (b64.startsWith('iVBOR')) mime = 'image/png';
           else if (b64.startsWith('R0lGO')) mime = 'image/gif';
@@ -103,7 +103,7 @@ export const buildExportPayload = async (
       } else {
         try {
           const filePath = m.banner.replace(/\?.*$/, '').replace(/^file:\/\//, '');
-          const b64 = await RNFS.readFile(filePath, 'base64');
+          const b64 = await ReactNativeBlobUtil.fs.readFile(filePath, 'base64');
           let mime = 'image/png';
           if (b64.startsWith('/9j/')) mime = 'image/jpeg';
           else if (b64.startsWith('R0lGO')) mime = 'image/gif';
@@ -246,11 +246,14 @@ const dateSlug = () => new Date().toISOString().slice(0, 10);
 
 const saveToDownloads = async (content: string, filename: string): Promise<void> => {
   const isAndroid = Platform.OS === 'android';
+  // blob-util's `dirs.CacheDir` is the cross-platform analogue of RNFS's
+  // TemporaryDirectoryPath (which was iOS-only and undefined on Android).
+  // Since CacheDir always exists, the `|| DocumentDir` fallback is no longer needed.
   const basePath = isAndroid
-    ? RNFS.DownloadDirectoryPath
-    : RNFS.TemporaryDirectoryPath || RNFS.DocumentDirectoryPath;
+    ? ReactNativeBlobUtil.fs.dirs.DownloadDir
+    : ReactNativeBlobUtil.fs.dirs.CacheDir;
   const path = `${basePath}/${filename}`;
-  await RNFS.writeFile(path, content, 'utf8');
+  await ReactNativeBlobUtil.fs.writeFile(path, content, 'utf8');
   if (isAndroid) {
     Alert.alert(
       i18n.t('share.savedToDownloads'),

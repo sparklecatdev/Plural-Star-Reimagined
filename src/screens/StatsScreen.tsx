@@ -3,6 +3,7 @@ import {View, Text, ScrollView, TouchableOpacity} from 'react-native';
 import {useTranslation} from 'react-i18next';
 import {Fonts} from '../theme';
 import {Member, HistoryEntry, ChatMessage, fmtDur, getInitials, translateMood} from '../utils';
+import {DateTimeEditor} from '../components/DateTimeEditor';
 
 const Avatar = ({member, size = 28, T}: {member?: Member | null; size?: number; T: any}) => (
   <View style={{width: size, height: size, borderRadius: size / 2, backgroundColor: member?.color || T.toggleOff,
@@ -31,12 +32,24 @@ export const StatsScreen = ({theme: T, history, members, chatMessages}: Props) =
   const rangeStart = useMemo(() => {
     if (range === '7d') return Date.now() - 7 * 86400000;
     if (range === '30d') return Date.now() - 30 * 86400000;
-    if (range === 'custom') return customStart;
+    if (range === 'custom') {
+      // Normalize to start-of-day so picking "May 1" includes everything from
+      // 00:00 May 1 forward, not just events after the moment the user tapped.
+      const d = new Date(customStart);
+      d.setHours(0, 0, 0, 0);
+      return d.getTime();
+    }
     return 0;
   }, [range, customStart]);
 
   const rangeEnd = useMemo(() => {
-    if (range === 'custom') return customEnd;
+    if (range === 'custom') {
+      // End-of-day for the end date — picking "May 5" should include all of
+      // May 5 events, not stop at midnight at the start of May 5.
+      const d = new Date(customEnd);
+      d.setHours(23, 59, 59, 999);
+      return d.getTime();
+    }
     return Date.now();
   }, [range, customEnd]);
 
@@ -198,7 +211,66 @@ export const StatsScreen = ({theme: T, history, members, chatMessages}: Props) =
         <RangeBtn id="all" label={t('stats.allTime')} />
         <RangeBtn id="7d" label={t('stats.last7')} />
         <RangeBtn id="30d" label={t('stats.last30')} />
+        <RangeBtn id="custom" label={t('stats.customRange', {defaultValue: 'Custom'})} />
       </View>
+
+      {range === 'custom' && (
+        <View style={{backgroundColor: T.card, borderRadius: 10, borderWidth: 1, borderColor: T.border, padding: 12, marginBottom: 16}}>
+          <DateTimeEditor
+            date={new Date(customStart)}
+            onChange={d => {
+              // Guard against the user picking a start after the current end.
+              // Bump the end forward to keep the range non-empty.
+              const t0 = d.getTime();
+              setCustomStart(t0);
+              if (t0 > customEnd) setCustomEnd(t0);
+            }}
+            mode="date"
+            label={t('stats.rangeStart', {defaultValue: 'Start date'})}
+            T={T}
+          />
+          <DateTimeEditor
+            date={new Date(customEnd)}
+            onChange={d => {
+              const t1 = d.getTime();
+              setCustomEnd(t1);
+              if (t1 < customStart) setCustomStart(t1);
+            }}
+            mode="date"
+            label={t('stats.rangeEnd', {defaultValue: 'End date'})}
+            T={T}
+          />
+          <View style={{flexDirection: 'row', gap: 8, marginTop: 4}}>
+            <TouchableOpacity onPress={() => {
+              const now = Date.now();
+              setCustomStart(now - 30 * 86400000);
+              setCustomEnd(now);
+            }} activeOpacity={0.7}
+              style={{flex: 1, alignItems: 'center', paddingVertical: 8, borderRadius: 8, borderWidth: 1, backgroundColor: T.surface, borderColor: T.border}}>
+              <Text style={{fontSize: fs(11), color: T.dim}}>{t('stats.last30')}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => {
+              // "This month" — first of the current month to today.
+              const now = new Date();
+              const start = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+              setCustomStart(start);
+              setCustomEnd(Date.now());
+            }} activeOpacity={0.7}
+              style={{flex: 1, alignItems: 'center', paddingVertical: 8, borderRadius: 8, borderWidth: 1, backgroundColor: T.surface, borderColor: T.border}}>
+              <Text style={{fontSize: fs(11), color: T.dim}}>{t('stats.thisMonth', {defaultValue: 'This month'})}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => {
+              // "This year" — Jan 1 of the current year to today.
+              const start = new Date(new Date().getFullYear(), 0, 1).getTime();
+              setCustomStart(start);
+              setCustomEnd(Date.now());
+            }} activeOpacity={0.7}
+              style={{flex: 1, alignItems: 'center', paddingVertical: 8, borderRadius: 8, borderWidth: 1, backgroundColor: T.surface, borderColor: T.border}}>
+              <Text style={{fontSize: fs(11), color: T.dim}}>{t('stats.thisYear', {defaultValue: 'This year'})}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
 
       <View style={{flexDirection: 'row', gap: 8, marginBottom: 16}}>
         <StatCard label={t('stats.totalTime')} value={fmtDur(0, stats.totalMs)} accent />

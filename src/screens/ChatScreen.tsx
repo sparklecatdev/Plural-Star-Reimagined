@@ -1,7 +1,7 @@
 import React, {useState, useEffect, useRef, useCallback} from 'react';
 import {View, Text, ScrollView, TouchableOpacity, TextInput, Alert, FlatList, Image, Linking, Platform} from 'react-native';
 import {useTranslation} from 'react-i18next';
-import RNFS from 'react-native-fs';
+import ReactNativeBlobUtil from 'react-native-blob-util';
 import Share from 'react-native-share';
 import {safePick, isPickerCancel, getPickedFilePath} from '../utils/safePicker';
 import {Fonts} from '../theme';
@@ -104,7 +104,7 @@ export const ChatScreen = ({theme: T, members, channels, onSaveChannels}: Props)
       const ext = fileName.split('.').pop()?.toLowerCase() || '';
       const imageExts = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp'];
       const isImage = imageExts.includes(ext);
-      const base64 = await RNFS.readFile(getPickedFilePath(res), 'base64');
+      const base64 = await ReactNativeBlobUtil.fs.readFile(getPickedFilePath(res), 'base64');
       const msgId = uid();
       const fileUri = await saveChatMedia(msgId, base64, ext);
       const msg: ChatMessage = {
@@ -166,11 +166,14 @@ export const ChatScreen = ({theme: T, members, channels, onSaveChannels}: Props)
   };
 
   const exportChannelSnapshot = async (filename: string, channel: ChatChannel, msgs: ChatMessage[]) => {
+    // blob-util's `dirs.CacheDir` always exists on both platforms, replacing the
+    // RNFS pattern of `TemporaryDirectoryPath || DocumentDirectoryPath` (the
+    // former was iOS-only, hence the fallback chain).
     const basePath = Platform.OS === 'android'
-      ? RNFS.DownloadDirectoryPath
-      : RNFS.TemporaryDirectoryPath || RNFS.DocumentDirectoryPath;
+      ? ReactNativeBlobUtil.fs.dirs.DownloadDir
+      : ReactNativeBlobUtil.fs.dirs.CacheDir;
     const path = `${basePath}/${filename}`;
-    await RNFS.writeFile(path, JSON.stringify({channel, messages: msgs}, null, 2), 'utf8');
+    await ReactNativeBlobUtil.fs.writeFile(path, JSON.stringify({channel, messages: msgs}, null, 2), 'utf8');
     if (Platform.OS === 'ios') {
       await Share.open({
         url: `file://${path}`,

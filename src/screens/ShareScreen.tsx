@@ -2,7 +2,7 @@ import React, {useState} from 'react';
 import {View, Text, ScrollView, TouchableOpacity, TextInput, Alert, StyleSheet, ActivityIndicator} from 'react-native';
 import {useTranslation} from 'react-i18next';
 import {safePick, isPickerCancel, getPickedFilePath} from '../utils/safePicker';
-import RNFS from 'react-native-fs';
+import ReactNativeBlobUtil from 'react-native-blob-util';
 import {exportJSON, exportHTML, exportEmail, exportAllJournalJSON, exportAllJournalTxt, exportAllJournalMd, ExportCategories} from '../export/exportUtils';
 import {store, KEYS, chatMsgKey, listRecoverableBackups, restoreFromBackup, RecoverableEntry} from '../storage';
 import {SystemInfo, Member, MemberGroup, FrontState, HistoryEntry, JournalEntry, ShareSettings, AppSettings, ExportPayload, CustomFieldDef, CustomFieldType, CustomFieldValue, uid, allFrontMemberIds, findOpenFrontInHistory} from '../utils';
@@ -29,7 +29,7 @@ export const ShareScreen = ({theme: T, system, members, front, history, journal,
   const [restoreSel, setRestoreSel] = useState({system: true, members: true, avatars: true, banners: true, journal: true, frontHistory: true, groups: true, chat: true, moods: true, palettes: true, settings: true, customFields: true, noteboards: true, polls: true});
   const [restoreError, setRestoreError] = useState('');
   const [restoreDone, setRestoreDone] = useState(false);
-  // Recover Data flow: scans the on-disk RNFS backup directory and lets the
+  // Recover Data flow: scans the on-disk backup directory and lets the
   // user pick which orphaned backups to restore. Used when AsyncStorage was
   // wiped (Samsung SQLite cap, force-stop on low storage, etc.) but the
   // on-disk backups survived.
@@ -79,9 +79,9 @@ export const ShareScreen = ({theme: T, system, members, front, history, journal,
       const ext = (res.name || '').split('.').pop()?.toLowerCase() || '';
       const titleBase = (res.name || 'Imported Entry').replace(/\.[^.]+$/, '');
       let body = '';
-      if (['txt', 'md', 'markdown'].includes(ext)) {body = await RNFS.readFile(getPickedFilePath(res), 'utf8');}
+      if (['txt', 'md', 'markdown'].includes(ext)) {body = await ReactNativeBlobUtil.fs.readFile(getPickedFilePath(res), 'utf8');}
       else if (ext === 'json') {
-        const raw = await RNFS.readFile(getPickedFilePath(res), 'utf8');
+        const raw = await ReactNativeBlobUtil.fs.readFile(getPickedFilePath(res), 'utf8');
         try { const parsed = JSON.parse(raw); if (parsed._meta?.app === 'Plural Space' || parsed._meta?.app === 'Plural Star') {setImportStatus('error'); setImportMsg(t('share.backupLooksLike')); return;} body = typeof parsed === 'string' ? parsed : JSON.stringify(parsed, null, 2);
         } catch {body = raw;}
       } else {setImportStatus('error'); setImportMsg(t('share.unsupportedFormat', {ext})); return;}
@@ -99,15 +99,15 @@ export const ShareScreen = ({theme: T, system, members, front, history, journal,
       // Read the file immediately while the document picker's temp copy is still
       // valid. On some Android devices (Motorola in particular) fileCopyUri can
       // be null, leaving getPickedFilePath returning a raw content:// URI that
-      // RNFS may not be able to read later from handleRestore. Reading eagerly
+      // the filesystem layer may not be able to read later from handleRestore. Reading eagerly
       // avoids that race and also avoids a stale-temp-file crash on those devices.
       const pickedPath = getPickedFilePath(res);
       let content: string;
       try {
-        content = await RNFS.readFile(pickedPath, 'utf8');
+        content = await ReactNativeBlobUtil.fs.readFile(pickedPath, 'utf8');
       } catch {
         // Last-resort: try the original uri in case getPickedFilePath lost something.
-        content = await RNFS.readFile(res.uri || res.fileCopyUri || pickedPath, 'utf8');
+        content = await ReactNativeBlobUtil.fs.readFile(res.uri || res.fileCopyUri || pickedPath, 'utf8');
       }
       // Quick sanity check — confirm it's a native Plural Star / Plural Space backup, OR
       // a Simply Plural raw-Mongo export (no _meta, has members[] with _id and a top-level
@@ -126,8 +126,8 @@ export const ShareScreen = ({theme: T, system, members, front, history, journal,
       }
       // Copy into a reliable app-internal temp path so handleRestore can always
       // read it regardless of what the OS does with the document picker's copy.
-      const safeTempPath = `${RNFS.TemporaryDirectoryPath}/ps_restore_pending.json`;
-      await RNFS.writeFile(safeTempPath, content, 'utf8');
+      const safeTempPath = `${ReactNativeBlobUtil.fs.dirs.CacheDir}/ps_restore_pending.json`;
+      await ReactNativeBlobUtil.fs.writeFile(safeTempPath, content, 'utf8');
       setRestorePath(safeTempPath);
       setRestoreFile(res.name || 'backup.json');
       setRestorePreview(true);
@@ -144,7 +144,7 @@ export const ShareScreen = ({theme: T, system, members, front, history, journal,
           // Re-read from disk now — the full payload is only in memory during processing
           // and is never stored in React state. This avoids holding 6MB+ in the component
           // tree the entire time the user is viewing the restore UI.
-          const content = await RNFS.readFile(restorePath, 'utf8');
+          const content = await ReactNativeBlobUtil.fs.readFile(restorePath, 'utf8');
           const rawData: any = JSON.parse(content);
 
           // Detect Simply Plural JSON export shape and route through SP pipeline if so.
@@ -387,9 +387,9 @@ export const ShareScreen = ({theme: T, system, members, front, history, journal,
           setRestoring(false);
           // Clean up our internal temp copy regardless of outcome.
           try {
-            const safeTempPath = `${RNFS.TemporaryDirectoryPath}/ps_restore_pending.json`;
-            const exists = await RNFS.exists(safeTempPath);
-            if (exists) await RNFS.unlink(safeTempPath);
+            const safeTempPath = `${ReactNativeBlobUtil.fs.dirs.CacheDir}/ps_restore_pending.json`;
+            const exists = await ReactNativeBlobUtil.fs.exists(safeTempPath);
+            if (exists) await ReactNativeBlobUtil.fs.unlink(safeTempPath);
           } catch {}
         }
       }},
@@ -637,10 +637,22 @@ export const ShareScreen = ({theme: T, system, members, front, history, journal,
             };
             const existingDefs = await store.get<CustomFieldDef[]>(KEYS.customFieldDefs, []) || [];
             const fieldIdMap: Record<string, string> = {};
+            // NAME-based fallback. We've seen SP responses where per-member
+            // `info` is keyed by something other than the customField's id
+            // (numeric order, alternative uuid, even names). Lowercased name
+            // → localFieldId is checked when the id lookup misses.
+            const fieldNameMap: Record<string, string> = {};
             const newDefs: CustomFieldDef[] = [];
             const cfIdDiag: string[] = [];
             extPreview.customFields.forEach((cf: any, i: number) => {
-              const candidates = [cf.id, cf.uuid, cf._id, cf.content?._id, cf.content?.id, cf.content?.uuid];
+              const candidates = [
+                cf.id, cf.uuid, cf._id,
+                cf.content?._id, cf.content?.id, cf.content?.uuid,
+                // Also try `order` and the array index — SP has been observed
+                // using these as the per-member info keys in some token shapes.
+                cf.content?.order, cf.order,
+                String(i),
+              ];
               const spIds = candidates.map(normId).filter(Boolean);
               const spName = cf.content?.name || cf.name || `Field ${i + 1}`;
               const spType = cf.content?.type ?? cf.type;
@@ -653,6 +665,7 @@ export const ShareScreen = ({theme: T, system, members, front, history, journal,
                 newDefs.push({id: localId, name: String(spName), type: SP_TYPE_MAP[String(spType)] || 'text', sortOrder: cf.content?.order ?? i});
               }
               spIds.forEach(k => { fieldIdMap[k] = localId; });
+              fieldNameMap[String(spName).toLowerCase().trim()] = localId;
               cfIdDiag.push(`${spName}:[${spIds.join('|')}]`);
             });
             if (newDefs.length > 0) {
@@ -660,18 +673,34 @@ export const ShareScreen = ({theme: T, system, members, front, history, journal,
             }
             const currentMembers = await store.get<Member[]>(KEYS.members, []) || [];
             let diagLogged = 0;
-            let wroteCount = 0;
+            let membersMatched = 0;       // resolved by idMap
+            let membersWithInfo = 0;      // had a populated info-shaped object
+            let totalInfoKeys = 0;
+            let matchedKeys = 0;
+            const unmatchedKeySamples = new Set<string>();
             const updatedMembers = currentMembers.map(lm => {
               const spMember = extPreview.members.find((sm: any) => {
                 const eid = isPK ? (sm.uuid || sm.id) : (sm._id || sm.id);
                 return eid && idMap[normId(eid)] === lm.id;
               });
               if (!spMember) return lm;
-              const info = spMember.content?.info || spMember.info;
+              membersMatched++;
+              // SP per-member CF data has historically lived at content.info,
+              // but older / alternative shapes use content.fields, top-level
+              // info, or top-level customFields. Try them all.
+              const info =
+                spMember.content?.info ||
+                spMember.info ||
+                spMember.content?.fields ||
+                spMember.fields ||
+                spMember.content?.customFields ||
+                spMember.customFields;
               if (!info || typeof info !== 'object') return lm;
+              membersWithInfo++;
               const existingCF: CustomFieldValue[] = lm.customFields || [];
               const newCF: CustomFieldValue[] = [...existingCF];
               const entries = Object.entries(info);
+              totalInfoKeys += entries.length;
               if (diagLogged < 2) {
                 const memberName = spMember.content?.name || spMember.name || '(unknown)';
                 const infoKeys = entries.map(([k]) => k);
@@ -679,10 +708,17 @@ export const ShareScreen = ({theme: T, system, members, front, history, journal,
                 console.log(`[CF-IMPORT] member="${memberName}" infoKeys=[${infoKeys.join(',')}] shapes=[${infoShapes.join(' ')}] cfMap=[${cfIdDiag.join(' ')}]`);
                 diagLogged++;
               }
-              let localWrote = 0;
               entries.forEach(([spFieldId, rawValue]) => {
-                const localFieldId = fieldIdMap[normId(spFieldId)] || fieldIdMap[spFieldId];
-                if (!localFieldId) return;
+                const norm = normId(spFieldId);
+                // 1) normalized id lookup, 2) raw key lookup, 3) name fallback.
+                const localFieldId =
+                  fieldIdMap[norm] ||
+                  fieldIdMap[spFieldId] ||
+                  fieldNameMap[String(spFieldId).toLowerCase().trim()];
+                if (!localFieldId) {
+                  if (unmatchedKeySamples.size < 6) unmatchedKeySamples.add(spFieldId);
+                  return;
+                }
                 let value: any = rawValue;
                 if (value && typeof value === 'object' && !Array.isArray(value)) {
                   if ('value' in value) value = (value as any).value;
@@ -694,13 +730,30 @@ export const ShareScreen = ({theme: T, system, members, front, history, journal,
                 const existingIdx = newCF.findIndex(cv => cv.fieldId === localFieldId);
                 if (existingIdx >= 0) newCF[existingIdx] = {fieldId: localFieldId, value: valStr as any};
                 else newCF.push({fieldId: localFieldId, value: valStr as any});
-                localWrote++;
+                matchedKeys++;
               });
-              if (localWrote > 0) wroteCount++;
               return {...lm, customFields: newCF};
             });
-            console.log(`[CF-IMPORT] wrote CF values to ${wroteCount}/${currentMembers.length} members`);
+            console.log(`[CF-IMPORT] matched=${membersMatched}/${currentMembers.length} withInfo=${membersWithInfo} totalKeys=${totalInfoKeys} written=${matchedKeys} unmatchedSamples=[${[...unmatchedKeySamples].join(',')}]`);
             await store.set(KEYS.members, updatedMembers);
+
+            // Surface a summary so the user can diagnose without logcat access.
+            // Pops only when the import looks suspicious: either no per-member
+            // info data at all, or info present but no keys resolved.
+            const suspicious = (membersWithInfo > 0 && matchedKeys === 0) ||
+                               (membersMatched > 0 && membersWithInfo === 0);
+            if (suspicious) {
+              const sampleStr = [...unmatchedKeySamples].slice(0, 5).join(', ');
+              const lines = [
+                `Members matched by ID: ${membersMatched} / ${currentMembers.length}`,
+                `Members with custom-field data attached: ${membersWithInfo}`,
+                `Custom-field keys seen: ${totalInfoKeys}, written: ${matchedKeys}`,
+                membersWithInfo === 0
+                  ? 'SimplyPlural did not return any per-member custom field data. The token may lack read access to member content, or your SP account stores CF data under a shape we do not recognize.'
+                  : `${totalInfoKeys - matchedKeys} keys did not match any of our field IDs/names. Sample unmatched keys: ${sampleStr || '(none)'}`,
+              ];
+              Alert.alert('Custom Fields — partial import', lines.join('\n\n'));
+            }
           }
           // Member groups import.
           // SP shape: [{id, content: {name, color, desc, members: [memberIds]}}, ...]
@@ -791,7 +844,7 @@ export const ShareScreen = ({theme: T, system, members, front, history, journal,
   const handleSPFileImport = async () => {
     try {
       const [res] = await safePick({type: ['application/json', 'text/plain']});
-      const content = await RNFS.readFile(getPickedFilePath(res), 'utf8');
+      const content = await ReactNativeBlobUtil.fs.readFile(getPickedFilePath(res), 'utf8');
       const data = JSON.parse(content);
       if (!data.members && !data.frontHistory && !data.users) {
         Alert.alert(t('share.importFailed'), t('share.notValidSPExport'));
@@ -1010,10 +1063,10 @@ export const ShareScreen = ({theme: T, system, members, front, history, journal,
     ]);
   };
 
-  // Scan the on-disk RNFS backup directory and present what's recoverable.
+  // Scan the on-disk backup directory and present what's recoverable.
   // The Recover Data flow is the last-line-of-defense for users whose
   // AsyncStorage was wiped (Samsung SQLite cap, system-level data clear, etc).
-  // RNFS backups survive AsyncStorage failures because they're separate file-system
+  // On-disk backups survive AsyncStorage failures because they're separate file-system
   // writes — the backup directory at DocumentDirectoryPath/ps_backup is independent.
   const handleScanRecovery = async () => {
     setRecoverScanning(true);

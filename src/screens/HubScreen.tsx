@@ -3,6 +3,7 @@ import {View, Text, ScrollView, TouchableOpacity, TextInput, Alert, Linking} fro
 import {useTranslation} from 'react-i18next';
 import {Fonts} from '../theme';
 import {Member, HistoryEntry, FrontState, FrontTierKey, fmtTime, fmtDur, getInitials, allFrontMemberIds} from '../utils';
+import {DateTimeEditor} from '../components/DateTimeEditor';
 
 const Avatar = ({member, size = 26, T}: {member?: Member | null; size?: number; T: any}) => (
   <View style={{width: size, height: size, borderRadius: size / 2, backgroundColor: member?.color || T.toggleOff,
@@ -26,78 +27,12 @@ interface Props {
   renderCustomFieldsScreen: () => React.ReactNode;
   renderPollsScreen: () => React.ReactNode;
   resetKey?: number;
+  // When set, the retroHistory tile opens directly in edit-mode for this
+  // history index. App.tsx sets this in response to the Edit button on a
+  // history row, then clears it when the user navigates away.
+  editHistoryIndex?: number | null;
+  onClearEditHistory?: () => void;
 }
-
-const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-
-const DateTimeEditor = ({date, onChange, label, T}: {date: Date; onChange: (d: Date) => void; label: string; T: any}) => {
-  const fs = (s: number) => Math.round(s * (T.textScale || 1));
-  const [expanded, setExpanded] = useState(false);
-  const month = date.getMonth();
-  const day = date.getDate();
-  const year = date.getFullYear();
-  const hours = date.getHours();
-  const minutes = date.getMinutes();
-  const isPM = hours >= 12;
-  const displayHour = hours % 12 || 12;
-
-  const adjust = (field: string, delta: number) => {
-    const d = new Date(date);
-    if (field === 'month') d.setMonth(d.getMonth() + delta);
-    else if (field === 'day') d.setDate(d.getDate() + delta);
-    else if (field === 'year') d.setFullYear(d.getFullYear() + delta);
-    else if (field === 'hour') d.setHours(d.getHours() + delta);
-    else if (field === 'minute') d.setMinutes(d.getMinutes() + delta);
-    else if (field === 'ampm') d.setHours(d.getHours() + (isPM ? -12 : 12));
-    onChange(d);
-  };
-
-  const Stepper = ({value, field, width}: {value: string; field: string; width: number}) => (
-    <View style={{alignItems: 'center', width}}>
-      <TouchableOpacity onPress={() => adjust(field, 1)} activeOpacity={0.6} style={{padding: 4}}>
-        <Text style={{fontSize: fs(14), color: T.dim}}>▲</Text>
-      </TouchableOpacity>
-      <View style={{backgroundColor: T.surface, borderWidth: 1, borderColor: T.border, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 6, minWidth: width, alignItems: 'center'}}>
-        <Text style={{fontSize: fs(14), color: T.text, fontWeight: '500', fontFamily: 'monospace'}}>{value}</Text>
-      </View>
-      <TouchableOpacity onPress={() => adjust(field, -1)} activeOpacity={0.6} style={{padding: 4}}>
-        <Text style={{fontSize: fs(14), color: T.dim}}>▼</Text>
-      </TouchableOpacity>
-    </View>
-  );
-
-  const fmtDateDisplay = (d: Date) => d.toLocaleDateString(undefined, {month: 'short', day: 'numeric', year: 'numeric'});
-  const fmtTimeDisplay = (d: Date) => d.toLocaleTimeString(undefined, {hour: 'numeric', minute: '2-digit'});
-
-  return (
-    <View style={{marginBottom: 14}}>
-      {label ? <Text style={{fontSize: fs(10), letterSpacing: 1, textTransform: 'uppercase', color: T.dim, marginBottom: 6, fontWeight: '600'}}>{label}</Text> : null}
-      <TouchableOpacity onPress={() => setExpanded(!expanded)} activeOpacity={0.7}
-        style={{flexDirection: 'row', gap: 8, padding: 10, borderRadius: 8, borderWidth: 1, backgroundColor: T.surface, borderColor: expanded ? `${T.accent}50` : T.border}}>
-        <Text style={{flex: 1, fontSize: fs(14), color: T.text}}>{fmtDateDisplay(date)}</Text>
-        <Text style={{fontSize: fs(14), color: T.text}}>{fmtTimeDisplay(date)}</Text>
-        <Text style={{fontSize: fs(12), color: T.dim}}>{expanded ? '▲' : '▼'}</Text>
-      </TouchableOpacity>
-      {expanded && (
-        <View style={{backgroundColor: T.card, borderWidth: 1, borderColor: T.border, borderRadius: 8, marginTop: 6, padding: 12}}>
-          <View style={{flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 4}}>
-            <Stepper value={MONTHS[month]} field="month" width={48} />
-            <Stepper value={String(day).padStart(2, '0')} field="day" width={40} />
-            <Stepper value={String(year)} field="year" width={56} />
-            <View style={{width: 12}} />
-            <Stepper value={String(displayHour).padStart(2, '0')} field="hour" width={40} />
-            <Text style={{fontSize: fs(18), color: T.dim, fontWeight: '700'}}>:</Text>
-            <Stepper value={String(minutes).padStart(2, '0')} field="minute" width={40} />
-            <TouchableOpacity onPress={() => adjust('ampm', 0)} activeOpacity={0.6}
-              style={{backgroundColor: T.surface, borderWidth: 1, borderColor: T.border, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 6, marginTop: 2}}>
-              <Text style={{fontSize: fs(13), color: T.accent, fontWeight: '600'}}>{isPM ? 'PM' : 'AM'}</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      )}
-    </View>
-  );
-};
 
 const TierMemberPicker = ({tierKey, label, color, selected, setSelected, members, allSelected, T}: {
   tierKey: FrontTierKey; label: string; color: string; selected: string[]; setSelected: (ids: string[]) => void;
@@ -165,28 +100,50 @@ const TierMemberPicker = ({tierKey, label, color, selected, setSelected, members
   );
 };
 
-const RetroHistoryScreen = ({T, members, history, front, onSaveHistory, onSetFront, onBack}: {
+const RetroHistoryScreen = ({T, members, history, front, onSaveHistory, onSetFront, onBack, editIndex, editEntry}: {
   T: any; members: Member[]; history: HistoryEntry[]; front: FrontState | null;
   onSaveHistory: (h: HistoryEntry[]) => void; onSetFront: (f: FrontState | null) => void; onBack: () => void;
+  // When editIndex/editEntry are provided, the screen acts as an editor: form
+  // is prefilled, "save" replaces the entry in place instead of prepending,
+  // and overlap detection excludes the entry being edited (so it doesn't
+  // overlap itself). Add-mode = both undefined.
+  editIndex?: number;
+  editEntry?: HistoryEntry;
 }) => {
   const {t} = useTranslation();
   const fs = (s: number) => Math.round(s * (T.textScale || 1));
-  const [primaryIds, setPrimaryIds] = useState<string[]>([]);
-  const [coFrontIds, setCoFrontIds] = useState<string[]>([]);
-  const [coConIds, setCoConIds] = useState<string[]>([]);
-  const [mood, setMood] = useState('');
-  const [note, setNote] = useState('');
-  const [location, setLocation] = useState('');
-  const [startDate, setStartDate] = useState(new Date());
-  const [endDate, setEndDate] = useState(new Date());
-  const [isCurrent, setIsCurrent] = useState(false);
+  const isEditing = editIndex !== undefined && editIndex >= 0 && !!editEntry;
+
+  // Detect whether the entry being edited mirrors the current active front.
+  // If so, edits to mood/location/members/start need to update the front state
+  // alongside history. Front and the open history entry share startTime as
+  // their identity; checking both startTime AND endTime === null avoids false
+  // positives when a different closed entry happens to share a timestamp.
+  const editingActiveFront = !!(
+    isEditing && editEntry && front
+    && editEntry.endTime === null
+    && editEntry.startTime === front.startTime
+    && (!editEntry.changeType || editEntry.changeType === 'front')
+  );
+
+  const [primaryIds, setPrimaryIds] = useState<string[]>(editEntry?.memberIds || []);
+  const [coFrontIds, setCoFrontIds] = useState<string[]>(editEntry?.coFrontIds || []);
+  const [coConIds, setCoConIds] = useState<string[]>(editEntry?.coConsciousIds || []);
+  const [mood, setMood] = useState(editEntry?.mood || '');
+  const [note, setNote] = useState(editEntry?.note || '');
+  const [location, setLocation] = useState(editEntry?.location || '');
+  const [startDate, setStartDate] = useState(editEntry ? new Date(editEntry.startTime) : new Date());
+  const [endDate, setEndDate] = useState(editEntry?.endTime ? new Date(editEntry.endTime) : new Date());
+  const [isCurrent, setIsCurrent] = useState(editEntry?.endTime === null);
 
   const allSelected: Record<FrontTierKey, string[]> = {primary: primaryIds, coFront: coFrontIds, coConscious: coConIds};
 
   const findOverlaps = (start: number, end: number | null): HistoryEntry[] => {
     const effectiveEnd = end ?? Date.now();
-    return history.filter(e => {
+    return history.filter((e, i) => {
       if (!e.startTime) return false;
+      // Exclude the entry being edited — it always overlaps itself.
+      if (isEditing && i === editIndex) return false;
       const eEnd = e.endTime ?? Date.now();
       return e.startTime < effectiveEnd && start < eEnd;
     });
@@ -208,6 +165,31 @@ const RetroHistoryScreen = ({T, members, history, front, onSaveHistory, onSetFro
     changeType: 'front',
   });
 
+  // Common helpers — in edit mode, "applying" the new entry is a swap at
+  // editIndex; in add mode it's a prepend. Both paths re-sort and cap.
+  const replaceEntries = (deleteOverlapKeys?: Set<string>): HistoryEntry[] => {
+    const newEntry = buildEntry();
+    let base = history;
+    if (deleteOverlapKeys) {
+      base = base.filter(e => !deleteOverlapKeys.has(`${e.startTime}-${(e.memberIds || []).join(',')}`));
+    }
+    if (isEditing) {
+      // editIndex may have shifted if deleteOverlapKeys removed earlier entries.
+      // Find the original entry pointer instead of trusting index.
+      const updated = base.filter((_, i) => !(history === base && i === editIndex)).concat();
+      // The filter above only works when base hasn't been narrowed. For the
+      // deleteOverlapKeys case, build by mapping the new entry over editEntry's
+      // identity (startTime + memberIds), then strip the original tombstone.
+      if (deleteOverlapKeys) {
+        const editKey = `${editEntry!.startTime}-${(editEntry!.memberIds || []).join(',')}`;
+        const stripped = base.filter(e => `${e.startTime}-${(e.memberIds || []).join(',')}` !== editKey);
+        return [newEntry, ...stripped].sort((a, b) => b.startTime - a.startTime).slice(0, 1000);
+      }
+      return [newEntry, ...updated].sort((a, b) => b.startTime - a.startTime).slice(0, 1000);
+    }
+    return [newEntry, ...base].sort((a, b) => b.startTime - a.startTime).slice(0, 1000);
+  };
+
   const handleSave = () => {
     if (primaryIds.length === 0 && coFrontIds.length === 0 && coConIds.length === 0) {
       Alert.alert(t('hub.noMembersSelected'), t('hub.selectAtLeastOne'));
@@ -221,7 +203,29 @@ const RetroHistoryScreen = ({T, members, history, front, onSaveHistory, onSetFro
     const newEntry = buildEntry();
     const overlaps = findOverlaps(newEntry.startTime, newEntry.endTime);
 
-    if (isCurrent && front) {
+    // Editing the entry that mirrors the active front: also update front state
+    // so mood/members/location stay in sync. No overwrite prompt needed.
+    if (editingActiveFront) {
+      if (isCurrent) {
+        const newFront: FrontState = {
+          primary: {memberIds: primaryIds, mood: mood || undefined, note, location: location || undefined},
+          coFront: {memberIds: coFrontIds, note: front?.coFront.note || ''},
+          coConscious: {memberIds: coConIds, note: front?.coConscious.note || ''},
+          startTime: startDate.getTime(),
+        };
+        onSetFront(newFront);
+      } else {
+        // User closed out the open front by setting an end time.
+        onSetFront(null);
+      }
+      onSaveHistory(replaceEntries());
+      onBack();
+      return;
+    }
+
+    // Marking a *different* entry as current when a front already exists —
+    // ask the user how to reconcile. Same flow as the original add path.
+    if (isCurrent && front && !editingActiveFront) {
       Alert.alert(
         t('hub.activeFrontExists'),
         t('hub.activeFrontExistsMsg', {names: allFrontMemberIds(front).map(id => members.find(m => m.id === id)?.name || '?').join(', ')}),
@@ -229,7 +233,8 @@ const RetroHistoryScreen = ({T, members, history, front, onSaveHistory, onSetFro
           {text: t('common.cancel'), style: 'cancel'},
           {text: t('hub.overwrite'), style: 'destructive', onPress: () => {
             const now = Date.now();
-            const updated = history.map(e =>
+            // Close out the existing open front entry.
+            const closed = history.map(e =>
               e.endTime === null && e.startTime === front.startTime && (!e.changeType || e.changeType === 'front')
                 ? {...e, endTime: now} : e
             );
@@ -240,7 +245,13 @@ const RetroHistoryScreen = ({T, members, history, front, onSaveHistory, onSetFro
               startTime: startDate.getTime(),
             };
             onSetFront(newFront);
-            onSaveHistory([newEntry, ...updated].slice(0, 1000));
+            // Insert/replace the new entry against the closed-out history.
+            if (isEditing) {
+              const updated = closed.map((e, i) => i === editIndex ? newEntry : e);
+              onSaveHistory(updated.sort((a, b) => b.startTime - a.startTime).slice(0, 1000));
+            } else {
+              onSaveHistory([newEntry, ...closed].slice(0, 1000));
+            }
             onBack();
           }},
           {text: t('hub.addTo'), onPress: () => {
@@ -251,7 +262,7 @@ const RetroHistoryScreen = ({T, members, history, front, onSaveHistory, onSetFro
               startTime: front?.startTime || startDate.getTime(),
             };
             onSetFront(newFront);
-            onSaveHistory([newEntry, ...history].slice(0, 1000));
+            onSaveHistory(replaceEntries());
             onBack();
           }},
         ]
@@ -270,13 +281,12 @@ const RetroHistoryScreen = ({T, members, history, front, onSaveHistory, onSetFro
         [
           {text: t('common.cancel'), style: 'cancel'},
           {text: t('hub.keepBoth'), onPress: () => {
-            onSaveHistory([newEntry, ...history].sort((a, b) => b.startTime - a.startTime).slice(0, 1000));
+            onSaveHistory(replaceEntries());
             onBack();
           }},
           {text: t('hub.replace'), style: 'destructive', onPress: () => {
             const overlapSet = new Set(overlaps.map(e => `${e.startTime}-${e.memberIds.join(',')}`));
-            const filtered = history.filter(e => !overlapSet.has(`${e.startTime}-${(e.memberIds || []).join(',')}`));
-            onSaveHistory([newEntry, ...filtered].sort((a, b) => b.startTime - a.startTime).slice(0, 1000));
+            onSaveHistory(replaceEntries(overlapSet));
             onBack();
           }},
         ]
@@ -284,7 +294,7 @@ const RetroHistoryScreen = ({T, members, history, front, onSaveHistory, onSetFro
       return;
     }
 
-    onSaveHistory([newEntry, ...history].sort((a, b) => b.startTime - a.startTime).slice(0, 1000));
+    onSaveHistory(replaceEntries());
     onBack();
   };
 
@@ -294,7 +304,7 @@ const RetroHistoryScreen = ({T, members, history, front, onSaveHistory, onSetFro
         <TouchableOpacity onPress={onBack} activeOpacity={0.7} style={{padding: 4, marginRight: 12}}>
           <Text style={{fontSize: fs(18), color: T.dim}}>←</Text>
         </TouchableOpacity>
-        <Text style={{fontFamily: Fonts.display, fontSize: fs(22), fontWeight: '600', fontStyle: 'italic', color: T.text}}>{t('hub.retroHistory')}</Text>
+        <Text style={{fontFamily: Fonts.display, fontSize: fs(22), fontWeight: '600', fontStyle: 'italic', color: T.text}}>{isEditing ? t('hub.editEntry', {defaultValue: 'Edit Entry'}) : t('hub.retroHistory')}</Text>
       </View>
 
       <DateTimeEditor date={startDate} onChange={setStartDate} label={t('hub.startTime')} T={T} />
@@ -347,12 +357,32 @@ const RetroHistoryScreen = ({T, members, history, front, onSaveHistory, onSetFro
 const DISCORD_URL = 'https://discord.gg/FFQw33cu8m';
 const BMC_URL = 'https://www.buymeacoffee.com/PluralStar';
 
-export const HubScreen = ({theme: T, members, history, front, onSaveHistory, onSetFront, renderShareScreen, renderStatsScreen, renderChatScreen, renderCustomFieldsScreen, renderPollsScreen, resetKey}: Props) => {
+export const HubScreen = ({theme: T, members, history, front, onSaveHistory, onSetFront, renderShareScreen, renderStatsScreen, renderChatScreen, renderCustomFieldsScreen, renderPollsScreen, resetKey, editHistoryIndex, onClearEditHistory}: Props) => {
   const {t} = useTranslation();
   const fs = (s: number) => Math.round(s * (T.textScale || 1));
   const [activeTile, setActiveTile] = useState<HubTile | null>(null);
 
   useEffect(() => { setActiveTile(null); }, [resetKey]);
+
+  // Externally-driven edit-mode: when App.tsx asks us to edit a specific
+  // history entry (via editHistoryIndex), jump straight into the retroHistory
+  // tile. Clearing happens when the user navigates away.
+  useEffect(() => {
+    if (editHistoryIndex !== null && editHistoryIndex !== undefined) {
+      setActiveTile('retroHistory');
+    }
+  }, [editHistoryIndex]);
+
+  const handleRetroBack = () => {
+    setActiveTile(null);
+    if (editHistoryIndex !== null && editHistoryIndex !== undefined) {
+      onClearEditHistory?.();
+    }
+  };
+
+  const editingEntry = (editHistoryIndex !== null && editHistoryIndex !== undefined)
+    ? history[editHistoryIndex]
+    : undefined;
 
   if (activeTile === 'share') {
     return (
@@ -369,7 +399,13 @@ export const HubScreen = ({theme: T, members, history, front, onSaveHistory, onS
   }
 
   if (activeTile === 'retroHistory') {
-    return <RetroHistoryScreen T={T} members={members} history={history} front={front} onSaveHistory={onSaveHistory} onSetFront={onSetFront} onBack={() => setActiveTile(null)} />;
+    return <RetroHistoryScreen
+      T={T} members={members} history={history} front={front}
+      onSaveHistory={onSaveHistory} onSetFront={onSetFront}
+      onBack={handleRetroBack}
+      editIndex={editingEntry ? editHistoryIndex! : undefined}
+      editEntry={editingEntry}
+    />;
   }
 
   if (activeTile === 'statistics') {

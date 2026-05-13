@@ -31,24 +31,13 @@ target 'PluralSpace' do
       # :ccache_enabled => true
     )
 
-    # Xcode 26 in this environment does not materialize the document picker
-    # module map at PODS_CONFIGURATION_BUILD_DIR soon enough for app target
-    # compilation, so point the app xcconfigs at the stable generated file.
-    support_files = [
-      'Target Support Files/Pods-PluralSpace/Pods-PluralSpace.debug.xcconfig',
-      'Target Support Files/Pods-PluralSpace/Pods-PluralSpace.release.xcconfig',
-    ]
-    from = '${PODS_CONFIGURATION_BUILD_DIR}/react-native-document-picker/react_native_document_picker.modulemap'
-    to = '${PODS_ROOT}/Target Support Files/react-native-document-picker/react-native-document-picker.modulemap'
-
-    support_files.each do |relative_path|
-      xcconfig_path = File.join(installer.sandbox.root, relative_path)
-      next unless File.exist?(xcconfig_path)
-
-      contents = File.read(xcconfig_path)
-      updated = contents.gsub(from, to)
-      File.write(xcconfig_path, updated) if updated != contents
-    end
+    # NOTE: A previous Xcode-26 modulemap workaround for `react-native-document-picker`
+    # (the old, deprecated package) lived here. We have since migrated to
+    # `@react-native-documents/picker`, which publishes a different pod name and
+    # modulemap path, so the gsub no longer matched anything (no-op). Removed
+    # for clarity. If Xcode 26 raises a modulemap-not-found error for the NEW
+    # picker, add a fresh workaround keyed on `@react-native-documents` rather
+    # than restoring this dead block.
 
     fmt_support_files = [
       'Target Support Files/fmt/fmt.debug.xcconfig',

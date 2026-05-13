@@ -1,7 +1,7 @@
 import React, {useState, useMemo, useEffect} from 'react';
 import {View, Text, TouchableOpacity, TextInput, StyleSheet, ScrollView, Image, Keyboard, Alert} from 'react-native';
 import {useTranslation} from 'react-i18next';
-import RNFS from 'react-native-fs';
+import ReactNativeBlobUtil from 'react-native-blob-util';
 import {safePick, isPickerCancel, getPickedFilePath} from '../utils/safePicker';
 import {Sheet} from '../components/Sheet';
 import {PALETTE, BUILTIN_PALETTES, deriveTheme} from '../theme';
@@ -13,6 +13,7 @@ import type {SupportedLanguage} from '../i18n/i18n';
 
 import {RichText as RichDescription} from '../components/MarkdownRenderer';
 import {RichTextEditor} from '../components/RichTextEditor';
+import {DateTimeEditor} from '../components/DateTimeEditor';
 import {saveAvatar, deleteAvatar, saveBioImage, saveBannerImage} from '../utils/mediaUtils';
 
 const HexField = ({label, value, onChange, T}: {label: string; value: string; onChange: (v: string) => void; T: any}) => (
@@ -32,10 +33,11 @@ const Btn = ({children, onPress, variant = 'primary', disabled = false, style = 
   return (<TouchableOpacity onPress={onPress} disabled={disabled} activeOpacity={0.7} style={[{paddingHorizontal: 16, paddingVertical: 9, borderRadius: 8, borderWidth: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: v.bg, borderColor: v.border, opacity: disabled ? 0.5 : 1}, style]}><Text style={{fontSize: 14, fontWeight: '500', color: v.color}}>{children}</Text></TouchableOpacity>);
 };
 
-const Field = ({label, value, onChange, placeholder, multiline = false, numberOfLines = 4, T}: any) => (
+const Field = ({label, value, onChange, placeholder, multiline = false, numberOfLines = 4, readOnly = false, T}: any) => (
   <View style={{marginBottom: 14}}>
     {label && <Text style={{fontSize: 10, letterSpacing: 1, textTransform: 'uppercase', color: T.dim, marginBottom: 5, fontWeight: '600'}}>{label}</Text>}
     <TextInput value={value} onChangeText={onChange} placeholder={placeholder} placeholderTextColor={T.muted} multiline={multiline} numberOfLines={multiline ? numberOfLines : 1}
+      editable={!readOnly}
       style={{backgroundColor: T.surface, color: T.text, borderWidth: 1, borderColor: T.border, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, minHeight: multiline ? 100 : undefined, textAlignVertical: multiline ? 'top' : 'center'}} />
   </View>
 );
@@ -357,7 +359,7 @@ export const EditFrontDetailModal = ({visible, theme: T, front, tier, settings, 
 
 // ── Member Modal (with tags + group selection) ────────────────────────────
 
-export const MemberModal = ({visible, theme: T, member, members, groups, settings, onSave, onDelete, onClose}: any) => {
+export const MemberModal = ({visible, theme: T, member, members, groups, settings, onSave, onDelete, onClose, readOnly = false}: any) => {
   const {t} = useTranslation();
   const fs = (s: number) => Math.round(s * (T.textScale || 1));
   const isNew = !member;
@@ -390,7 +392,7 @@ export const MemberModal = ({visible, theme: T, member, members, groups, setting
   const pickAvatar = async () => {
     try {
       const [res] = await safePick({type: ['image/png', 'image/jpeg', 'image/gif', 'image/webp']});
-      const base64 = await RNFS.readFile(getPickedFilePath(res), 'base64');
+      const base64 = await ReactNativeBlobUtil.fs.readFile(getPickedFilePath(res), 'base64');
       const uri = await saveAvatar(f.id, base64);
       set('avatar', uri);
     } catch (e: any) {
@@ -453,11 +455,13 @@ export const MemberModal = ({visible, theme: T, member, members, groups, setting
   const activeMembers = (members || []).filter((m: Member) => !m.archived);
 
   return (
-    <Sheet visible={visible} title={isNew ? t('modal.addMember') : t('modal.editMember')} theme={T} onClose={onClose} footer={<>
+    <Sheet visible={visible} title={readOnly ? f.name || t('modal.editMember') : (isNew ? t('modal.addMember') : t('modal.editMember'))} theme={T} onClose={onClose} footer={readOnly ? (
+      <Btn variant="ghost" T={T} onPress={onClose}>{t('common.close', {defaultValue: 'Close'})}</Btn>
+    ) : (<>
       {!isNew && !confirmDel && <Btn variant="danger" T={T} onPress={() => setConfirmDel(true)}>{t('common.delete')}</Btn>}
       {confirmDel && (<><Btn variant="danger" T={T} onPress={() => {onDelete(member.id); onClose();}}>{t('modal.confirmDelete')}</Btn><Btn variant="ghost" T={T} onPress={() => setConfirmDel(false)}>{t('common.cancel')}</Btn></>)}
       {!confirmDel && <Btn variant="ghost" T={T} onPress={onClose}>{t('common.cancel')}</Btn>}
-      {!confirmDel && <Btn T={T} onPress={() => {if (f.name.trim()) {onSave(f); onClose();}}}>{t('common.save')}</Btn>}</>}>
+      {!confirmDel && <Btn T={T} onPress={() => {if (f.name.trim()) {onSave(f); onClose();}}}>{t('common.save')}</Btn>}</>)}>
 
       {/* Sub-tabs */}
       {!isNew && (
@@ -476,7 +480,7 @@ export const MemberModal = ({visible, theme: T, member, members, groups, setting
       {/* ── Main Tab ── */}
       {(memberTab === 'main' || isNew) && (<>
         <View style={{alignItems: 'center', marginBottom: 16}}>
-          <TouchableOpacity onPress={pickAvatar} activeOpacity={0.7}>
+          <TouchableOpacity onPress={readOnly ? undefined : pickAvatar} activeOpacity={readOnly ? 1 : 0.7}>
             {f.avatar ? (
               <Image source={{uri: f.avatar}} style={{width: 80, height: 80, borderRadius: 40, borderWidth: 2, borderColor: f.color}} />
             ) : (
@@ -484,92 +488,116 @@ export const MemberModal = ({visible, theme: T, member, members, groups, setting
                 <Text style={{fontSize: 28, fontWeight: '700', color: 'rgba(0,0,0,0.75)'}}>{getInitials(f.name || '?')}</Text>
               </View>
             )}
-            <View style={{position: 'absolute', bottom: 0, right: 0, width: 24, height: 24, borderRadius: 12, backgroundColor: T.accent, alignItems: 'center', justifyContent: 'center'}}>
-              <Text style={{fontSize: 12, color: T.bg}}>📷</Text>
-            </View>
+            {!readOnly && (
+              <View style={{position: 'absolute', bottom: 0, right: 0, width: 24, height: 24, borderRadius: 12, backgroundColor: T.accent, alignItems: 'center', justifyContent: 'center'}}>
+                <Text style={{fontSize: 12, color: T.bg}}>📷</Text>
+              </View>
+            )}
           </TouchableOpacity>
-          {f.avatar && (
+          {f.avatar && !readOnly && (
             <TouchableOpacity onPress={removeAvatar} activeOpacity={0.7} style={{marginTop: 6}}>
               <Text style={{fontSize: 11, color: T.danger}}>{t('modal.removePfp')}</Text>
             </TouchableOpacity>
           )}
         </View>
 
-        <TouchableOpacity onPress={async () => {
-          try {
-            const [res] = await safePick({type: ['image/*']});
-            const srcUri = getPickedFilePath(res);
-            const sourceFileUri = srcUri.startsWith('file://') ? srcUri : `file://${srcUri}`;
-            const uri = await saveBannerImage(`banner-${f.id}`, sourceFileUri);
-            set('banner', uri);
-          } catch (e: any) { if (!isPickerCancel(e)) Alert.alert(t('modal.pfpFailed')); }
-        }} activeOpacity={0.7} style={{marginBottom: 10}}>
-          <View style={{width: '100%', aspectRatio: 3, borderRadius: 8, borderWidth: 1, borderStyle: 'dashed', borderColor: T.border, overflow: 'hidden', backgroundColor: T.surface, alignItems: 'center', justifyContent: 'center'}}>
-            {f.banner ? <Image source={{uri: f.banner}} style={{width: '100%', height: '100%', borderRadius: 8}} resizeMode="cover" /> : <Text style={{fontSize: 11, color: T.dim}}>{t('memberProfile.changeBanner')}</Text>}
-          </View>
-        </TouchableOpacity>
-        {f.banner && <TouchableOpacity onPress={() => set('banner', undefined)} activeOpacity={0.7} style={{marginBottom: 8}}><Text style={{fontSize: 10, color: T.danger}}>{t('memberProfile.removeBanner')}</Text></TouchableOpacity>}
+        {/* Banner: in readOnly only render when a banner exists; in edit mode always show the picker box. */}
+        {(!readOnly || f.banner) && (
+          <TouchableOpacity onPress={readOnly ? undefined : async () => {
+            try {
+              const [res] = await safePick({type: ['image/*']});
+              const srcUri = getPickedFilePath(res);
+              const sourceFileUri = srcUri.startsWith('file://') ? srcUri : `file://${srcUri}`;
+              const uri = await saveBannerImage(`banner-${f.id}`, sourceFileUri);
+              set('banner', uri);
+            } catch (e: any) { if (!isPickerCancel(e)) Alert.alert(t('modal.pfpFailed')); }
+          }} activeOpacity={readOnly ? 1 : 0.7} style={{marginBottom: 10}}>
+            <View style={{width: '100%', aspectRatio: 3, borderRadius: 8, borderWidth: readOnly ? 0 : 1, borderStyle: 'dashed', borderColor: T.border, overflow: 'hidden', backgroundColor: T.surface, alignItems: 'center', justifyContent: 'center'}}>
+              {f.banner ? <Image source={{uri: f.banner}} style={{width: '100%', height: '100%', borderRadius: 8}} resizeMode="cover" /> : <Text style={{fontSize: 11, color: T.dim}}>{t('memberProfile.changeBanner')}</Text>}
+            </View>
+          </TouchableOpacity>
+        )}
+        {f.banner && !readOnly && <TouchableOpacity onPress={() => set('banner', undefined)} activeOpacity={0.7} style={{marginBottom: 8}}><Text style={{fontSize: 10, color: T.danger}}>{t('memberProfile.removeBanner')}</Text></TouchableOpacity>}
 
-        <Field label={t('modal.name')} value={f.name} onChange={(v: string) => set('name', v)} placeholder={t('modal.headmateName')} T={T} />
-        <Field label={t('modal.pronouns')} value={f.pronouns} onChange={(v: string) => set('pronouns', v)} placeholder={t('modal.pronounsPlaceholder')} T={T} />
-        <Field label={t('modal.role')} value={f.role} onChange={(v: string) => set('role', v)} placeholder={t('modal.rolePlaceholder')} T={T} />
+        <Field label={t('modal.name')} value={f.name} onChange={(v: string) => set('name', v)} placeholder={t('modal.headmateName')} readOnly={readOnly} T={T} />
+        <Field label={t('modal.pronouns')} value={f.pronouns} onChange={(v: string) => set('pronouns', v)} placeholder={t('modal.pronounsPlaceholder')} readOnly={readOnly} T={T} />
+        <Field label={t('modal.role')} value={f.role} onChange={(v: string) => set('role', v)} placeholder={t('modal.rolePlaceholder')} readOnly={readOnly} T={T} />
 
         <Text style={{fontSize: 10, letterSpacing: 1, textTransform: 'uppercase', color: T.dim, marginBottom: 8, fontWeight: '600'}}>{t('modal.color')}</Text>
         <View style={{flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10}}>
           <View style={{width: 36, height: 36, borderRadius: 18, backgroundColor: f.color, borderWidth: 2, borderColor: 'rgba(255,255,255,0.15)'}} />
           <TextInput value={hexInput} onChangeText={handleHexChange} placeholder="#C9A96E" placeholderTextColor={T.muted} maxLength={7} autoCapitalize="characters"
+            editable={!readOnly}
             style={{flex: 1, backgroundColor: T.surface, color: T.text, borderWidth: 1, borderColor: hexError ? T.danger : T.border, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 9, fontSize: 14, fontFamily: 'monospace'}} />
         </View>
-        {hexError && <Text style={{fontSize: 11, color: T.danger, marginBottom: 8}}>{t('modal.invalidHex')}</Text>}
-        <View style={{flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 14}}>{PALETTE.map((c: string) => (<TouchableOpacity key={c} onPress={() => {set('color', c); setHexInput(c); setHexError(false);}} activeOpacity={0.8} style={{width: 30, height: 30, borderRadius: 15, backgroundColor: c, borderWidth: 2, borderColor: f.color === c ? '#fff' : 'transparent'}} />))}</View>
+        {hexError && !readOnly && <Text style={{fontSize: 11, color: T.danger, marginBottom: 8}}>{t('modal.invalidHex')}</Text>}
+        {!readOnly && <View style={{flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 14}}>{PALETTE.map((c: string) => (<TouchableOpacity key={c} onPress={() => {set('color', c); setHexInput(c); setHexError(false);}} activeOpacity={0.8} style={{width: 30, height: 30, borderRadius: 15, backgroundColor: c, borderWidth: 2, borderColor: f.color === c ? '#fff' : 'transparent'}} />))}</View>}
+        {readOnly && <View style={{marginBottom: 14}} />}
 
-        {(groups || []).length > 0 && (
-          <>
-            <Text style={{fontSize: 10, letterSpacing: 1, textTransform: 'uppercase', color: T.dim, marginBottom: 8, fontWeight: '600'}}>{t('memberGroups.title')}</Text>
-            <View style={{flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginBottom: 14}}>
-              {(groups || []).map((g: MemberGroup) => {
-                const active = (f.groupIds || []).includes(g.id);
-                return (
-                  <TouchableOpacity key={g.id} onPress={() => togGroup(g.id)} activeOpacity={0.7}
-                    style={{flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999, borderWidth: 1,
-                      backgroundColor: active ? `${g.color || T.accent}20` : T.surface, borderColor: active ? `${g.color || T.accent}50` : T.border}}>
-                    <View style={{width: 7, height: 7, borderRadius: 3.5, backgroundColor: g.color || T.accent}} />
-                    <Text style={{fontSize: 12, color: active ? (g.color || T.accent) : T.dim}}>{g.name}</Text>
-                    {active && <Text style={{fontSize: 11, fontWeight: '700', color: g.color || T.accent}}>✓</Text>}
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          </>
+        {(groups || []).length > 0 && (() => {
+          // In readOnly we render only the groups this member belongs to (and skip the section entirely
+          // if there are none). In edit mode we render all groups as toggleable chips.
+          const visibleGroups = readOnly
+            ? (groups || []).filter((g: MemberGroup) => (f.groupIds || []).includes(g.id))
+            : (groups || []);
+          if (readOnly && visibleGroups.length === 0) return null;
+          return (
+            <>
+              <Text style={{fontSize: 10, letterSpacing: 1, textTransform: 'uppercase', color: T.dim, marginBottom: 8, fontWeight: '600'}}>{t('memberGroups.title')}</Text>
+              <View style={{flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginBottom: 14}}>
+                {visibleGroups.map((g: MemberGroup) => {
+                  const active = (f.groupIds || []).includes(g.id);
+                  return (
+                    <TouchableOpacity key={g.id} onPress={readOnly ? undefined : () => togGroup(g.id)} activeOpacity={readOnly ? 1 : 0.7}
+                      style={{flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999, borderWidth: 1,
+                        backgroundColor: active ? `${g.color || T.accent}20` : T.surface, borderColor: active ? `${g.color || T.accent}50` : T.border}}>
+                      <View style={{width: 7, height: 7, borderRadius: 3.5, backgroundColor: g.color || T.accent}} />
+                      <Text style={{fontSize: 12, color: active ? (g.color || T.accent) : T.dim}}>{g.name}</Text>
+                      {active && !readOnly && <Text style={{fontSize: 11, fontWeight: '700', color: g.color || T.accent}}>✓</Text>}
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </>
+          );
+        })()}
+
+        {/* Tags: in readOnly, skip the section if there are none; otherwise just show the chips
+            without the X delete affordance and without the add bar. */}
+        {(!readOnly || (f.tags || []).length > 0) && (
+          <Text style={{fontSize: 10, letterSpacing: 1, textTransform: 'uppercase', color: T.dim, marginBottom: 8, fontWeight: '600'}}>{t('modal.memberTags')}</Text>
         )}
-
-        <Text style={{fontSize: 10, letterSpacing: 1, textTransform: 'uppercase', color: T.dim, marginBottom: 8, fontWeight: '600'}}>{t('modal.memberTags')}</Text>
         {(f.tags || []).length > 0 && (
-          <View style={{flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 8}}>
+          <View style={{flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: readOnly ? 14 : 8}}>
             {(f.tags || []).map((tag: string) => (
-              <TouchableOpacity key={tag} onPress={() => set('tags', (f.tags || []).filter(x => x !== tag))} activeOpacity={0.7}
+              <TouchableOpacity key={tag} onPress={readOnly ? undefined : () => set('tags', (f.tags || []).filter(x => x !== tag))} activeOpacity={readOnly ? 1 : 0.7}
                 style={{flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 9, paddingVertical: 4, borderRadius: 999, backgroundColor: `${T.info}18`, borderWidth: 1, borderColor: `${T.info}40`}}>
-                <Text style={{fontSize: 12, color: T.info}}>{tag}</Text><Text style={{fontSize: 10, color: T.danger}}>✕</Text>
+                <Text style={{fontSize: 12, color: T.info}}>{tag}</Text>
+                {!readOnly && <Text style={{fontSize: 10, color: T.danger}}>✕</Text>}
               </TouchableOpacity>))}
           </View>
         )}
-        <View style={{flexDirection: 'row', gap: 8, alignItems: 'center', marginBottom: 14}}>
-          <TextInput value={tagInput} onChangeText={setTagInput} placeholder={t('modal.memberTagPlaceholder')} placeholderTextColor={T.muted} autoCapitalize="none" autoCorrect={false}
-            style={{flex: 1, backgroundColor: T.surface, color: T.text, borderWidth: 1, borderColor: T.border, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 9, fontSize: 13}} onSubmitEditing={addTag} returnKeyType="done" />
-          <Btn T={T} onPress={addTag} style={{paddingHorizontal: 12, paddingVertical: 9}}>{t('common.add')}</Btn>
-        </View>
+        {!readOnly && (
+          <View style={{flexDirection: 'row', gap: 8, alignItems: 'center', marginBottom: 14}}>
+            <TextInput value={tagInput} onChangeText={setTagInput} placeholder={t('modal.memberTagPlaceholder')} placeholderTextColor={T.muted} autoCapitalize="none" autoCorrect={false}
+              style={{flex: 1, backgroundColor: T.surface, color: T.text, borderWidth: 1, borderColor: T.border, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 9, fontSize: 13}} onSubmitEditing={addTag} returnKeyType="done" />
+            <Btn T={T} onPress={addTag} style={{paddingHorizontal: 12, paddingVertical: 9}}>{t('common.add')}</Btn>
+          </View>
+        )}
 
-        <View style={{marginBottom: 14}}>
-          <Text style={{fontSize: 10, letterSpacing: 1, textTransform: 'uppercase', color: T.dim, marginBottom: 5, fontWeight: '600'}}>{t('modal.descriptionBio')}</Text>
-          <TouchableOpacity onPress={() => setShowDescEditor(true)} activeOpacity={0.7}
-            style={{backgroundColor: T.surface, borderWidth: 1, borderColor: T.border, borderRadius: 8, padding: 12, minHeight: 80}}>
-            {f.description ? <RichDescription text={f.description} T={T} /> : <Text style={{fontSize: 13, color: T.muted}}>{t('modal.descriptionPlaceholder')}</Text>}
-          </TouchableOpacity>
-        </View>
-        <RichTextEditor visible={showDescEditor} title={t('modal.descriptionBio')} initialContent={f.description || ''} theme={T}
-          onSave={(html: string) => {set('description', html); setShowDescEditor(false);}} onClose={() => setShowDescEditor(false)} />
+        {(!readOnly || f.description) && (
+          <View style={{marginBottom: 14}}>
+            <Text style={{fontSize: 10, letterSpacing: 1, textTransform: 'uppercase', color: T.dim, marginBottom: 5, fontWeight: '600'}}>{t('modal.descriptionBio')}</Text>
+            <TouchableOpacity onPress={readOnly ? undefined : () => setShowDescEditor(true)} activeOpacity={readOnly ? 1 : 0.7}
+              style={{backgroundColor: T.surface, borderWidth: 1, borderColor: T.border, borderRadius: 8, padding: 12, minHeight: 80}}>
+              {f.description ? <RichDescription text={f.description} T={T} /> : <Text style={{fontSize: 13, color: T.muted}}>{t('modal.descriptionPlaceholder')}</Text>}
+            </TouchableOpacity>
+          </View>
+        )}
+        {!readOnly && <RichTextEditor visible={showDescEditor} title={t('modal.descriptionBio')} initialContent={f.description || ''} theme={T}
+          onSave={(html: string) => {set('description', html); setShowDescEditor(false);}} onClose={() => setShowDescEditor(false)} />}
 
-        {!isNew && (
+        {!isNew && !readOnly && (
           <View style={{borderTopWidth: 1, borderTopColor: T.border, paddingTop: 14, marginTop: 4}}>
             <View style={{flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between'}}>
               <View style={{flex: 1}}>
@@ -591,12 +619,97 @@ export const MemberModal = ({visible, theme: T, member, members, groups, setting
           {fieldDefs.length > 0 ? fieldDefs.map(fd => {
             const cfv = (f.customFields || []).find(v => v.fieldId === fd.id);
             const val = cfv?.value ?? '';
+
+            // ── Date-family types ────────────────────────────────────────
+            // All store the value as a JS timestamp (ms since epoch). The
+            // DateTimeEditor's mode controls which sub-fields render. For
+            // a brand-new value with no stored data, default to "today".
+            const dateTypes: Record<string, true> = {
+              date: true, timestamp: true, monthYear: true,
+              month: true, year: true, monthDay: true,
+            };
+            if (dateTypes[fd.type]) {
+              const modeMap: Record<string, 'date' | 'datetime' | 'monthYear' | 'month' | 'year' | 'monthDay'> = {
+                date: 'date', timestamp: 'datetime', monthYear: 'monthYear',
+                month: 'month', year: 'year', monthDay: 'monthDay',
+              };
+              // Legacy values: older Plural Star releases let users type free-form
+              // text into these fields (no specialized editor existed). Recover
+              // anything Date.parse() understands; otherwise default to today.
+              let dateVal: Date;
+              if (typeof val === 'number' && Number.isFinite(val)) {
+                dateVal = new Date(val);
+              } else if (typeof val === 'string' && val) {
+                const asNum = Number(val);
+                if (Number.isFinite(asNum) && asNum > 0) {
+                  dateVal = new Date(asNum);
+                } else {
+                  const parsed = Date.parse(val);
+                  dateVal = Number.isFinite(parsed) ? new Date(parsed) : new Date();
+                }
+              } else {
+                dateVal = new Date();
+              }
+              return (
+                <View key={fd.id} style={{marginBottom: 14}}>
+                  <DateTimeEditor
+                    date={dateVal}
+                    onChange={readOnly ? () => {} : d => setFieldVal(fd.id, d.getTime())}
+                    label={fd.name}
+                    mode={modeMap[fd.type]}
+                    T={T}
+                  />
+                  {val !== '' && !readOnly && (
+                    <TouchableOpacity onPress={() => setFieldVal(fd.id, null)} activeOpacity={0.7}
+                      style={{alignSelf: 'flex-end', marginTop: -8, paddingVertical: 4, paddingHorizontal: 6}}>
+                      <Text style={{fontSize: fs(11), color: T.muted}}>{t('common.clear', {defaultValue: 'Clear'})}</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              );
+            }
+
+            // ── dateRange ────────────────────────────────────────────────
+            // Stored as a stringified {start, end} pair. Falls back gracefully
+            // if either bound is missing or unparseable.
+            if (fd.type === 'dateRange') {
+              let range: {start: number; end: number} = {start: Date.now(), end: Date.now()};
+              if (typeof val === 'string' && val) {
+                try { const parsed = JSON.parse(val); if (parsed && typeof parsed.start === 'number' && typeof parsed.end === 'number') range = parsed; } catch {}
+              }
+              const startD = new Date(range.start);
+              const endD = new Date(range.end);
+              const writeRange = (next: Partial<typeof range>) => {
+                const merged = {...range, ...next};
+                setFieldVal(fd.id, JSON.stringify(merged));
+              };
+              return (
+                <View key={fd.id} style={{marginBottom: 14}}>
+                  <Text style={{fontSize: 10, letterSpacing: 1, textTransform: 'uppercase', color: T.dim, marginBottom: 6, fontWeight: '600'}}>{fd.name}</Text>
+                  <DateTimeEditor
+                    date={startD}
+                    onChange={readOnly ? () => {} : d => writeRange({start: d.getTime()})}
+                    label={t('customFields.startDate', {defaultValue: 'Start'})}
+                    mode="date"
+                    T={T}
+                  />
+                  <DateTimeEditor
+                    date={endD}
+                    onChange={readOnly ? () => {} : d => writeRange({end: d.getTime()})}
+                    label={t('customFields.endDate', {defaultValue: 'End'})}
+                    mode="date"
+                    T={T}
+                  />
+                </View>
+              );
+            }
+
             return (
               <View key={fd.id} style={{marginBottom: 14}}>
                 {fd.type === 'toggle' ? (
                   <View style={{flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between'}}>
                     <Text style={{fontSize: fs(13), color: T.text, fontWeight: '500'}}>{fd.name}</Text>
-                    <TouchableOpacity onPress={() => setFieldVal(fd.id, !val)} activeOpacity={0.8}
+                    <TouchableOpacity onPress={readOnly ? undefined : () => setFieldVal(fd.id, !val)} activeOpacity={readOnly ? 1 : 0.8}
                       style={{width: 40, height: 22, borderRadius: 11, backgroundColor: val ? T.accent : T.toggleOff, justifyContent: 'center'}}>
                       <View style={{width: 16, height: 16, borderRadius: 8, backgroundColor: '#fff', position: 'absolute', left: val ? 20 : 3}} />
                     </TouchableOpacity>
@@ -607,28 +720,50 @@ export const MemberModal = ({visible, theme: T, member, members, groups, setting
                     <View style={{flexDirection: 'row', alignItems: 'center', gap: 10}}>
                       <View style={{width: 32, height: 32, borderRadius: 8, backgroundColor: String(val || '#333'), borderWidth: 1, borderColor: T.border}} />
                       <TextInput value={String(val || '')} onChangeText={v => setFieldVal(fd.id, v)} placeholder="#000000" placeholderTextColor={T.muted}
+                        editable={!readOnly}
                         style={{flex: 1, backgroundColor: T.surface, color: T.text, borderWidth: 1, borderColor: T.border, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, fontSize: 13, fontFamily: 'monospace'}} />
                     </View>
                   </View>
                 ) : (fd.type === 'markdown' || (fd.type === 'text' && fd.markdown)) ? (
                   <View style={{marginBottom: 0}}>
                     <Text style={{fontSize: 10, letterSpacing: 1, textTransform: 'uppercase', color: T.dim, marginBottom: 5, fontWeight: '600'}}>{fd.name}</Text>
-                    <TouchableOpacity onPress={() => setMarkdownEditFieldId(fd.id)} activeOpacity={0.7}
+                    <TouchableOpacity onPress={readOnly ? undefined : () => setMarkdownEditFieldId(fd.id)} activeOpacity={readOnly ? 1 : 0.7}
                       style={{backgroundColor: T.surface, borderWidth: 1, borderColor: T.border, borderRadius: 8, padding: 12, minHeight: 72}}>
                       {val ? <RichDescription text={String(val)} T={T} /> : <Text style={{fontSize: 13, color: T.muted}}>{fd.name}…</Text>}
                     </TouchableOpacity>
-                    <RichTextEditor
+                    {!readOnly && <RichTextEditor
                       visible={markdownEditFieldId === fd.id}
                       title={fd.name}
                       initialContent={String(val || '')}
                       theme={T}
                       onSave={(html: string) => { setFieldVal(fd.id, html); setMarkdownEditFieldId(null); }}
                       onClose={() => setMarkdownEditFieldId(null)}
+                    />}
+                  </View>
+                ) : fd.type === 'number' ? (
+                  // Numeric input — hint the keyboard, accept '-' and '.' for negatives/decimals,
+                  // commit `null` when empty so the field round-trips through JSON cleanly.
+                  <View>
+                    <Text style={{fontSize: 10, letterSpacing: 1, textTransform: 'uppercase', color: T.dim, marginBottom: 5, fontWeight: '600'}}>{fd.name}</Text>
+                    <TextInput
+                      value={val === null || val === '' ? '' : String(val)}
+                      onChangeText={(raw: string) => {
+                        const cleaned = raw.replace(/[^0-9.\-]/g, '');
+                        if (cleaned === '' || cleaned === '-' || cleaned === '.') { setFieldVal(fd.id, null); return; }
+                        const n = Number(cleaned);
+                        if (Number.isFinite(n)) setFieldVal(fd.id, n);
+                      }}
+                      placeholder={fd.name}
+                      placeholderTextColor={T.muted}
+                      editable={!readOnly}
+                      keyboardType="numbers-and-punctuation"
+                      style={{backgroundColor: T.surface, color: T.text, borderWidth: 1, borderColor: T.border, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14}}
                     />
                   </View>
                 ) : (
-                  <Field label={fd.name} value={String(val || '')} onChange={(v: string) => setFieldVal(fd.id, fd.type === 'number' ? (v === '' ? null : Number(v)) : v)}
-                    placeholder={fd.name} T={T} />
+                  // Plain text (the only remaining fallthrough — `text` without markdown).
+                  <Field label={fd.name} value={String(val || '')} onChange={(v: string) => setFieldVal(fd.id, v)}
+                    placeholder={fd.name} readOnly={readOnly} T={T} />
                 )}
               </View>
             );
@@ -656,14 +791,16 @@ export const MemberModal = ({visible, theme: T, member, members, groups, setting
                   <Text style={{fontSize: fs(10), color: T.muted, marginLeft: 'auto'}}>{fmtTime(note.timestamp)}</Text>
                 </View>
                 <Text style={{fontSize: fs(13), color: T.text, lineHeight: 20}}>{note.content}</Text>
-                <View style={{flexDirection: 'row', gap: 12, marginTop: 8}}>
-                  <TouchableOpacity onPress={() => {togglePin(note.id); markNoteboardRead();}} activeOpacity={0.7}>
-                    <Text style={{fontSize: fs(11), color: note.pinned ? T.accent : T.dim}}>{note.pinned ? `📌 ${t('noteboard.unpin')}` : t('noteboard.pin')}</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity onPress={() => deleteNote(note.id)} activeOpacity={0.7}>
-                    <Text style={{fontSize: fs(11), color: T.danger}}>{t('noteboard.deleteNote')}</Text>
-                  </TouchableOpacity>
-                </View>
+                {!readOnly && (
+                  <View style={{flexDirection: 'row', gap: 12, marginTop: 8}}>
+                    <TouchableOpacity onPress={() => {togglePin(note.id); markNoteboardRead();}} activeOpacity={0.7}>
+                      <Text style={{fontSize: fs(11), color: note.pinned ? T.accent : T.dim}}>{note.pinned ? `📌 ${t('noteboard.unpin')}` : t('noteboard.pin')}</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={() => deleteNote(note.id)} activeOpacity={0.7}>
+                      <Text style={{fontSize: fs(11), color: T.danger}}>{t('noteboard.deleteNote')}</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
               </TouchableOpacity>
             );
           }) : (
@@ -672,30 +809,32 @@ export const MemberModal = ({visible, theme: T, member, members, groups, setting
             </View>
           )}
 
-          {/* Write note */}
-          <View style={{backgroundColor: T.surface, borderRadius: 10, borderWidth: 1, borderColor: T.border, padding: 12, marginTop: 8}}>
-            <View style={{marginBottom: 8}}>
-              <Text style={{fontSize: fs(11), color: T.dim, marginBottom: 6}}>{t('noteboard.writingAs')}</Text>
-              <View style={{flexDirection: 'row', flexWrap: 'wrap', gap: 4}}>
-                  {activeMembers.map((m: Member) => (
-                    <TouchableOpacity key={m.id} onPress={() => setNoteAuthorId(m.id)} activeOpacity={0.7}
-                      style={{paddingHorizontal: 8, paddingVertical: 4, borderRadius: 999, borderWidth: 1,
-                        backgroundColor: noteAuthorId === m.id ? `${m.color}20` : T.bg,
-                        borderColor: noteAuthorId === m.id ? `${m.color}50` : T.border}}>
-                      <Text style={{fontSize: fs(11), color: noteAuthorId === m.id ? m.color : T.dim}}>{m.name}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
+          {/* Write note: hidden in readOnly */}
+          {!readOnly && (
+            <View style={{backgroundColor: T.surface, borderRadius: 10, borderWidth: 1, borderColor: T.border, padding: 12, marginTop: 8}}>
+              <View style={{marginBottom: 8}}>
+                <Text style={{fontSize: fs(11), color: T.dim, marginBottom: 6}}>{t('noteboard.writingAs')}</Text>
+                <View style={{flexDirection: 'row', flexWrap: 'wrap', gap: 4}}>
+                    {activeMembers.map((m: Member) => (
+                      <TouchableOpacity key={m.id} onPress={() => setNoteAuthorId(m.id)} activeOpacity={0.7}
+                        style={{paddingHorizontal: 8, paddingVertical: 4, borderRadius: 999, borderWidth: 1,
+                          backgroundColor: noteAuthorId === m.id ? `${m.color}20` : T.bg,
+                          borderColor: noteAuthorId === m.id ? `${m.color}50` : T.border}}>
+                        <Text style={{fontSize: fs(11), color: noteAuthorId === m.id ? m.color : T.dim}}>{m.name}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+              </View>
+              <View style={{flexDirection: 'row', gap: 8, alignItems: 'flex-end'}}>
+                <TextInput value={noteText} onChangeText={setNoteText} placeholder={t('noteboard.placeholder')} placeholderTextColor={T.muted} multiline
+                  style={{flex: 1, backgroundColor: T.bg, color: T.text, borderWidth: 1, borderColor: T.border, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, fontSize: 13, minHeight: 48, textAlignVertical: 'top'}} />
+                <TouchableOpacity onPress={addNote} activeOpacity={0.7}
+                  style={{backgroundColor: T.accentBg, borderWidth: 1, borderColor: `${T.accent}40`, borderRadius: 8, paddingHorizontal: 14, paddingVertical: 10}}>
+                  <Text style={{fontSize: fs(13), fontWeight: '600', color: T.accent}}>+</Text>
+                </TouchableOpacity>
+              </View>
             </View>
-            <View style={{flexDirection: 'row', gap: 8, alignItems: 'flex-end'}}>
-              <TextInput value={noteText} onChangeText={setNoteText} placeholder={t('noteboard.placeholder')} placeholderTextColor={T.muted} multiline
-                style={{flex: 1, backgroundColor: T.bg, color: T.text, borderWidth: 1, borderColor: T.border, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, fontSize: 13, minHeight: 48, textAlignVertical: 'top'}} />
-              <TouchableOpacity onPress={addNote} activeOpacity={0.7}
-                style={{backgroundColor: T.accentBg, borderWidth: 1, borderColor: `${T.accent}40`, borderRadius: 8, paddingHorizontal: 14, paddingVertical: 10}}>
-                <Text style={{fontSize: fs(13), fontWeight: '600', color: T.accent}}>+</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
+          )}
         </View>
       )}
     </Sheet>
@@ -846,7 +985,7 @@ export const SystemModal = ({visible, theme: T, system, settings, palettes, acti
         <TouchableOpacity onPress={async () => {
           try {
             const [res] = await safePick({type: ['image/*']});
-            const raw = await RNFS.readFile(getPickedFilePath(res), 'base64');
+            const raw = await ReactNativeBlobUtil.fs.readFile(getPickedFilePath(res), 'base64');
             const uri = await saveBioImage('system-avatar', raw, 'png');
             setF((x: any) => ({...x, avatar: uri}));
           } catch (e: any) { if (!isPickerCancel(e)) Alert.alert(t('modal.pfpFailed')); }

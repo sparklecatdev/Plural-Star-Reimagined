@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import RNFS from 'react-native-fs';
+import ReactNativeBlobUtil from 'react-native-blob-util';
 
 export const KEYS = {
   system:   'ps:system',
@@ -31,14 +31,14 @@ const CRITICAL_KEYS = new Set([
 // production builds stay quiet; flip to a hard `true` to debug a release build.
 const STORAGE_DEBUG = __DEV__;
 
-const BACKUP_DIR = `${RNFS.DocumentDirectoryPath}/ps_backup`;
+const BACKUP_DIR = `${ReactNativeBlobUtil.fs.dirs.DocumentDir}/ps_backup`;
 
 const backupPath = (key: string): string =>
   `${BACKUP_DIR}/${key.replace(/:/g, '_')}.json`;
 
 const ensureBackupDir = async () => {
-  const exists = await RNFS.exists(BACKUP_DIR);
-  if (!exists) await RNFS.mkdir(BACKUP_DIR);
+  const exists = await ReactNativeBlobUtil.fs.exists(BACKUP_DIR);
+  if (!exists) await ReactNativeBlobUtil.fs.mkdir(BACKUP_DIR);
 };
 
 // Returns true on success, false on any failure. Awaitable so callers can react.
@@ -46,7 +46,7 @@ const writeBackup = async (key: string, value: unknown): Promise<boolean> => {
   try {
     await ensureBackupDir();
     const json = JSON.stringify(value);
-    await RNFS.writeFile(backupPath(key), json, 'utf8');
+    await ReactNativeBlobUtil.fs.writeFile(backupPath(key), json, 'utf8');
     if (STORAGE_DEBUG) console.log(`[STORAGE] backup-write OK ${key} (${json.length}b)`);
     return true;
   } catch (e) {
@@ -58,12 +58,12 @@ const writeBackup = async (key: string, value: unknown): Promise<boolean> => {
 const readBackup = async <T>(key: string): Promise<T | null> => {
   try {
     const path = backupPath(key);
-    const exists = await RNFS.exists(path);
+    const exists = await ReactNativeBlobUtil.fs.exists(path);
     if (!exists) {
       if (STORAGE_DEBUG) console.log(`[STORAGE] backup-read MISS ${key} (no file)`);
       return null;
     }
-    const raw = await RNFS.readFile(path, 'utf8');
+    const raw = await ReactNativeBlobUtil.fs.readFile(path, 'utf8');
     if (STORAGE_DEBUG) console.log(`[STORAGE] backup-read OK ${key} (${raw.length}b)`);
     return JSON.parse(raw) as T;
   } catch (e) {
@@ -81,15 +81,19 @@ export const chatMsgKey = (channelId: string): string => `ps:chat:${channelId}`;
 export type RecoverableEntry = {key: string; sizeBytes: number; mtime: number; preview: string};
 export const listRecoverableBackups = async (): Promise<RecoverableEntry[]> => {
   try {
-    const exists = await RNFS.exists(BACKUP_DIR);
+    const exists = await ReactNativeBlobUtil.fs.exists(BACKUP_DIR);
     if (!exists) return [];
-    const files = await RNFS.readDir(BACKUP_DIR);
+    // blob-util's `lstat` is the equivalent of RNFS's `readDir`. Result shape
+    // differs: each entry has `filename` (not `name`), `type: 'file' | 'directory'`
+    // (not `isFile()`), and `lastModified` as a numeric ms timestamp (some
+    // versions return it as a numeric string, hence the Number() coercion).
+    const files = await ReactNativeBlobUtil.fs.lstat(BACKUP_DIR);
     const out: RecoverableEntry[] = [];
     for (const f of files) {
-      if (!f.isFile() || !f.name.endsWith('.json')) continue;
-      const key = `ps:${f.name.replace(/\.json$/, '').replace(/^ps_/, '')}`;
+      if (f.type !== 'file' || !f.filename.endsWith('.json')) continue;
+      const key = `ps:${f.filename.replace(/\.json$/, '').replace(/^ps_/, '')}`;
       try {
-        const raw = await RNFS.readFile(f.path, 'utf8');
+        const raw = await ReactNativeBlobUtil.fs.readFile(f.path, 'utf8');
         const parsed = JSON.parse(raw);
         let preview = '';
         if (Array.isArray(parsed)) preview = `${parsed.length} item${parsed.length === 1 ? '' : 's'}`;
@@ -97,7 +101,7 @@ export const listRecoverableBackups = async (): Promise<RecoverableEntry[]> => {
           if (parsed.name) preview = `name: "${String(parsed.name).slice(0, 40)}"`;
           else preview = `${Object.keys(parsed).length} field${Object.keys(parsed).length === 1 ? '' : 's'}`;
         } else preview = String(parsed).slice(0, 40);
-        out.push({key, sizeBytes: f.size, mtime: f.mtime ? f.mtime.getTime() : 0, preview});
+        out.push({key, sizeBytes: Number(f.size) || 0, mtime: Number(f.lastModified) || 0, preview});
       } catch { /* skip unreadable */ }
     }
     return out.sort((a, b) => b.mtime - a.mtime);
@@ -113,9 +117,9 @@ export const listRecoverableBackups = async (): Promise<RecoverableEntry[]> => {
 export const restoreFromBackup = async (key: string): Promise<boolean> => {
   try {
     const path = backupPath(key);
-    const exists = await RNFS.exists(path);
+    const exists = await ReactNativeBlobUtil.fs.exists(path);
     if (!exists) return false;
-    const raw = await RNFS.readFile(path, 'utf8');
+    const raw = await ReactNativeBlobUtil.fs.readFile(path, 'utf8');
     await AsyncStorage.setItem(key, raw);
     if (STORAGE_DEBUG) console.log(`[STORAGE] restored ${key} from backup (${raw.length}b)`);
     return true;
@@ -157,7 +161,7 @@ export const store = {
       }
     }
     // AsyncStorage returned null OR threw OR returned unparseable data.
-    // For critical keys, try the RNFS backup as fallback.
+    // For critical keys, try the filesystem backup as fallback.
     if (CRITICAL_KEYS.has(key)) {
       const backup = await readBackup<T>(key);
       if (backup !== null) {
@@ -194,7 +198,7 @@ export const store = {
           // written before returning so future loads can recover.
           const ok = await writeBackup(key, value);
           if (!asyncStorageOk && !ok) {
-            console.error(`[STORAGE] CRITICAL: ${key} failed BOTH AsyncStorage AND RNFS backup writes — data lost this session`);
+            console.error(`[STORAGE] CRITICAL: ${key} failed BOTH AsyncStorage AND filesystem backup writes — data lost this session`);
           }
         }
       } else {
@@ -202,7 +206,7 @@ export const store = {
         if (!isEmpty) {
           const ok = await writeBackup(key, value);
           if (!asyncStorageOk && !ok) {
-            console.error(`[STORAGE] CRITICAL: ${key} failed BOTH AsyncStorage AND RNFS backup writes — data lost this session`);
+            console.error(`[STORAGE] CRITICAL: ${key} failed BOTH AsyncStorage AND filesystem backup writes — data lost this session`);
           }
         } else {
           // User explicitly cleared this collection. Remove the backup file
@@ -210,8 +214,8 @@ export const store = {
           // guards already prevent transient empties from reaching here.
           try {
             const path = backupPath(key);
-            const exists = await RNFS.exists(path);
-            if (exists) await RNFS.unlink(path);
+            const exists = await ReactNativeBlobUtil.fs.exists(path);
+            if (exists) await ReactNativeBlobUtil.fs.unlink(path);
             if (STORAGE_DEBUG) console.log(`[STORAGE] backup-delete ${key} (intentional empty)`);
           } catch { /* non-fatal */ }
         }
@@ -223,8 +227,8 @@ export const store = {
       await AsyncStorage.removeItem(key);
       if (CRITICAL_KEYS.has(key)) {
         const path = backupPath(key);
-        const exists = await RNFS.exists(path);
-        if (exists) await RNFS.unlink(path);
+        const exists = await ReactNativeBlobUtil.fs.exists(path);
+        if (exists) await ReactNativeBlobUtil.fs.unlink(path);
       }
     } catch (e) { console.error('Storage remove error:', e); }
   },
@@ -232,9 +236,12 @@ export const store = {
     try {
       const allKeys = await AsyncStorage.getAllKeys();
       const psKeys = allKeys.filter(k => k.startsWith('ps:'));
-      await AsyncStorage.multiRemove(psKeys);
-      const exists = await RNFS.exists(BACKUP_DIR);
-      if (exists) await RNFS.unlink(BACKUP_DIR);
+      // v3 renamed `multiRemove` → `removeMany` (and similarly `multiGet` →
+      // `getMany`, `multiSet` → `setMany`). The native bridge still exposes
+      // the old names as `legacy_*`, but the public API uses the new ones.
+      await AsyncStorage.removeMany(psKeys);
+      const exists = await ReactNativeBlobUtil.fs.exists(BACKUP_DIR);
+      if (exists) await ReactNativeBlobUtil.fs.unlink(BACKUP_DIR);
     } catch (e) { console.error('Storage clear error:', e); }
   },
 };

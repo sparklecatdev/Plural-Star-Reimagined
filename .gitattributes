@@ -1,0 +1,64 @@
+# Default: treat everything as text, normalize to LF on commit.
+# Working-tree line endings stay native (CRLF on Windows, LF on macOS/Linux),
+# but the repository always stores LF — keeps diffs clean across contributors.
+* text=auto eol=lf
+
+# Windows shell scripts must stay CRLF in the working tree or cmd.exe chokes.
+*.bat   text eol=crlf
+*.cmd   text eol=crlf
+*.ps1   text eol=crlf
+
+# Source — explicit LF (defensive; matched by * above but kept obvious).
+*.ts    text eol=lf
+*.tsx   text eol=lf
+*.js    text eol=lf
+*.jsx   text eol=lf
+*.json  text eol=lf
+*.md    text eol=lf
+*.yml   text eol=lf
+*.yaml  text eol=lf
+*.html  text eol=lf
+*.css   text eol=lf
+*.svg   text eol=lf
+*.swift text eol=lf
+*.kt    text eol=lf
+*.java  text eol=lf
+*.gradle text eol=lf
+*.pro   text eol=lf
+*.plist text eol=lf
+*.xml   text eol=lf
+*.pbxproj text eol=lf
+*.xcscheme text eol=lf
+*.xcworkspacedata text eol=lf
+Gemfile text eol=lf
+Gemfile.lock text eol=lf
+Podfile text eol=lf
+Podfile.lock text eol=lf
+
+# Binary — never line-end munge, never try to diff as text.
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.webp  binary
+*.ico   binary
+*.icns  binary
+*.ttf   binary
+*.otf   binary
+*.woff  binary
+*.woff2 binary
+*.keystore binary
+*.jks   binary
+*.p12   binary
+*.mobileprovision binary
+*.apk   binary
+*.aab   binary
+*.ipa   binary
+*.zip   binary
+*.jar   binary
+*.so    binary
+
+# Lockfiles: keep as text but suppress in PR diffs (still merge-able).
+package-lock.json -diff
+Podfile.lock -diff
+Gemfile.lock -diff

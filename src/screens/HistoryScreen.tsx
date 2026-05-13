@@ -35,9 +35,12 @@ interface Props {
   getMember: (id: string) => Member | undefined;
   members: Member[];
   onSaveHistory: (h: HistoryEntry[]) => void;
+  // Tapping Edit on a front-history row jumps to Hub > Retroactive in
+  // edit-mode for the given history index. App.tsx owns the navigation.
+  onEditEntry?: (originalIndex: number) => void;
 }
 
-export const HistoryScreen = ({theme: T, history, journal, getMember, members, onSaveHistory}: Props) => {
+export const HistoryScreen = ({theme: T, history, journal, getMember, members, onSaveHistory, onEditEntry}: Props) => {
   const {t} = useTranslation();
   const fs = (s: number) => Math.round(s * (T.textScale || 1));
   const [subTab, setSubTab] = useState<SubTab>('front');
@@ -210,7 +213,6 @@ export const HistoryScreen = ({theme: T, history, journal, getMember, members, o
           data={frontHistoryRows}
           keyExtractor={(item) => item.key}
           getItemType={(item) => item.kind}
-          estimatedItemSize={120}
           contentContainerStyle={{padding: 16, paddingBottom: 32}}
           ListEmptyComponent={
             <View style={{alignItems: 'center', paddingVertical: 48}}>
@@ -315,10 +317,18 @@ export const HistoryScreen = ({theme: T, history, journal, getMember, members, o
                         </Text>
                       </TouchableOpacity>
                     ) : <View />}
-                    <TouchableOpacity onPress={() => startDelete(originalIndex)} activeOpacity={0.7}
-                      style={{paddingVertical: 2, paddingHorizontal: 6}}>
-                      <Text style={{fontSize: fs(10), color: T.danger, opacity: 0.6}}>{t('history.deleteEntry')}</Text>
-                    </TouchableOpacity>
+                    <View style={{flexDirection: 'row', gap: 12}}>
+                      {onEditEntry && (
+                        <TouchableOpacity onPress={() => onEditEntry(originalIndex)} activeOpacity={0.7}
+                          style={{paddingVertical: 2, paddingHorizontal: 6}}>
+                          <Text style={{fontSize: fs(10), color: T.accent, opacity: 0.8}}>{t('history.editEntry', {defaultValue: 'Edit'})}</Text>
+                        </TouchableOpacity>
+                      )}
+                      <TouchableOpacity onPress={() => startDelete(originalIndex)} activeOpacity={0.7}
+                        style={{paddingVertical: 2, paddingHorizontal: 6}}>
+                        <Text style={{fontSize: fs(10), color: T.danger, opacity: 0.6}}>{t('history.deleteEntry')}</Text>
+                      </TouchableOpacity>
+                    </View>
                   </View>
                 </View>
               </View>
