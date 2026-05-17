@@ -1,5 +1,6 @@
 import React, {useState, useEffect} from 'react';
-import {View, Text, ScrollView, TouchableOpacity, TextInput, Alert} from 'react-native';
+import {View, Text, ScrollView, TouchableOpacity, TextInput, Alert, KeyboardAvoidingView} from 'react-native';
+import {useKeyboardBehavior} from '../hooks/useKeyboardBehavior';
 import {useTranslation} from 'react-i18next';
 import {Fonts} from '../theme';
 import {Member, MemberPoll, PollOption, uid, fmtTime} from '../utils';
@@ -13,6 +14,7 @@ interface Props {
 export const PollsScreen = ({theme: T, members}: Props) => {
   const {t} = useTranslation();
   const fs = (s: number) => Math.round(s * (T.textScale || 1));
+  const behavior = useKeyboardBehavior();
   const activeMembers = members.filter(m => !m.archived);
   const [polls, setPolls] = useState<MemberPoll[]>([]);
   const [showCreate, setShowCreate] = useState(false);
@@ -67,8 +69,7 @@ export const PollsScreen = ({theme: T, members}: Props) => {
   const getName = (id: string) => members.find(m => m.id === id)?.name || '?';
 
   return (
-    <View style={{flex: 1}}>
-      {/* Voter selector + create */}
+    <KeyboardAvoidingView style={{flex: 1}} behavior={behavior}>
       <View style={{flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, paddingVertical: 10}}>
         <Text style={{fontSize: fs(11), color: T.dim}}>{t('polls.votingAs')}</Text>
         <TouchableOpacity onPress={() => setVoterPickerOpen(!voterPickerOpen)} activeOpacity={0.7}
@@ -111,19 +112,18 @@ export const PollsScreen = ({theme: T, members}: Props) => {
         </View>
       )}
 
-      {/* Create form */}
       {showCreate && (
         <View style={{marginHorizontal: 16, marginBottom: 12, backgroundColor: T.card, borderRadius: 12, borderWidth: 1, borderColor: T.border, padding: 14}}>
           <TextInput value={question} onChangeText={setQuestion} placeholder={t('polls.questionPlaceholder')} placeholderTextColor={T.muted}
-            style={{backgroundColor: T.surface, color: T.text, borderWidth: 1, borderColor: T.border, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 9, fontSize: 14, marginBottom: 10}} />
+            style={{backgroundColor: T.surface, color: T.text, borderWidth: 1, borderColor: T.border, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 9, fontSize: fs(14), marginBottom: 10}} />
           {options.map((opt, i) => (
             <View key={i} style={{flexDirection: 'row', gap: 6, marginBottom: 6, alignItems: 'center'}}>
               <TextInput value={opt} onChangeText={v => {const u = [...options]; u[i] = v; setOptions(u);}}
                 placeholder={`${t('polls.optionPlaceholder')} ${i + 1}`} placeholderTextColor={T.muted}
-                style={{flex: 1, backgroundColor: T.surface, color: T.text, borderWidth: 1, borderColor: T.border, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 7, fontSize: 13}} />
+                style={{flex: 1, backgroundColor: T.surface, color: T.text, borderWidth: 1, borderColor: T.border, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 7, fontSize: fs(13)}} />
               {options.length > 2 && (
                 <TouchableOpacity onPress={() => setOptions(options.filter((_, j) => j !== i))} activeOpacity={0.7}>
-                  <Text style={{fontSize: 14, color: T.danger}}>✕</Text>
+                  <Text style={{fontSize: fs(14), color: T.danger}}>✕</Text>
                 </TouchableOpacity>
               )}
             </View>
@@ -132,7 +132,7 @@ export const PollsScreen = ({theme: T, members}: Props) => {
             <Text style={{fontSize: fs(12), color: T.accent}}>{t('polls.addOption')}</Text>
           </TouchableOpacity>
           <TouchableOpacity onPress={() => setHideVoters(!hideVoters)} activeOpacity={0.7} style={{flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6, marginBottom: 10}}>
-            <Text style={{fontSize: 16, color: hideVoters ? T.accent : T.muted}}>{hideVoters ? '☑' : '☐'}</Text>
+            <Text style={{fontSize: fs(16), color: hideVoters ? T.accent : T.muted}}>{hideVoters ? '☑' : '☐'}</Text>
             <Text style={{fontSize: fs(12), color: T.dim}}>{t('polls.hideVoters')}</Text>
           </TouchableOpacity>
           <TouchableOpacity onPress={createPoll} activeOpacity={0.7}
@@ -190,6 +190,6 @@ export const PollsScreen = ({theme: T, members}: Props) => {
           );
         })}
       </ScrollView>
-    </View>
+    </KeyboardAvoidingView>
   );
 };

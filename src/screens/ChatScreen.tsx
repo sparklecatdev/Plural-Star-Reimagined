@@ -28,9 +28,10 @@ interface Props {
   members: Member[];
   channels: ChatChannel[];
   onSaveChannels: (ch: ChatChannel[]) => void;
+  onMentionPress?: (memberId: string) => void;
 }
 
-export const ChatScreen = ({theme: T, members, channels, onSaveChannels}: Props) => {
+export const ChatScreen = ({theme: T, members, channels, onSaveChannels, onMentionPress}: Props) => {
   const {t} = useTranslation();
   const fs = (s: number) => Math.round(s * (T.textScale || 1));
   const [activeChannelId, setActiveChannelId] = useState<string | null>(channels.find(c => !c.archived)?.id || null);
@@ -255,7 +256,7 @@ export const ChatScreen = ({theme: T, members, channels, onSaveChannels}: Props)
                 <Text style={{fontSize: fs(13), color: T.info, flex: 1}} numberOfLines={1}>{getChatMediaFileName(msg.content)}</Text>
               </View>
             ) : (
-              <RichContent text={msg.content} T={T} />
+              <RichContent text={msg.content} T={T} members={members} onMentionPress={onMentionPress} />
             )}
             {reactionEntries.length > 0 && (
               <View style={{flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 4}}>

@@ -1,5 +1,6 @@
 import React, {useState, useEffect} from 'react';
-import {View, Text, ScrollView, TouchableOpacity, TextInput, Alert} from 'react-native';
+import {View, Text, ScrollView, TouchableOpacity, TextInput, Alert, KeyboardAvoidingView} from 'react-native';
+import {useKeyboardBehavior} from '../hooks/useKeyboardBehavior';
 import {useTranslation} from 'react-i18next';
 import {Fonts} from '../theme';
 import {CustomFieldDef, CustomFieldType, uid} from '../utils';
@@ -28,6 +29,7 @@ interface Props {
 export const CustomFieldsScreen = ({theme: T, onUpdate}: Props) => {
   const {t} = useTranslation();
   const fs = (s: number) => Math.round(s * (T.textScale || 1));
+  const behavior = useKeyboardBehavior();
   const [fields, setFields] = useState<CustomFieldDef[]>([]);
   const [newName, setNewName] = useState('');
   const [newType, setNewType] = useState<CustomFieldType>('text');
@@ -83,7 +85,7 @@ export const CustomFieldsScreen = ({theme: T, onUpdate}: Props) => {
   const typeLabel = (type: CustomFieldType) => t(`customFields.type${type.charAt(0).toUpperCase() + type.slice(1)}` as any);
 
   return (
-    <View style={{flex: 1}}>
+    <KeyboardAvoidingView style={{flex: 1}} behavior={behavior}>
       <ScrollView style={{flex: 1}} contentContainerStyle={{padding: 16, paddingBottom: 100}}>
         {fields.length === 0 && (
           <View style={{alignItems: 'center', paddingVertical: 48}}>
@@ -101,7 +103,7 @@ export const CustomFieldsScreen = ({theme: T, onUpdate}: Props) => {
                   hitSlop={{top: 10, bottom: 6, left: 12, right: 12}}
                   activeOpacity={0.6}
                   style={{padding: 3}}>
-                  <Text style={{fontSize: 14, color: i === 0 ? T.border : T.muted, lineHeight: 14}}>▲</Text>
+                  <Text style={{fontSize: fs(14), color: i === 0 ? T.border : T.muted, lineHeight: 14}}>▲</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   onPress={() => moveField(fd.id, 'down')}
@@ -109,17 +111,17 @@ export const CustomFieldsScreen = ({theme: T, onUpdate}: Props) => {
                   hitSlop={{top: 6, bottom: 10, left: 12, right: 12}}
                   activeOpacity={0.6}
                   style={{padding: 3}}>
-                  <Text style={{fontSize: 14, color: i === fields.length - 1 ? T.border : T.muted, lineHeight: 14}}>▼</Text>
+                  <Text style={{fontSize: fs(14), color: i === fields.length - 1 ? T.border : T.muted, lineHeight: 14}}>▼</Text>
                 </TouchableOpacity>
               </View>
               <View style={{flex: 1}}>
                 {editId === fd.id ? (
                   <View style={{flexDirection: 'row', gap: 8, alignItems: 'center'}}>
                     <TextInput value={editName} onChangeText={setEditName} autoFocus
-                      style={{flex: 1, backgroundColor: T.surface, color: T.text, borderWidth: 1, borderColor: T.border, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, fontSize: 14}}
+                      style={{flex: 1, backgroundColor: T.surface, color: T.text, borderWidth: 1, borderColor: T.border, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, fontSize: fs(14)}}
                       onSubmitEditing={() => renameField(fd.id)} />
                     <TouchableOpacity onPress={() => renameField(fd.id)} activeOpacity={0.7}>
-                      <Text style={{fontSize: 16, color: T.accent}}>✓</Text>
+                      <Text style={{fontSize: fs(16), color: T.accent}}>✓</Text>
                     </TouchableOpacity>
                   </View>
                 ) : (
@@ -129,7 +131,7 @@ export const CustomFieldsScreen = ({theme: T, onUpdate}: Props) => {
                 )}
               </View>
               <TouchableOpacity onPress={() => deleteField(fd.id)} activeOpacity={0.7}>
-                <Text style={{fontSize: 18, color: T.danger}}>🗑</Text>
+                <Text style={{fontSize: fs(18), color: T.danger}}>🗑</Text>
               </TouchableOpacity>
             </View>
 
@@ -142,7 +144,7 @@ export const CustomFieldsScreen = ({theme: T, onUpdate}: Props) => {
 
             {(fd.type === 'text' || fd.type === 'markdown') && (
               <TouchableOpacity onPress={() => toggleMarkdown(fd.id)} activeOpacity={0.7} style={{flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8}}>
-                <Text style={{fontSize: 16, color: fd.markdown ? T.accent : T.muted}}>{fd.markdown ? '☑' : '☐'}</Text>
+                <Text style={{fontSize: fs(16), color: fd.markdown ? T.accent : T.muted}}>{fd.markdown ? '☑' : '☐'}</Text>
                 <Text style={{fontSize: fs(12), color: T.dim}}>{t('customFields.markdownSupport')}</Text>
               </TouchableOpacity>
             )}
@@ -150,19 +152,18 @@ export const CustomFieldsScreen = ({theme: T, onUpdate}: Props) => {
         ))}
       </ScrollView>
 
-      {/* Add field bar */}
       <View style={{position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: T.surface, borderTopWidth: 1, borderTopColor: T.border, padding: 12}}>
         <View style={{flexDirection: 'row', gap: 8, alignItems: 'center'}}>
           <TextInput value={newName} onChangeText={setNewName} placeholder={t('customFields.fieldName')} placeholderTextColor={T.muted}
-            style={{flex: 1, backgroundColor: T.bg, color: T.text, borderWidth: 1, borderColor: T.border, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 9, fontSize: 13}}
+            style={{flex: 1, backgroundColor: T.bg, color: T.text, borderWidth: 1, borderColor: T.border, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 9, fontSize: fs(13)}}
             onSubmitEditing={addField} />
           <TouchableOpacity onPress={() => setShowTypePicker(!showTypePicker)} activeOpacity={0.7}
             style={{backgroundColor: T.bg, borderWidth: 1, borderColor: T.border, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 9}}>
-            <Text style={{fontSize: 12, color: T.dim}}>{typeLabel(newType)} ▾</Text>
+            <Text style={{fontSize: fs(12), color: T.dim}}>{typeLabel(newType)} ▾</Text>
           </TouchableOpacity>
           <TouchableOpacity onPress={addField} activeOpacity={0.7}
             style={{backgroundColor: T.accentBg, borderWidth: 1, borderColor: `${T.accent}40`, borderRadius: 8, paddingHorizontal: 14, paddingVertical: 9}}>
-            <Text style={{fontSize: 13, fontWeight: '600', color: T.accent}}>+</Text>
+            <Text style={{fontSize: fs(13), fontWeight: '600', color: T.accent}}>+</Text>
           </TouchableOpacity>
         </View>
 
@@ -172,13 +173,13 @@ export const CustomFieldsScreen = ({theme: T, onUpdate}: Props) => {
               <TouchableOpacity key={ft.type} onPress={() => {setNewType(ft.type); setShowTypePicker(false);}} activeOpacity={0.7}
                 style={{flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: T.border,
                   backgroundColor: newType === ft.type ? `${T.accent}15` : 'transparent'}}>
-                <Text style={{fontSize: 16, width: 24, textAlign: 'center'}}>{ft.icon}</Text>
+                <Text style={{fontSize: fs(16), width: 24, textAlign: 'center'}}>{ft.icon}</Text>
                 <Text style={{fontSize: fs(13), color: newType === ft.type ? T.accent : T.text, fontWeight: newType === ft.type ? '600' : '400'}}>{typeLabel(ft.type)}</Text>
               </TouchableOpacity>
             ))}
           </View>
         )}
       </View>
-    </View>
+    </KeyboardAvoidingView>
   );
 };

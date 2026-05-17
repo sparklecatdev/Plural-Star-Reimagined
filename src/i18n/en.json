@@ -12,7 +12,8 @@
     "untitled": "Untitled",
     "records": "{{count}} records",
     "notInExport": "Not in export",
-    "ok": "OK"
+    "ok": "OK",
+    "search": "Search…"
   },
   "tabs": {
     "front": "Front",
@@ -62,6 +63,9 @@
   },
   "members": {
     "title": "Members",
+    "count": "{{count}} member",
+    "count_other": "{{count}} members",
+    "countFiltered": "{{filtered}} of {{total}} members",
     "add": "+ Add",
     "search": "Search…",
     "noMembers": "No members yet. Add your first headmate.",
@@ -78,6 +82,7 @@
     "selectAll": "All",
     "selectNone": "None",
     "selectedCount": "{{count}} selected",
+    "refineSearch": "+{{count}} more — refine search",
     "archive": "Archive",
     "restore": "Restore",
     "bulkArchive": "Archive members",
@@ -147,7 +152,19 @@
     "areYouSure": "Are you sure?",
     "searchTags": "Search tags…",
     "searchAuthors": "Search authors…",
-    "noEntriesFilter": "No entries match this filter."
+    "noEntriesFilter": "No entries match this filter.",
+    "entriesTab": "Entries",
+    "templatesTab": "Templates",
+    "noTemplates": "No templates yet. Create one to pre-fill new entries.",
+    "newTemplate": "+ New Template",
+    "editTemplate": "Edit Template",
+    "fromTemplate": "From template…",
+    "templateHint": "Pre-fill from a saved template?",
+    "pickTemplate": "Pick a template",
+    "templateName": "Template Name *",
+    "templateNamePlaceholder": "e.g. Morning Pages",
+    "templateTitle": "Entry Title (preset)",
+    "templateBody": "Entry Body (preset)"
   },
   "share": {
     "title": "Share & Export",
@@ -231,6 +248,7 @@
     "importSelected": "Import Selected",
     "membersCount": "{{count}} members",
     "frontEntries": "{{count}} front entries",
+    "groupsCount": "{{count}} groups",
     "system": "System",
     "importCategories": "Import these categories",
     "controlVisibility": "Control what's visible in shared exports and email summaries.",
@@ -388,7 +406,9 @@
     "textSizeDesc": "Adjust text size across the app.",
     "textScaleNormal": "Normal",
     "textScaleLarge": "Large",
-    "textScaleExtraLarge": "Extra Large"
+    "textScaleExtraLarge": "Extra Large",
+    "dyslexicFont": "Dyslexia-Friendly Font",
+    "dyslexicFontDesc": "Switches body text to OpenDyslexic. Headings keep their styled font."
   },
   "notification": {
     "locationPermTitle": "Location Permission",

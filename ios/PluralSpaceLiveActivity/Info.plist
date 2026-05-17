@@ -25,5 +25,12 @@
 		<key>NSExtensionPointIdentifier</key>
 		<string>com.apple.widgetkit-extension</string>
 	</dict>
+	<key>UIAppFonts</key>
+	<array>
+		<string>OpenDyslexic-Bold.otf</string>
+		<string>OpenDyslexic-BoldItalic.otf</string>
+		<string>OpenDyslexic-Italic.otf</string>
+		<string>OpenDyslexic-Regular.otf</string>
+	</array>
 </dict>
 </plist>

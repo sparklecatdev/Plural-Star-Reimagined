@@ -1,6 +1,6 @@
 {
   "name": "PluralStar",
-  "version": "1.7.1",
+  "version": "1.7.2",
   "private": true,
   "scripts": {
     "android": "node scripts/run-android.js",
@@ -22,6 +22,7 @@
     "react-i18next": "^16.6.1",
     "react-native": "0.85.3",
     "react-native-blob-util": "^0.24.7",
+    "react-native-image-picker": "^8.2.1",
     "react-native-localize": "^3.4.1",
     "react-native-safe-area-context": "^5.7.0",
     "react-native-share": "^12.2.6"

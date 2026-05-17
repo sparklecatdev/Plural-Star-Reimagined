@@ -125,6 +125,15 @@ export interface JournalEntry {
   timestamp: number;
 }
 
+export interface JournalTemplate {
+  id: string;
+  name: string;
+  title: string;
+  body: string;
+  hashtags: string[];
+  createdAt?: number;
+}
+
 export interface ShareSettings {
   showFront: boolean;
   showMembers: boolean;
@@ -147,6 +156,7 @@ export interface AppSettings {
   frontCheckInterval?: number;
   noteboardNotifications?: boolean;
   appLockPassword?: string;
+  useDyslexicFont?: boolean;
 }
 
 export interface ExportPayload {

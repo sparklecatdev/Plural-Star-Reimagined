@@ -28,7 +28,6 @@
 	<true/>
 	<key>NSAppTransportSecurity</key>
 	<dict>
-	  <!-- Do not change NSAllowsArbitraryLoads to true, or you will risk app rejection! -->
 		<key>NSAllowsArbitraryLoads</key>
 		<false/>
 		<key>NSAllowsLocalNetworking</key>
@@ -59,5 +58,12 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<false/>
+	<key>UIAppFonts</key>
+	<array>
+		<string>OpenDyslexic-Bold.otf</string>
+		<string>OpenDyslexic-BoldItalic.otf</string>
+		<string>OpenDyslexic-Italic.otf</string>
+		<string>OpenDyslexic-Regular.otf</string>
+	</array>
 </dict>
 </plist>

@@ -73,7 +73,10 @@
     "searchHint": "Введіть ім'я або оберіть тег",
     "active": "Активні",
     "archived": "В архіві",
-    "noArchived": "Архів порожній."
+    "noArchived": "Архів порожній.",
+    "count": "{{count}} member",
+    "count_other": "{{count}} members",
+    "countFiltered": "{{filtered}} of {{total}} members"
   },
   "history": {
     "title": "Історія",
@@ -134,7 +137,19 @@
     "areYouSure": "Ви впевнені?",
     "searchTags": "Пошук тегів…",
     "searchAuthors": "Пошук авторів…",
-    "noEntriesFilter": "За фільтром записів немає."
+    "noEntriesFilter": "За фільтром записів немає.",
+    "entriesTab": "Entries",
+    "templatesTab": "Templates",
+    "noTemplates": "No templates yet. Create one to pre-fill new entries.",
+    "newTemplate": "+ New Template",
+    "editTemplate": "Edit Template",
+    "fromTemplate": "From template…",
+    "templateHint": "Pre-fill from a saved template?",
+    "pickTemplate": "Pick a template",
+    "templateName": "Template Name *",
+    "templateNamePlaceholder": "e.g. Morning Pages",
+    "templateTitle": "Entry Title (preset)",
+    "templateBody": "Entry Body (preset)"
   },
   "share": {
     "title": "Поділитися та експорт",
@@ -374,7 +389,9 @@
     "textSizeDesc": "Розмір шрифту в додатку.",
     "textScaleNormal": "Звичайний",
     "textScaleLarge": "Великий",
-    "textScaleExtraLarge": "Величезний"
+    "textScaleExtraLarge": "Величезний",
+    "dyslexicFont": "Dyslexia-Friendly Font",
+    "dyslexicFontDesc": "Switches body text to OpenDyslexic. Headings keep their styled font."
   },
   "notification": {
     "locationPermTitle": "Дозвіл на геолокацію",

@@ -2,15 +2,9 @@ import React, {useState, useEffect} from 'react';
 import {View, Text, ScrollView, TouchableOpacity, TextInput, Alert, Linking} from 'react-native';
 import {useTranslation} from 'react-i18next';
 import {Fonts} from '../theme';
-import {Member, HistoryEntry, FrontState, FrontTierKey, fmtTime, fmtDur, getInitials, allFrontMemberIds} from '../utils';
+import {Member, HistoryEntry, FrontState, FrontTierKey, fmtTime, fmtDur, allFrontMemberIds} from '../utils';
 import {DateTimeEditor} from '../components/DateTimeEditor';
-
-const Avatar = ({member, size = 26, T}: {member?: Member | null; size?: number; T: any}) => (
-  <View style={{width: size, height: size, borderRadius: size / 2, backgroundColor: member?.color || T.toggleOff,
-    alignItems: 'center', justifyContent: 'center'}}>
-    <Text style={{fontSize: size * 0.35, fontWeight: '700', color: 'rgba(0,0,0,0.75)'}}>{getInitials(member?.name || '?')}</Text>
-  </View>
-);
+import {Avatar} from '../components/Avatar';
 
 type HubTile = 'share' | 'retroHistory' | 'statistics' | 'chat' | 'customFields' | 'polls' | 'discord' | 'credits' | 'supportPS';
 

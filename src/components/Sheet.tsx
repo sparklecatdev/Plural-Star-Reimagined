@@ -1,5 +1,5 @@
 import React, {ReactNode, useEffect, useRef, useState} from 'react';
-import {View, Text, TouchableOpacity, ScrollView, StyleSheet, LayoutChangeEvent, Platform} from 'react-native';
+import {View, Text, TouchableOpacity, ScrollView, StyleSheet, LayoutChangeEvent, Platform, Keyboard} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {TrueSheet} from '@lodev09/react-native-true-sheet';
 import {Fonts} from '../theme';
@@ -15,12 +15,24 @@ interface SheetProps {
 
 const isIPad = Platform.OS === 'ios' && Platform.isPad;
 
+const ANDROID_NAV_BAR_FLOOR = 24;
+
 export const Sheet = ({visible, title, theme: T, onClose, children, footer}: SheetProps) => {
   const sheetRef = useRef<TrueSheet>(null);
   const insets = useSafeAreaInsets();
-  const bottomInset = isIPad ? 0 : insets.bottom;
+  const rawBottomInset = isIPad ? 0 : insets.bottom;
+  const bottomInset = Platform.OS === 'android'
+    ? Math.max(rawBottomInset, ANDROID_NAV_BAR_FLOOR)
+    : rawBottomInset;
   const [footerHeight, setFooterHeight] = useState(0);
   const onFooterLayout = (e: LayoutChangeEvent) => setFooterHeight(e.nativeEvent.layout.height);
+
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  useEffect(() => {
+    const show = Keyboard.addListener('keyboardDidShow', e => setKeyboardHeight(e.endCoordinates.height));
+    const hide = Keyboard.addListener('keyboardDidHide', () => setKeyboardHeight(0));
+    return () => { show.remove(); hide.remove(); };
+  }, []);
 
   const wasVisible = useRef(false);
   useEffect(() => {
@@ -33,9 +45,10 @@ export const Sheet = ({visible, title, theme: T, onClose, children, footer}: She
     }
   }, [visible]);
 
-  const scrollPaddingBottom = footer
+  const basePaddingBottom = footer
     ? (footerHeight > 0 ? footerHeight + 24 : 96)
     : 56 + bottomInset;
+  const scrollPaddingBottom = basePaddingBottom + keyboardHeight;
 
   return (
     <TrueSheet

@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import React, {useState, useMemo, useDeferredValue} from 'react';
 import {View, Text, ScrollView, TouchableOpacity, TextInput, StyleSheet, Image, Alert} from 'react-native';
 import {FlashList} from '@shopify/flash-list';
 import {useTranslation} from 'react-i18next';
@@ -125,17 +125,19 @@ export const MembersScreen = ({theme: T, members, front, groups, initialSortMode
     );
   };
 
+  const deferredQuery = useDeferredValue(query);
+
   const tabMembers = members.filter(m => memberTab === 'archived' ? m.archived : !m.archived);
   const allFrontIds = new Set(allFrontMemberIds(front));
   const allTags = [...new Set(tabMembers.flatMap(m => m.tags || []))].sort();
   const archivedCount = members.filter(m => m.archived).length;
 
-  const filtered = sortMembers(tabMembers.filter(m => {
-    const nameMatch = !query || m.name.toLowerCase().includes(query.toLowerCase()) || m.role?.toLowerCase().includes(query.toLowerCase());
+  const filtered = useMemo(() => sortMembers(tabMembers.filter(m => {
+    const nameMatch = !deferredQuery || m.name.toLowerCase().includes(deferredQuery.toLowerCase()) || m.role?.toLowerCase().includes(deferredQuery.toLowerCase());
     const groupMatch = !activeGroup || (m.groupIds || []).includes(activeGroup);
     const tagMatch = !activeTag || (m.tags || []).includes(activeTag);
     return nameMatch && groupMatch && tagMatch;
-  }), sortMode);
+  }), sortMode), [tabMembers, deferredQuery, activeGroup, activeTag, sortMode]);
 
   const addGroup = () => {
     const name = newGroupName.trim();
@@ -182,7 +184,7 @@ export const MembersScreen = ({theme: T, members, front, groups, initialSortMode
         <View style={{flexDirection: 'row', alignItems: 'center', gap: 14}}>
           {selectionMode && (
             <View style={{width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: isSelected ? T.accent : T.border, backgroundColor: isSelected ? T.accent : 'transparent', alignItems: 'center', justifyContent: 'center'}}>
-              {isSelected && <Text style={{fontSize: 12, fontWeight: '700', color: T.bg}}>✓</Text>}
+              {isSelected && <Text style={{fontSize: fs(12), fontWeight: '700', color: T.bg}}>✓</Text>}
             </View>
           )}
           {!selectionMode && showReorder && (
@@ -219,6 +221,11 @@ export const MembersScreen = ({theme: T, members, front, groups, initialSortMode
 
   const allVisibleIds = filtered.map(m => m.id);
   const allSelectedInView = allVisibleIds.length > 0 && allVisibleIds.every(id => selectedIds.has(id));
+
+  const flashExtraData = useMemo(
+    () => ({T, front, groups, showReorder, filteredLength: filtered.length, selectionMode, selectedCount: selectedIds.size}),
+    [T, front, groups, showReorder, filtered.length, selectionMode, selectedIds.size],
+  );
   const toggleSelectAll = () => {
     if (allSelectedInView) {
       setSelectedIds(new Set());
@@ -231,7 +238,7 @@ export const MembersScreen = ({theme: T, members, front, groups, initialSortMode
     <View>
       {selectionMode ? (
         <View style={s.headerRow}>
-          <Text style={[s.heading, {color: T.text, fontSize: 22}]} numberOfLines={1}>
+          <Text style={[s.heading, {color: T.text, fontSize: fs(22)}]} numberOfLines={1}>
             {t('members.selectedCount', {count: selectedIds.size, defaultValue: `${selectedIds.size} selected`})}
           </Text>
           <View style={{flexDirection: 'row', gap: 6}}>
@@ -247,7 +254,14 @@ export const MembersScreen = ({theme: T, members, front, groups, initialSortMode
         </View>
       ) : (
         <View style={s.headerRow}>
-          <Text style={[s.heading, {color: T.text}]}>{t('members.title')}</Text>
+          <View style={{flex: 1}}>
+            <Text style={[s.heading, {color: T.text}]}>{t('members.title')}</Text>
+            <Text style={{fontSize: fs(11), color: T.dim, marginTop: 2}}>
+              {(query || activeGroup || activeTag)
+                ? t('members.countFiltered', {filtered: filtered.length, total: tabMembers.length, defaultValue: `${filtered.length} of ${tabMembers.length} members`})
+                : t('members.count', {count: tabMembers.length, defaultValue: `${tabMembers.length} member${tabMembers.length === 1 ? '' : 's'}`})}
+            </Text>
+          </View>
           <View style={{flexDirection: 'row', gap: 6}}>
             <TouchableOpacity onPress={() => enterSelection()} activeOpacity={0.7}
               style={[s.addBtn, {backgroundColor: T.surface, borderColor: T.border}]}>
@@ -296,7 +310,6 @@ export const MembersScreen = ({theme: T, members, front, groups, initialSortMode
         ))}
       </View>
 
-      {/* Sort Mode */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{marginBottom: 10, flexGrow: 0}}>
         <View style={{flexDirection: 'row', gap: 6, paddingHorizontal: 2}}>
           {(['alphabetical', 'reverse-alphabetical', 'age', 'color', 'role', 'manual'] as const).map(mode => (
@@ -312,7 +325,6 @@ export const MembersScreen = ({theme: T, members, front, groups, initialSortMode
         </View>
       </ScrollView>
 
-      {/* Manage Groups Section */}
       {showManageGroups && (
         <View style={{backgroundColor: T.card, borderRadius: 12, borderWidth: 1, borderColor: T.border, padding: 14, marginBottom: 14}}>
           <Text style={{fontSize: fs(10), letterSpacing: 1, textTransform: 'uppercase', color: T.dim, fontWeight: '600', marginBottom: 10}}>{t('memberGroups.title')}</Text>
@@ -347,7 +359,6 @@ export const MembersScreen = ({theme: T, members, front, groups, initialSortMode
         </View>
       )}
 
-      {/* Group filter chips */}
       {groups.length > 0 && (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{marginBottom: 6}}>
           <View style={{flexDirection: 'row', gap: 6}}>
@@ -368,7 +379,6 @@ export const MembersScreen = ({theme: T, members, front, groups, initialSortMode
         </ScrollView>
       )}
 
-      {/* Tag filter chips */}
       {allTags.length > 0 && (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{marginBottom: 8}}>
           <View style={{flexDirection: 'row', gap: 6}}>
@@ -386,9 +396,9 @@ export const MembersScreen = ({theme: T, members, front, groups, initialSortMode
         </ScrollView>
       )}
 
-      {/* Search */}
       {tabMembers.length > 3 && (
         <TextInput value={query} onChangeText={setQuery} placeholder={t('members.search')} placeholderTextColor={T.muted}
+          autoCorrect={false} autoComplete="off" spellCheck={false} textContentType="none"
           style={[s.search, {backgroundColor: T.surface, color: T.text, borderColor: T.border}]} />
       )}
     </View>
@@ -399,7 +409,7 @@ export const MembersScreen = ({theme: T, members, front, groups, initialSortMode
       data={filtered}
       renderItem={renderMember}
       keyExtractor={(m: Member) => m.id}
-      extraData={{T, front, groups, showReorder, filteredLength: filtered.length, selectionMode, selectedCount: selectedIds.size}}
+      extraData={flashExtraData}
       contentContainerStyle={{padding: 16, paddingBottom: 32, backgroundColor: T.bg}}
       keyboardShouldPersistTaps="handled"
       ListHeaderComponent={ListHeader}

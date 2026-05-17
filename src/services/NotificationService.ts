@@ -88,27 +88,37 @@ export const showFrontNotification = async (
     const coConsciousNames = resolveNames(coConsciousIds, members);
 
     const duration = fmtDur(front.startTime);
-    const titleNames = primaryNames || coFrontNames || coConsciousNames || 'Unknown';
+    const titleNames = primaryNames || coFrontNames || coConsciousNames ||
+      i18n.t('common.unknown', {defaultValue: 'Unknown'});
     const title = `◈ ${titleNames}  ·  ${duration}`;
 
     const lines: string[] = [];
-    if (primaryIds.length > 0) lines.push(`Primary: ${primaryNames}`);
-    if (coFrontIds.length > 0) lines.push(`Co-Front: ${coFrontNames}`);
-    if (coConsciousIds.length > 0) lines.push(`Co-Conscious: ${coConsciousNames}`);
+    if (primaryIds.length > 0)
+      lines.push(i18n.t('notification.primary', {names: primaryNames, defaultValue: `Primary: ${primaryNames}`}));
+    if (coFrontIds.length > 0)
+      lines.push(i18n.t('notification.coFront', {names: coFrontNames, defaultValue: `Co-Front: ${coFrontNames}`}));
+    if (coConsciousIds.length > 0)
+      lines.push(i18n.t('notification.coConscious', {names: coConsciousNames, defaultValue: `Co-Conscious: ${coConsciousNames}`}));
 
     const primaryMood = getTierField(front, 'primary', 'mood');
     const primaryLocation = getTierField(front, 'primary', 'location');
     const primaryNote = getTierField(front, 'primary', 'note');
 
-    if (primaryMood) lines.push(`Mood: ${primaryMood}`);
-    if (primaryLocation) lines.push(`At: ${primaryLocation}`);
-    if (primaryNote) lines.push(`Note: ${primaryNote}`);
-    lines.push(`Since ${fmtTime(front.startTime)}`);
+    if (primaryMood)
+      lines.push(i18n.t('notification.mood', {mood: primaryMood, defaultValue: `Mood: ${primaryMood}`}));
+    if (primaryLocation)
+      lines.push(i18n.t('notification.at', {location: primaryLocation, defaultValue: `At: ${primaryLocation}`}));
+    if (primaryNote)
+      lines.push(i18n.t('notification.note', {note: primaryNote, defaultValue: `Note: ${primaryNote}`}));
+    lines.push(i18n.t('notification.since', {time: fmtTime(front.startTime), defaultValue: `Since ${fmtTime(front.startTime)}`}));
 
     const summaryParts: string[] = [];
-    if (coFrontIds.length > 0) summaryParts.push(`CF: ${coFrontNames}`);
-    if (coConsciousIds.length > 0) summaryParts.push(`CC: ${coConsciousNames}`);
-    if (primaryMood) summaryParts.push(`Mood: ${primaryMood}`);
+    if (coFrontIds.length > 0)
+      summaryParts.push(i18n.t('notification.cfShort', {names: coFrontNames, defaultValue: `CF: ${coFrontNames}`}));
+    if (coConsciousIds.length > 0)
+      summaryParts.push(i18n.t('notification.ccShort', {names: coConsciousNames, defaultValue: `CC: ${coConsciousNames}`}));
+    if (primaryMood)
+      summaryParts.push(i18n.t('notification.mood', {mood: primaryMood, defaultValue: `Mood: ${primaryMood}`}));
     summaryParts.push(duration);
     const summary = summaryParts.join('  ·  ');
 

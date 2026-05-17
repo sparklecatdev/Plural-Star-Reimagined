@@ -73,7 +73,10 @@
     "searchHint": "Digite um nome ou selecione uma tag para encontrar membros",
     "active": "Ativos",
     "archived": "Arquivados",
-    "noArchived": "Nenhum membro arquivado."
+    "noArchived": "Nenhum membro arquivado.",
+    "count": "{{count}} member",
+    "count_other": "{{count}} members",
+    "countFiltered": "{{filtered}} of {{total}} members"
   },
   "history": {
     "title": "Histórico",
@@ -134,7 +137,19 @@
     "areYouSure": "Tem certeza?",
     "searchTags": "Buscar tags…",
     "searchAuthors": "Buscar autores…",
-    "noEntriesFilter": "Nenhuma entrada corresponde a este filtro."
+    "noEntriesFilter": "Nenhuma entrada corresponde a este filtro.",
+    "entriesTab": "Entries",
+    "templatesTab": "Templates",
+    "noTemplates": "No templates yet. Create one to pre-fill new entries.",
+    "newTemplate": "+ New Template",
+    "editTemplate": "Edit Template",
+    "fromTemplate": "From template…",
+    "templateHint": "Pre-fill from a saved template?",
+    "pickTemplate": "Pick a template",
+    "templateName": "Template Name *",
+    "templateNamePlaceholder": "e.g. Morning Pages",
+    "templateTitle": "Entry Title (preset)",
+    "templateBody": "Entry Body (preset)"
   },
   "share": {
     "title": "Compartilhar e Exportar",
@@ -374,7 +389,9 @@
     "textSizeDesc": "Ajustar o tamanho do texto no app.",
     "textScaleNormal": "Normal",
     "textScaleLarge": "Grande",
-    "textScaleExtraLarge": "Extra Grande"
+    "textScaleExtraLarge": "Extra Grande",
+    "dyslexicFont": "Dyslexia-Friendly Font",
+    "dyslexicFontDesc": "Switches body text to OpenDyslexic. Headings keep their styled font."
   },
   "notification": {
     "locationPermTitle": "Localização",

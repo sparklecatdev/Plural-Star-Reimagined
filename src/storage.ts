@@ -18,6 +18,7 @@ export const KEYS = {
   noteboards: 'ps:noteboards',
   lastNoteboardSeen: 'ps:lastNoteboardSeen',
   polls:    'ps:polls',
+  journalTemplates: 'ps:journalTemplates',
 };
 
 const CRITICAL_KEYS = new Set([

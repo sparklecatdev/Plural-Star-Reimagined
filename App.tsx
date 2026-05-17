@@ -1,5 +1,5 @@
 import React, {useState, useEffect, useCallback, useMemo, useRef} from 'react';
-import {View, Text, Image, TouchableOpacity, StyleSheet, StatusBar, Platform, PermissionsAndroid, Alert} from 'react-native';
+import {View, Text, TextInput, Image, TouchableOpacity, StyleSheet, StatusBar, Platform, PermissionsAndroid, Alert} from 'react-native';
 import {SafeAreaProvider, useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useTranslation} from 'react-i18next';
 import notifee from '@notifee/react-native';
@@ -8,11 +8,11 @@ import './src/i18n/i18n';
 import i18n, {changeLanguage} from './src/i18n/i18n';
 import type {SupportedLanguage} from './src/i18n/i18n';
 
-import {T, BUILTIN_PALETTES, deriveTheme} from './src/theme';
+import {T, BUILTIN_PALETTES, deriveTheme, DYSLEXIC_FONT} from './src/theme';
 import type {CustomPalette, ThemeColors} from './src/theme';
 import {AccentText} from './src/components/AccentText';
 import {store, KEYS} from './src/storage';
-import {SystemInfo, Member, MemberGroup, FrontState, FrontTier, FrontTierKey, HistoryEntry, JournalEntry, ShareSettings, AppSettings, ChatChannel, ChatMessage, NoteboardEntry, DEFAULT_CHANNELS, findOpenFrontInHistory, migrateFrontState, frontToHistoryEntry, uid} from './src/utils';
+import {SystemInfo, Member, MemberGroup, FrontState, FrontTier, FrontTierKey, HistoryEntry, JournalEntry, JournalTemplate, ShareSettings, AppSettings, ChatChannel, ChatMessage, NoteboardEntry, DEFAULT_CHANNELS, findOpenFrontInHistory, migrateFrontState, frontToHistoryEntry, uid} from './src/utils';
 import {migrateInlineAvatars, migrateInlineChatMedia, clearAllMedia} from './src/utils/mediaUtils';
 import {showFrontNotification, clearFrontNotification, scheduleFrontCheckReminder, cancelFrontCheckReminder, showNoteboardNotification, clearNoteboardNotification} from './src/services/NotificationService';
 
@@ -37,7 +37,16 @@ const TAB_ICONS: Record<Tab, string> = {
   front: '◈', members: '◇', hub: '⬡', journal: '◉', history: '◷',
 };
 
-const DEFAULT_SETTINGS: AppSettings = {locations: [], customMoods: [], lightMode: false, gpsEnabled: false, filesEnabled: true, language: 'en', notificationsEnabled: true, noteboardNotifications: true, activePaletteId: '__dark__', textScale: 1.0};
+const DEFAULT_SETTINGS: AppSettings = {locations: [], customMoods: [], lightMode: false, gpsEnabled: false, filesEnabled: true, language: 'en', notificationsEnabled: true, noteboardNotifications: true, activePaletteId: '__dark__', textScale: 1.0, useDyslexicFont: true};
+
+const applyDyslexicDefault = (on: boolean) => {
+  const family = on ? DYSLEXIC_FONT : undefined;
+  (Text as any).defaultProps = (Text as any).defaultProps || {};
+  (Text as any).defaultProps.style = family ? {fontFamily: family} : undefined;
+  (TextInput as any).defaultProps = (TextInput as any).defaultProps || {};
+  (TextInput as any).defaultProps.style = family ? {fontFamily: family} : undefined;
+};
+applyDyslexicDefault(true);
 
 const getGPSLocation = (): Promise<string | null> =>
   new Promise(async resolve => {
@@ -83,6 +92,7 @@ function MainAppContent() {
   const [front, setFront] = useState<FrontState | null>(null);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [journal, setJournal] = useState<JournalEntry[]>([]);
+  const [journalTemplates, setJournalTemplates] = useState<JournalTemplate[]>([]);
   const [shareSettings, setShareSettings] = useState<ShareSettings>({showFront: true, showMembers: true, showDescriptions: false});
   const [appSettings, setAppSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
   const [groups, setGroups] = useState<MemberGroup[]>([]);
@@ -100,8 +110,17 @@ function MainAppContent() {
   const [showJournal, setShowJournal] = useState(false);
   const [editJournal, setEditJournal] = useState<JournalEntry | null>(null);
   const [showSystem, setShowSystem] = useState(false);
-
+  const [, setDyslexicTick] = useState(0);
   const insets = useSafeAreaInsets();
+  const fs = (s: number) => Math.round(s * (appSettings.textScale || 1));
+
+  const openMemberById = (id: string) => {
+    const m = members.find(mb => mb.id === id);
+    if (!m) return;
+    setEditMember(m);
+    setViewOnlyMember(true);
+    setShowMember(true);
+  };
 
   const C: ThemeColors = useMemo(() => {
     const allPals = [...BUILTIN_PALETTES, ...palettes];
@@ -131,12 +150,13 @@ function MainAppContent() {
 
   const loadAll = useCallback(async () => {
     try {
-      const [sys, mem, fr, hist, jour, share, settings, savedLang, grps, savedPalettes, savedChannels] = await Promise.all([
+      const [sys, mem, fr, hist, jour, jourTemplates, share, settings, savedLang, grps, savedPalettes, savedChannels] = await Promise.all([
         store.get<SystemInfo>(KEYS.system),
         store.get<Member[]>(KEYS.members, []),
         store.get<any>(KEYS.front),
         store.get<HistoryEntry[]>(KEYS.history, []),
         store.get<JournalEntry[]>(KEYS.journal, []),
+        store.get<JournalTemplate[]>(KEYS.journalTemplates, []),
         store.get<ShareSettings>(KEYS.share, {showFront: true, showMembers: true, showDescriptions: false}),
         store.get<AppSettings>(KEYS.settings, DEFAULT_SETTINGS),
         store.get<string>(KEYS.language, ''),
@@ -169,6 +189,7 @@ function MainAppContent() {
       }
       setHistory(hist || []);
       setJournal(jour || []);
+      setJournalTemplates(jourTemplates || []);
       setShareSettings(share || {showFront: true, showMembers: true, showDescriptions: false});
       const mergedSettings = {...DEFAULT_SETTINGS, ...(settings || {})};
       setAppSettings(mergedSettings);
@@ -198,6 +219,7 @@ function MainAppContent() {
       setFront(null);
       setHistory([]);
       setJournal([]);
+      setJournalTemplates([]);
       setShareSettings({showFront: true, showMembers: true, showDescriptions: false});
       setAppSettings(DEFAULT_SETTINGS);
       setGroups([]);
@@ -267,6 +289,11 @@ function MainAppContent() {
   useEffect(() => { if (loaded && !firstRun) requestPermissions(); }, [loaded, firstRun]);
 
   useEffect(() => {
+    applyDyslexicDefault(appSettings.useDyslexicFont !== false);
+    setDyslexicTick(t => t + 1);
+  }, [appSettings.useDyslexicFont]);
+
+  useEffect(() => {
     if (appSettings.notificationsEnabled) { showFrontNotification(front, members, system.name).catch(e => console.error('[PS] notif error:', e)); }
     else { clearFrontNotification().catch(e => console.error('[PS] clear notif error:', e)); }
   }, [front, members, appSettings.notificationsEnabled, system.name]);
@@ -312,7 +339,7 @@ function MainAppContent() {
       clearNoteboardNotification().catch(() => {});
       return;
     }
-    if (newlyFronting.length === 0) return; // No transition, nothing to do.
+    if (newlyFronting.length === 0) return;
     (async () => {
       try {
         const allNotes = await store.get<NoteboardEntry[]>(KEYS.noteboards, []) || [];
@@ -350,6 +377,10 @@ function MainAppContent() {
   const saveJournal = async (d: JournalEntry[]) => {
     if (!loaded && d.length === 0) return;
     setJournal(d); await store.set(KEYS.journal, d);
+  };
+  const saveJournalTemplates = async (d: JournalTemplate[]) => {
+    if (!loaded && d.length === 0) return;
+    setJournalTemplates(d); await store.set(KEYS.journalTemplates, d);
   };
   const saveShareSettings = async (d: ShareSettings) => {setShareSettings(d); await store.set(KEYS.share, d);};
   const saveGroups = async (d: MemberGroup[]) => {
@@ -502,7 +533,7 @@ function MainAppContent() {
   const handleDeleteAccount = async () => {
     await clearFrontNotification(); await store.clearAll(); await clearAllMedia();
     setSystem({name: '', description: ''}); setMembers([]); setFront(null);
-    setHistory([]); setJournal([]);
+    setHistory([]); setJournal([]); setJournalTemplates([]);
     setShareSettings({showFront: true, showMembers: true, showDescriptions: false});
     setAppSettings(DEFAULT_SETTINGS); setGroups([]); setPalettes([]); setActivePaletteId('__dark__');
     setChatChannels([]); setAllChatMessages([]);
@@ -553,7 +584,7 @@ function MainAppContent() {
   );
 
   const renderChatScreen = () => (
-    <ChatScreen theme={C} members={members} channels={chatChannels} onSaveChannels={saveChatChannels} />
+    <ChatScreen theme={C} members={members} channels={chatChannels} onSaveChannels={saveChatChannels} onMentionPress={openMemberById} />
   );
 
   const renderCustomFieldsScreen = () => (
@@ -594,7 +625,7 @@ function MainAppContent() {
       case 'hub':
         return <HubScreen theme={C} members={members} history={history} front={front} onSaveHistory={saveHistory} onSetFront={handleHubSetFront} renderShareScreen={renderShareScreen} renderStatsScreen={renderStatsScreen} renderChatScreen={renderChatScreen} renderCustomFieldsScreen={renderCustomFieldsScreen} renderPollsScreen={renderPollsScreen} resetKey={hubResetKey} editHistoryIndex={editHistoryIndex} onClearEditHistory={() => setEditHistoryIndex(null)} />;
       case 'journal':
-        return <JournalScreen theme={C} journal={journal} members={members} systemJournalPassword={system.journalPassword} onAdd={() => {setEditJournal(null); setShowJournal(true);}} onEdit={e => {setEditJournal(e); setShowJournal(true);}} onDelete={deleteEntry} />;
+        return <JournalScreen theme={C} journal={journal} templates={journalTemplates} members={members} systemJournalPassword={system.journalPassword} onAdd={() => {setEditJournal(null); setShowJournal(true);}} onEdit={e => {setEditJournal(e); setShowJournal(true);}} onDelete={deleteEntry} onSaveTemplates={saveJournalTemplates} onMentionPress={openMemberById} />;
       case 'history':
         return <HistoryScreen theme={C} history={history} journal={journal} getMember={getMember} members={members} onSaveHistory={saveHistory} onEditEntry={(idx: number) => {setEditHistoryIndex(idx); setTab('hub');}} />;
     }
@@ -603,7 +634,7 @@ function MainAppContent() {
   return (
     <View style={[styles.root, {backgroundColor: C.bg}]}>
       <StatusBar barStyle={C.isLight ? 'dark-content' : 'light-content'} backgroundColor={C.bg} translucent={false} />
-      <View style={{backgroundColor: C.bg, paddingTop: Platform.OS === 'ios' ? Math.max(insets.top - 6, 0) : StatusBar.currentHeight || 0}}>
+      <View style={{backgroundColor: C.bg, paddingTop: Platform.OS === 'ios' ? Math.max(insets.top - 6, 0) : Math.max(StatusBar.currentHeight || 0, insets.top || 0, 28)}}>
         <View style={[styles.header, {borderBottomColor: C.border, backgroundColor: C.bg}]}>
           <AccentText T={C} style={[styles.headerTitle, {color: C.accent}]}>{system.name}</AccentText>
           <View style={styles.headerRight}>
@@ -624,8 +655,8 @@ function MainAppContent() {
       <View style={[styles.tabBar, {backgroundColor: C.surface, borderTopColor: C.border}]}>
         {TAB_IDS.map(id => (
           <TouchableOpacity key={id} onPress={() => { if (id === 'hub' && tab === 'hub') setHubResetKey(k => k + 1); setTab(id); }} activeOpacity={0.7} style={[styles.tabBtn, {paddingBottom: 8 + (insets.bottom || 0)}]}>
-            <AccentText T={C} style={[styles.tabIcon, {color: tab === id ? C.accent : C.dim}]}>{TAB_ICONS[id]}</AccentText>
-            <AccentText T={C} style={[styles.tabLabel, {color: tab === id ? C.accent : C.dim}]}>{t(`tabs.${id}`)}</AccentText>
+            <AccentText T={C} style={[styles.tabIcon, {color: tab === id ? C.accent : C.dim, fontSize: fs(18)}]}>{TAB_ICONS[id]}</AccentText>
+            <AccentText T={C} style={[styles.tabLabel, {color: tab === id ? C.accent : C.dim, fontSize: fs(9)}]}>{t(`tabs.${id}`)}</AccentText>
           </TouchableOpacity>
         ))}
       </View>
@@ -642,10 +673,12 @@ function MainAppContent() {
       )}
       <MemberModal key={`${editMember?.id || 'new-member'}-${viewOnlyMember ? 'view' : 'edit'}`} visible={showMember} theme={C} member={editMember} members={members} groups={groups} settings={appSettings}
         readOnly={viewOnlyMember}
+        onMentionPress={openMemberById}
         onSave={async (m: Member) => {await saveMember(m); setShowMember(false); setEditMember(null); setViewOnlyMember(false);}}
         onDelete={async (id: string) => {await deleteMember(id); setShowMember(false); setEditMember(null); setViewOnlyMember(false);}}
         onClose={() => {setShowMember(false); setEditMember(null); setViewOnlyMember(false);}} />
-      <JournalModal visible={showJournal} theme={C} entry={editJournal} members={members}
+      <JournalModal visible={showJournal} theme={C} entry={editJournal} members={members} templates={journalTemplates}
+        onMentionPress={openMemberById}
         onSave={async (e: JournalEntry) => {await saveEntry(e); setShowJournal(false);}}
         onClose={() => setShowJournal(false)} />
       <SystemModal visible={showSystem} theme={C} system={system} settings={appSettings}

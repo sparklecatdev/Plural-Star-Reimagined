@@ -171,7 +171,6 @@ export const HistoryScreen = ({theme: T, history, journal, getMember, members, o
 
   return (
     <View style={{flex: 1, backgroundColor: T.bg}}>
-      {/* Subtab header */}
       <View style={{backgroundColor: T.bg, paddingHorizontal: 16, paddingTop: 16}}>
         <Text style={[s.heading, {color: T.text}]}>{t('history.title')}</Text>
         <View style={{flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: T.border, marginTop: 4}}>
@@ -193,7 +192,6 @@ export const HistoryScreen = ({theme: T, history, journal, getMember, members, o
         </View>
       </View>
 
-      {/* ── FRONT HISTORY ── */}
       {subTab === 'front' && (
         <FlashList
           data={frontHistoryRows}
@@ -323,7 +321,6 @@ export const HistoryScreen = ({theme: T, history, journal, getMember, members, o
         />
       )}
 
-      {/* ── MEMBER HISTORY ── */}
       {subTab === 'member' && (
         <View style={{flex: 1}}>
           {members.length === 0 ? (
@@ -368,7 +365,6 @@ export const HistoryScreen = ({theme: T, history, journal, getMember, members, o
                 )}
               </View>
 
-              {/* Stats summary */}
               {selectedMember && allMemberEvents.length > 0 && (() => {
                 const frontE = memberHistoryEvents.filter(e => !e.entry.changeType || e.entry.changeType === 'front');
                 const totalMs = frontE.reduce((sum, e) => sum + ((e.entry.endTime ?? Date.now()) - e.entry.startTime), 0);

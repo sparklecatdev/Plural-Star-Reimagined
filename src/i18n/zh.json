@@ -73,7 +73,10 @@
     "searchHint": "输入名字或选择标签来查找成员",
     "active": "活跃",
     "archived": "已归档",
-    "noArchived": "没有已归档的成员。"
+    "noArchived": "没有已归档的成员。",
+    "count": "{{count}} member",
+    "count_other": "{{count}} members",
+    "countFiltered": "{{filtered}} of {{total}} members"
   },
   "history": {
     "title": "历史",
@@ -134,7 +137,19 @@
     "deleteEntry": "删除条目",
     "areYouSure": "确定吗？",
     "searchTags": "搜索标签…",
-    "searchAuthors": "搜索作者…"
+    "searchAuthors": "搜索作者…",
+    "entriesTab": "Entries",
+    "templatesTab": "Templates",
+    "noTemplates": "No templates yet. Create one to pre-fill new entries.",
+    "newTemplate": "+ New Template",
+    "editTemplate": "Edit Template",
+    "fromTemplate": "From template…",
+    "templateHint": "Pre-fill from a saved template?",
+    "pickTemplate": "Pick a template",
+    "templateName": "Template Name *",
+    "templateNamePlaceholder": "e.g. Morning Pages",
+    "templateTitle": "Entry Title (preset)",
+    "templateBody": "Entry Body (preset)"
   },
   "share": {
     "title": "分享与导出",
@@ -374,7 +389,9 @@
     "textSizeDesc": "调整应用内的文本大小。",
     "textScaleNormal": "正常",
     "textScaleLarge": "大",
-    "textScaleExtraLarge": "特大"
+    "textScaleExtraLarge": "特大",
+    "dyslexicFont": "Dyslexia-Friendly Font",
+    "dyslexicFontDesc": "Switches body text to OpenDyslexic. Headings keep their styled font."
   },
   "notification": {
     "locationPermTitle": "位置权限",

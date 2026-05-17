@@ -73,7 +73,10 @@
     "searchHint": "Kirjoita nimi tai valitse tunniste",
     "active": "Aktiivinen",
     "archived": "Arkistoitu",
-    "noArchived": "Ei arkistoituja jäseniä."
+    "noArchived": "Ei arkistoituja jäseniä.",
+    "count": "{{count}} member",
+    "count_other": "{{count}} members",
+    "countFiltered": "{{filtered}} of {{total}} members"
   },
   "history": {
     "title": "Historia",
@@ -134,7 +137,19 @@
     "unlock": "Avaa",
     "searchTags": "Hae tunnisteita…",
     "searchAuthors": "Hae kirjoittajia…",
-    "noEntriesFilter": "Mikään merkintä ei vastaa tätä suodatinta."
+    "noEntriesFilter": "Mikään merkintä ei vastaa tätä suodatinta.",
+    "entriesTab": "Entries",
+    "templatesTab": "Templates",
+    "noTemplates": "No templates yet. Create one to pre-fill new entries.",
+    "newTemplate": "+ New Template",
+    "editTemplate": "Edit Template",
+    "fromTemplate": "From template…",
+    "templateHint": "Pre-fill from a saved template?",
+    "pickTemplate": "Pick a template",
+    "templateName": "Template Name *",
+    "templateNamePlaceholder": "e.g. Morning Pages",
+    "templateTitle": "Entry Title (preset)",
+    "templateBody": "Entry Body (preset)"
   },
   "share": {
     "title": "Jaa & Vie",
@@ -374,7 +389,9 @@
     "editFrontDetails": "Muokkaa frontin tietoja",
     "headmateName": "Jäsenen nimi",
     "noteOptional": "Muistiinpano (valinnainen)",
-    "updateFront": "Päivitä front"
+    "updateFront": "Päivitä front",
+    "dyslexicFont": "Dyslexia-Friendly Font",
+    "dyslexicFontDesc": "Switches body text to OpenDyslexic. Headings keep their styled font."
   },
   "notification": {
     "locationPermTitle": "Sijainti",

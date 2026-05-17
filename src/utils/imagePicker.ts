@@ -1,0 +1,35 @@
+import {launchImageLibrary} from 'react-native-image-picker';
+
+export interface PickedImage {
+  uri: string;
+  base64?: string;
+  fileName?: string;
+  type?: string;
+  width?: number;
+  height?: number;
+}
+
+export const pickImageFromGallery = async (
+  opts: {includeBase64?: boolean; quality?: number} = {},
+): Promise<PickedImage | null> => {
+  const result = await launchImageLibrary({
+    mediaType: 'photo',
+    selectionLimit: 1,
+    includeBase64: opts.includeBase64 ?? false,
+    quality: opts.quality ?? 1,
+  });
+  if (result.didCancel) return null;
+  if (result.errorCode) {
+    throw new Error(result.errorMessage || result.errorCode);
+  }
+  const a = result.assets?.[0];
+  if (!a || !a.uri) return null;
+  return {
+    uri: a.uri,
+    base64: a.base64,
+    fileName: a.fileName,
+    type: a.type,
+    width: a.width,
+    height: a.height,
+  };
+};

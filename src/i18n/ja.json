@@ -73,7 +73,10 @@
     "searchHint": "名前を入力するかタグを選択してメンバーを検索",
     "active": "アクティブ",
     "archived": "アーカイブ済み",
-    "noArchived": "アーカイブされたメンバーはいません。"
+    "noArchived": "アーカイブされたメンバーはいません。",
+    "count": "{{count}} member",
+    "count_other": "{{count}} members",
+    "countFiltered": "{{filtered}} of {{total}} members"
   },
   "history": {
     "title": "履歴",
@@ -134,7 +137,19 @@
     "deleteEntry": "エントリを削除",
     "areYouSure": "よろしいですか？",
     "searchTags": "タグを検索…",
-    "searchAuthors": "著者を検索…"
+    "searchAuthors": "著者を検索…",
+    "entriesTab": "Entries",
+    "templatesTab": "Templates",
+    "noTemplates": "No templates yet. Create one to pre-fill new entries.",
+    "newTemplate": "+ New Template",
+    "editTemplate": "Edit Template",
+    "fromTemplate": "From template…",
+    "templateHint": "Pre-fill from a saved template?",
+    "pickTemplate": "Pick a template",
+    "templateName": "Template Name *",
+    "templateNamePlaceholder": "e.g. Morning Pages",
+    "templateTitle": "Entry Title (preset)",
+    "templateBody": "Entry Body (preset)"
   },
   "share": {
     "title": "共有とエクスポート",
@@ -374,7 +389,9 @@
     "textSizeDesc": "アプリ全体のテキストサイズを調整。",
     "textScaleNormal": "標準",
     "textScaleLarge": "大",
-    "textScaleExtraLarge": "特大"
+    "textScaleExtraLarge": "特大",
+    "dyslexicFont": "Dyslexia-Friendly Font",
+    "dyslexicFontDesc": "Switches body text to OpenDyslexic. Headings keep their styled font."
   },
   "notification": {
     "locationPermTitle": "位置情報の許可",

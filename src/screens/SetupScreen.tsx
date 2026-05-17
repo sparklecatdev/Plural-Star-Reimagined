@@ -1,7 +1,8 @@
 import React, {useState} from 'react';
-import {View, Text, Image, StyleSheet, ScrollView, KeyboardAvoidingView, Platform, TouchableOpacity, TextInput} from 'react-native';
+import {View, Text, Image, StyleSheet, ScrollView, KeyboardAvoidingView, TouchableOpacity, TextInput} from 'react-native';
 import {useTranslation} from 'react-i18next';
 import {Fonts} from '../theme';
+import {useKeyboardBehavior} from '../hooks/useKeyboardBehavior';
 
 interface Props {
   theme: any;
@@ -9,12 +10,16 @@ interface Props {
 }
 
 export const SetupScreen = ({theme: T, onSave}: Props) => {
+  const fs = (s: number) => Math.round(s * (T?.textScale || 1));
   const {t} = useTranslation();
   const [name, setName] = useState('');
   const [desc, setDesc] = useState('');
+  const behavior = useKeyboardBehavior();
 
   return (
-    <KeyboardAvoidingView style={{flex: 1, backgroundColor: T.bg}} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoidingView
+      style={{flex: 1, backgroundColor: T.bg}}
+      behavior={behavior}>
       <ScrollView contentContainerStyle={s.container} keyboardShouldPersistTaps="handled">
         <Image source={require('../assets/splash-logo.png')} style={s.logo} resizeMode="contain" />
         <Text style={[s.heading, {color: T.accent}]}>{t('setup.welcome')}</Text>

@@ -73,7 +73,10 @@
     "searchHint": "Skriv et navn eller velg en tag",
     "active": "Aktiv",
     "archived": "Arkivert",
-    "noArchived": "Ingen arkiverte medlemmer."
+    "noArchived": "Ingen arkiverte medlemmer.",
+    "count": "{{count}} member",
+    "count_other": "{{count}} members",
+    "countFiltered": "{{filtered}} of {{total}} members"
   },
   "history": {
     "title": "Historikk",
@@ -134,7 +137,19 @@
     "unlock": "Lås Opp",
     "searchTags": "Søk tagger…",
     "searchAuthors": "Søk forfattere…",
-    "noEntriesFilter": "Ingen oppføringer samsvarer med dette filteret."
+    "noEntriesFilter": "Ingen oppføringer samsvarer med dette filteret.",
+    "entriesTab": "Entries",
+    "templatesTab": "Templates",
+    "noTemplates": "No templates yet. Create one to pre-fill new entries.",
+    "newTemplate": "+ New Template",
+    "editTemplate": "Edit Template",
+    "fromTemplate": "From template…",
+    "templateHint": "Pre-fill from a saved template?",
+    "pickTemplate": "Pick a template",
+    "templateName": "Template Name *",
+    "templateNamePlaceholder": "e.g. Morning Pages",
+    "templateTitle": "Entry Title (preset)",
+    "templateBody": "Entry Body (preset)"
   },
   "share": {
     "title": "Del & Eksporter",
@@ -374,7 +389,9 @@
     "editFrontDetails": "Rediger front-detaljer",
     "headmateName": "Medlemsnavn",
     "noteOptional": "Notat (valgfritt)",
-    "updateFront": "Oppdater front"
+    "updateFront": "Oppdater front",
+    "dyslexicFont": "Dyslexia-Friendly Font",
+    "dyslexicFontDesc": "Switches body text to OpenDyslexic. Headings keep their styled font."
   },
   "notification": {
     "locationPermTitle": "Plassering",

@@ -2,15 +2,9 @@ import React, {useState, useMemo} from 'react';
 import {View, Text, ScrollView, TouchableOpacity} from 'react-native';
 import {useTranslation} from 'react-i18next';
 import {Fonts} from '../theme';
-import {Member, HistoryEntry, ChatMessage, fmtDur, getInitials, translateMood} from '../utils';
+import {Member, HistoryEntry, ChatMessage, fmtDur, translateMood} from '../utils';
 import {DateTimeEditor} from '../components/DateTimeEditor';
-
-const Avatar = ({member, size = 28, T}: {member?: Member | null; size?: number; T: any}) => (
-  <View style={{width: size, height: size, borderRadius: size / 2, backgroundColor: member?.color || T.toggleOff,
-    alignItems: 'center', justifyContent: 'center'}}>
-    <Text style={{fontSize: size * 0.35, fontWeight: '700', color: 'rgba(0,0,0,0.75)'}}>{getInitials(member?.name || '?')}</Text>
-  </View>
-);
+import {Avatar} from '../components/Avatar';
 
 type TimeRange = 'all' | '7d' | '30d' | 'custom';
 
@@ -277,7 +271,6 @@ export const StatsScreen = ({theme: T, history, members, chatMessages}: Props) =
       <Leaderboard title={t('stats.topMoods')} entries={stats.topMoods} renderValue={v => `${v}x`} formatKey={m => translateMood(m, t)} />
       <Leaderboard title={t('stats.topLocations')} entries={stats.topLocations} renderValue={v => `${v}x`} />
 
-      {/* Energy Averages */}
       {stats.energyAvgs.length > 0 && (
         <View style={{marginBottom: 16}}>
           <Text style={{fontSize: fs(10), letterSpacing: 1, textTransform: 'uppercase', color: T.dim, fontWeight: '600', marginBottom: 8}}>{t('energy.avgEnergy')}</Text>
@@ -297,7 +290,6 @@ export const StatsScreen = ({theme: T, history, members, chatMessages}: Props) =
         </View>
       )}
 
-      {/* Peak Hours */}
       {stats.peakHours.some((v: number) => v > 0) && (
         <View style={{marginBottom: 16}}>
           <Text style={{fontSize: fs(10), letterSpacing: 1, textTransform: 'uppercase', color: T.dim, fontWeight: '600', marginBottom: 8}}>{t('stats.peakHours')}</Text>
@@ -314,14 +306,13 @@ export const StatsScreen = ({theme: T, history, members, chatMessages}: Props) =
           <View style={{flexDirection: 'row', gap: 1, marginTop: 2}}>
             {stats.peakHours.map((_: number, h: number) => (
               <View key={h} style={{flex: 1, alignItems: 'center'}}>
-                <Text style={{fontSize: 7, color: T.muted}}>{h % 6 === 0 ? h : ''}</Text>
+                <Text style={{fontSize: fs(7), color: T.muted}}>{h % 6 === 0 ? h : ''}</Text>
               </View>
             ))}
           </View>
         </View>
       )}
 
-      {/* Member Leaderboard */}
       <View style={{marginBottom: 16}}>
         <Text style={{fontSize: fs(10), letterSpacing: 1, textTransform: 'uppercase', color: T.dim, fontWeight: '600', marginBottom: 8}}>{t('stats.topCoMembers')}</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{marginBottom: 10, flexGrow: 0}}>

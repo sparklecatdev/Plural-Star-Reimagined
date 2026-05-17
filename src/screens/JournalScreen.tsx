@@ -2,21 +2,27 @@ import React, {useState} from 'react';
 import {View, Text, ScrollView, TouchableOpacity, TextInput, Modal, Alert, Image, StyleSheet} from 'react-native';
 import {useTranslation} from 'react-i18next';
 import {Fonts} from '../theme';
-import {JournalEntry, Member, fmtTime} from '../utils';
+import {JournalEntry, JournalTemplate, Member, fmtTime} from '../utils';
 import {exportEntryTxt, exportEntryMd, exportEntryJSON} from '../export/exportUtils';
 import {RichText} from '../components/MarkdownRenderer';
+import {JournalTemplateModal} from '../modals';
 
 interface Props {
   theme: any;
   journal: JournalEntry[];
+  templates: JournalTemplate[];
   members: Member[];
   systemJournalPassword?: string;
   onAdd: () => void;
   onEdit: (entry: JournalEntry) => void;
   onDelete: (id: string) => void;
+  onSaveTemplates: (t: JournalTemplate[]) => void;
+  onMentionPress?: (memberId: string) => void;
 }
 
-export const JournalScreen = ({theme: T, journal, members, systemJournalPassword, onAdd, onEdit, onDelete}: Props) => {
+type JournalSubTab = 'entries' | 'templates';
+
+export const JournalScreen = ({theme: T, journal, templates, members, systemJournalPassword, onAdd, onEdit, onDelete, onSaveTemplates, onMentionPress}: Props) => {
   const {t} = useTranslation();
   const fs = (s: number) => Math.round(s * (T.textScale || 1));
   const [journalUnlocked, setJournalUnlocked] = useState(!systemJournalPassword);
@@ -33,6 +39,21 @@ export const JournalScreen = ({theme: T, journal, members, systemJournalPassword
   const [authorSearch, setAuthorSearch] = useState('');
   const [showTagResults, setShowTagResults] = useState(false);
   const [showAuthorResults, setShowAuthorResults] = useState(false);
+  const [subTab, setSubTab] = useState<JournalSubTab>('entries');
+  const [editingTemplate, setEditingTemplate] = useState<JournalTemplate | 'new' | null>(null);
+
+  const handleSaveTemplate = (tpl: JournalTemplate) => {
+    const existing = templates.find(x => x.id === tpl.id);
+    const next = existing
+      ? templates.map(x => (x.id === tpl.id ? tpl : x))
+      : [...templates, tpl];
+    onSaveTemplates(next);
+    setEditingTemplate(null);
+  };
+  const handleDeleteTemplate = (id: string) => {
+    onSaveTemplates(templates.filter(x => x.id !== id));
+    setEditingTemplate(null);
+  };
 
   const getMember = (id: string) => members.find(m => m.id === id);
   const allTags = [...new Set(journal.flatMap(e => e.hashtags || []))].sort();
@@ -111,11 +132,75 @@ export const JournalScreen = ({theme: T, journal, members, systemJournalPassword
     <ScrollView style={{flex: 1, backgroundColor: T.bg}} contentContainerStyle={s.content} keyboardShouldPersistTaps="handled">
       <View style={s.headerRow}>
         <Text style={[s.heading, {color: T.text}]}>{t('journal.title')}</Text>
-        <TouchableOpacity onPress={onAdd} activeOpacity={0.7}
+        <TouchableOpacity
+          onPress={() => subTab === 'entries' ? onAdd() : setEditingTemplate('new')}
+          activeOpacity={0.7}
           style={{paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, borderWidth: 1, backgroundColor: T.accentBg, borderColor: `${T.accent}40`}}>
-          <Text style={{fontSize: fs(13), fontWeight: '500', color: T.accent}}>{t('journal.new')}</Text>
+          <Text style={{fontSize: fs(13), fontWeight: '500', color: T.accent}}>
+            {subTab === 'entries'
+              ? t('journal.new')
+              : t('journal.newTemplate', {defaultValue: '+ Template'})}
+          </Text>
         </TouchableOpacity>
       </View>
+
+      <View style={{flexDirection: 'row', gap: 0, marginBottom: 14, borderBottomWidth: 1, borderBottomColor: T.border}}>
+        {(['entries', 'templates'] as JournalSubTab[]).map(tab => (
+          <TouchableOpacity key={tab} onPress={() => setSubTab(tab)} activeOpacity={0.7}
+            style={{paddingVertical: 10, paddingHorizontal: 16, borderBottomWidth: 2, borderBottomColor: subTab === tab ? T.accent : 'transparent'}}>
+            <Text style={{fontSize: fs(13), color: subTab === tab ? T.accent : T.dim, fontWeight: subTab === tab ? '600' : '400'}}>
+              {tab === 'entries'
+                ? t('journal.entriesTab', {defaultValue: 'Entries'})
+                : t('journal.templatesTab', {defaultValue: 'Templates'})}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      {subTab === 'templates' ? (
+        templates.length === 0 ? (
+          <View style={{alignItems: 'center', paddingVertical: 48}}>
+            <Text style={{fontSize: fs(36), opacity: 0.4, marginBottom: 12}}>◫</Text>
+            <Text style={{fontSize: fs(13), color: T.dim, textAlign: 'center', marginBottom: 16}}>
+              {t('journal.noTemplates', {defaultValue: 'No templates yet. Create one to pre-fill new entries.'})}
+            </Text>
+            <TouchableOpacity onPress={() => setEditingTemplate('new')} activeOpacity={0.7}
+              style={{paddingHorizontal: 16, paddingVertical: 9, borderRadius: 8, borderWidth: 1, backgroundColor: T.accentBg, borderColor: `${T.accent}40`}}>
+              <Text style={{fontSize: fs(14), fontWeight: '500', color: T.accent}}>
+                {t('journal.newTemplate', {defaultValue: '+ New Template'})}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <View style={{gap: 9}}>
+            {templates.map(tpl => (
+              <TouchableOpacity key={tpl.id} onPress={() => setEditingTemplate(tpl)} activeOpacity={0.7}
+                style={{backgroundColor: T.card, borderRadius: 10, borderWidth: 1, borderColor: T.border, padding: 14}}>
+                <View style={{flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4}}>
+                  <Text style={{fontSize: fs(14), fontWeight: '600', color: T.text, flex: 1}} numberOfLines={1}>{tpl.name}</Text>
+                  <Text style={{fontSize: fs(11), color: T.muted}}>✎</Text>
+                </View>
+                {tpl.title ? (
+                  <Text style={{fontSize: fs(12), color: T.dim, marginBottom: 4}} numberOfLines={1}>{tpl.title}</Text>
+                ) : null}
+                {tpl.body ? (
+                  <Text style={{fontSize: fs(11), color: T.muted, marginBottom: 4}} numberOfLines={2}>
+                    {tpl.body.replace(/<[^>]+>/g, '').replace(/[#*`~_]/g, '').trim()}
+                  </Text>
+                ) : null}
+                {(tpl.hashtags || []).length > 0 && (
+                  <View style={{flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 4}}>
+                    {tpl.hashtags.slice(0, 8).map(tag => (
+                      <Text key={tag} style={{fontSize: fs(10), color: T.info, paddingHorizontal: 6, paddingVertical: 1, borderRadius: 4, backgroundColor: `${T.info}15`}}>{tag}</Text>
+                    ))}
+                  </View>
+                )}
+              </TouchableOpacity>
+            ))}
+          </View>
+        )
+      ) : (
+      <>
 
       {allTags.length > 0 && (
         <View style={{marginBottom: 8}}>
@@ -228,7 +313,7 @@ export const JournalScreen = ({theme: T, journal, members, systemJournalPassword
                   </TouchableOpacity>
                 ) : (
                   <>
-                    {e.body ? <View style={{maxHeight: 80, overflow: 'hidden'}}><RichText text={e.body} T={T} numberOfLines={4} /></View> : null}
+                    {e.body ? <View style={{maxHeight: 80, overflow: 'hidden'}}><RichText text={e.body} T={T} numberOfLines={4} members={members} onMentionPress={onMentionPress} /></View> : null}
                     {(e.hashtags || []).length > 0 && (
                       <View style={{flexDirection: 'row', flexWrap: 'wrap', gap: 5, marginTop: 8}}>
                         {(e.hashtags || []).map(tag => (
@@ -246,6 +331,16 @@ export const JournalScreen = ({theme: T, journal, members, systemJournalPassword
           })}
         </View>
       )}
+      </>
+      )}
+
+      <JournalTemplateModal
+        visible={editingTemplate !== null}
+        theme={T}
+        template={editingTemplate === 'new' ? null : editingTemplate}
+        onSave={handleSaveTemplate}
+        onDelete={handleDeleteTemplate}
+        onClose={() => setEditingTemplate(null)} />
 
       <Modal visible={!!exportMenuEntry} transparent animationType="fade" onRequestClose={() => setExportMenuEntry(null)}>
         <View style={s.overlay}>

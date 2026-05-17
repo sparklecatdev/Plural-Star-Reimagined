@@ -20,6 +20,7 @@ interface Props {
 }
 
 export const ShareScreen = ({theme: T, system, members, front, history, journal, shareSettings, appSettings, onSettingsChange, getMember, onDataImported, onAddJournalEntry, onDeleteAccount}: Props) => {
+  const fs = (s: number) => Math.round(s * (T?.textScale || 1));
   const {t} = useTranslation();
   const [section, setSection] = useState<Section>('export');
   const [emailAddr, setEmailAddr] = useState('');
@@ -283,7 +284,7 @@ export const ShareScreen = ({theme: T, system, members, front, history, journal,
                 const b64 = raw.startsWith('data:') ? raw.split(',')[1] : raw;
                 const fileUri = await saveBannerFromBase64(memberId, b64).catch(() => null);
                 if (fileUri) { withBanners[i] = {...withBanners[i], banner: fileUri}; changed = true; }
-              } catch { /* skip — member keeps no banner */ }
+              } catch {}
             }
             if (changed) await store.set(KEYS.members, withBanners);
           }
@@ -615,8 +616,8 @@ export const ShareScreen = ({theme: T, system, members, front, history, journal,
             }
             const currentMembers = await store.get<Member[]>(KEYS.members, []) || [];
             let diagLogged = 0;
-            let membersMatched = 0;       // resolved by idMap
-            let membersWithInfo = 0;      // had a populated info-shaped object
+            let membersMatched = 0;
+            let membersWithInfo = 0;
             let totalInfoKeys = 0;
             let matchedKeys = 0;
             const unmatchedKeySamples = new Set<string>();
@@ -1058,7 +1059,7 @@ export const ShareScreen = ({theme: T, system, members, front, history, journal,
     <TouchableOpacity onPress={() => setSection(id)} activeOpacity={0.7}
       style={{flex: 1, paddingVertical: 8, borderRadius: 7, borderWidth: 1, alignItems: 'center',
         backgroundColor: section === id ? T.accentBg : 'transparent', borderColor: section === id ? `${T.accent}40` : T.border}}>
-      <Text style={{fontSize: 12, color: section === id ? T.accent : T.dim, fontWeight: section === id ? '600' : '400'}}>{label}</Text>
+      <Text style={{fontSize: fs(12), color: section === id ? T.accent : T.dim, fontWeight: section === id ? '600' : '400'}}>{label}</Text>
     </TouchableOpacity>
   );
 
@@ -1066,14 +1067,14 @@ export const ShareScreen = ({theme: T, system, members, front, history, journal,
     <TouchableOpacity onPress={() => {setImportSource(id); setExtPreview(null); setExtToken('');}} activeOpacity={0.7}
       style={{paddingVertical: 7, paddingHorizontal: 12, borderRadius: 7, borderWidth: 1,
         backgroundColor: importSource === id ? T.accentBg : 'transparent', borderColor: importSource === id ? `${T.accent}40` : T.border}}>
-      <Text style={{fontSize: 12, color: importSource === id ? T.accent : T.dim, fontWeight: importSource === id ? '600' : '400'}}>{label}</Text>
+      <Text style={{fontSize: fs(12), color: importSource === id ? T.accent : T.dim, fontWeight: importSource === id ? '600' : '400'}}>{label}</Text>
     </TouchableOpacity>
   );
 
   const Divider = ({label}: {label: string}) => (
     <View style={{flexDirection: 'row', alignItems: 'center', gap: 10, marginVertical: 18}}>
       <View style={{flex: 1, height: 1, backgroundColor: T.border}} />
-      <Text style={{fontSize: 10, letterSpacing: 1, textTransform: 'uppercase', color: T.muted, fontWeight: '600'}}>{label}</Text>
+      <Text style={{fontSize: fs(10), letterSpacing: 1, textTransform: 'uppercase', color: T.muted, fontWeight: '600'}}>{label}</Text>
       <View style={{flex: 1, height: 1, backgroundColor: T.border}} />
     </View>
   );
@@ -1086,7 +1087,7 @@ export const ShareScreen = ({theme: T, system, members, front, history, journal,
 
   const SectionRow = ({label, sublabel, value, onToggle, disabled = false}: any) => (
     <View style={{flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 13, borderBottomWidth: 1, borderBottomColor: T.border, paddingHorizontal: 14, opacity: disabled ? 0.4 : 1}}>
-      <View style={{flex: 1}}><Text style={{fontSize: 14, color: T.text, fontWeight: '500'}}>{label}</Text>{sublabel && <Text style={{fontSize: 11, color: T.muted, marginTop: 2}}>{sublabel}</Text>}</View>
+      <View style={{flex: 1}}><Text style={{fontSize: fs(14), color: T.text, fontWeight: '500'}}>{label}</Text>{sublabel && <Text style={{fontSize: fs(11), color: T.muted, marginTop: 2}}>{sublabel}</Text>}</View>
       <Toggle value={value && !disabled} onToggle={disabled ? () => {} : onToggle} />
     </View>
   );
@@ -1095,11 +1096,11 @@ export const ShareScreen = ({theme: T, system, members, front, history, journal,
     if (fronters.length === 0) return null;
     return (
       <View style={{marginTop: 8}}>
-        <Text style={{fontSize: 10, letterSpacing: 1, textTransform: 'uppercase', color, fontWeight: '600', marginBottom: 5}}>{label}</Text>
+        <Text style={{fontSize: fs(10), letterSpacing: 1, textTransform: 'uppercase', color, fontWeight: '600', marginBottom: 5}}>{label}</Text>
         <View style={{flexDirection: 'row', flexWrap: 'wrap', gap: 6}}>
           {fronters.map(m => (
             <View key={m.id} style={{flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, borderWidth: 1, backgroundColor: `${m.color}18`, borderColor: `${m.color}30`}}>
-              <View style={{width: 7, height: 7, borderRadius: 3.5, backgroundColor: m.color}} /><Text style={{fontSize: 13, color: T.text}}>{m.name}</Text>
+              <View style={{width: 7, height: 7, borderRadius: 3.5, backgroundColor: m.color}} /><Text style={{fontSize: fs(13), color: T.text}}>{m.name}</Text>
             </View>
           ))}
         </View>
@@ -1120,11 +1121,7 @@ export const ShareScreen = ({theme: T, system, members, front, history, journal,
           <Divider label={t('share.fullSystemExport')} />
           <Text style={[s.para, {color: T.dim}]}>{t('share.downloadsDirectly')}</Text>
 
-          {/* Export Categories — always visible, matches the Restore drawer's style.
-              Each toggle controls whether that category is included in JSON export.
-              HTML/email exports always include the static feature set (JSON-only
-              categories like noteboards/polls are not exposed in HTML or email). */}
-          <Text style={{fontSize: 10, letterSpacing: 1, textTransform: 'uppercase', color: T.dim, fontWeight: '600', marginBottom: 8, marginTop: 4}}>{t('share.exportCategories', {defaultValue: 'Export Categories'})}</Text>
+          <Text style={{fontSize: fs(10), letterSpacing: 1, textTransform: 'uppercase', color: T.dim, fontWeight: '600', marginBottom: 8, marginTop: 4}}>{t('share.exportCategories', {defaultValue: 'Export Categories'})}</Text>
           <View style={{backgroundColor: T.card, borderRadius: 10, borderWidth: 1, borderColor: T.border, overflow: 'hidden', marginBottom: 14}}>
             {([
               ['system', t('share.systemNameDesc')],
@@ -1149,7 +1146,7 @@ export const ShareScreen = ({theme: T, system, members, front, history, journal,
           <View style={{flexDirection: 'row', gap: 8, marginBottom: 6}}>
             {[['↓ JSON', handleJSON, T.accentBg, T.accent, `${T.accent}40`], ['↓ HTML', handleHTML, T.infoBg, T.info, `${T.info}40`]].map(([label, fn, bg, color, border]: any) => (
               <TouchableOpacity key={label} onPress={fn} activeOpacity={0.7} style={{flex: 1, alignItems: 'center', paddingVertical: 10, borderRadius: 8, borderWidth: 1, backgroundColor: bg, borderColor: border}}>
-                <Text style={{fontSize: 14, fontWeight: '500', color}}>{label}</Text>
+                <Text style={{fontSize: fs(14), fontWeight: '500', color}}>{label}</Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -1159,16 +1156,16 @@ export const ShareScreen = ({theme: T, system, members, front, history, journal,
           <View style={{flexDirection: 'row', gap: 8, marginBottom: 6}}>
             {[['↓ .txt', 'txt', T.accentBg, T.accent, `${T.accent}40`], ['↓ .md', 'md', T.infoBg, T.info, `${T.info}40`], ['↓ .json', 'json', 'transparent', T.dim, T.border]].map(([label, fmt, bg, color, border]: any) => (
               <TouchableOpacity key={fmt} onPress={() => handleJournalExport(fmt)} activeOpacity={0.7} style={{flex: 1, alignItems: 'center', paddingVertical: 10, borderRadius: 8, borderWidth: 1, backgroundColor: bg, borderColor: border}}>
-                <Text style={{fontSize: 13, fontWeight: '500', color}}>{label}</Text>
+                <Text style={{fontSize: fs(13), fontWeight: '500', color}}>{label}</Text>
               </TouchableOpacity>
             ))}
           </View>
           <Text style={[s.hint, {color: T.muted}]}>{t('share.perEntryHint')}</Text>
           <Divider label={t('share.sendEmail')} />
           <TextInput value={emailAddr} onChangeText={setEmailAddr} placeholder="recipient@email.com" placeholderTextColor={T.muted} keyboardType="email-address" autoCapitalize="none"
-            style={{backgroundColor: T.surface, color: T.text, borderWidth: 1, borderColor: T.border, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, marginBottom: 10}} />
+            style={{backgroundColor: T.surface, color: T.text, borderWidth: 1, borderColor: T.border, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, fontSize: fs(14), marginBottom: 10}} />
           <TouchableOpacity onPress={handleEmail} activeOpacity={0.7} style={{alignItems: 'center', paddingVertical: 11, borderRadius: 8, borderWidth: 1, backgroundColor: T.accentBg, borderColor: `${T.accent}40`}}>
-            <Text style={{fontSize: 14, fontWeight: '500', color: T.accent}}>{t('share.openInMail')}</Text>
+            <Text style={{fontSize: fs(14), fontWeight: '500', color: T.accent}}>{t('share.openInMail')}</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -1177,8 +1174,8 @@ export const ShareScreen = ({theme: T, system, members, front, history, journal,
         <View>
           {!appSettings.filesEnabled ? (
             <View style={{alignItems: 'center', paddingVertical: 48}}>
-              <Text style={{fontSize: 36, opacity: 0.4, marginBottom: 12}}>↑</Text>
-              <Text style={{fontSize: 13, color: T.dim, textAlign: 'center'}}>{t('share.filesDisabled')}</Text>
+              <Text style={{fontSize: fs(36), opacity: 0.4, marginBottom: 12}}>↑</Text>
+              <Text style={{fontSize: fs(13), color: T.dim, textAlign: 'center'}}>{t('share.filesDisabled')}</Text>
             </View>
           ) : (
           <>
@@ -1194,10 +1191,10 @@ export const ShareScreen = ({theme: T, system, members, front, history, journal,
               <Divider label={t('share.importJournalEntry')} />
               <Text style={[s.para, {color: T.dim}]}>{t('share.importJournalDesc')}</Text>
               <TouchableOpacity onPress={handleImportJournalFile} activeOpacity={0.7} style={{alignItems: 'center', paddingVertical: 11, borderRadius: 8, borderWidth: 1, backgroundColor: T.accentBg, borderColor: `${T.accent}40`, marginBottom: 10}}>
-                <Text style={{fontSize: 14, fontWeight: '500', color: T.accent}}>{t('share.pickFile')}</Text>
+                <Text style={{fontSize: fs(14), fontWeight: '500', color: T.accent}}>{t('share.pickFile')}</Text>
               </TouchableOpacity>
-              {importStatus === 'success' && <View style={{backgroundColor: T.successBg, borderWidth: 1, borderColor: `${T.success}30`, borderRadius: 8, padding: 12, marginBottom: 12}}><Text style={{fontSize: 13, color: T.success}}>✓ {importMsg}</Text></View>}
-              {importStatus === 'error' && <View style={{backgroundColor: T.dangerBg, borderWidth: 1, borderColor: `${T.danger}30`, borderRadius: 7, padding: 10, marginBottom: 12}}><Text style={{fontSize: 13, color: T.danger}}>⚠ {importMsg}</Text></View>}
+              {importStatus === 'success' && <View style={{backgroundColor: T.successBg, borderWidth: 1, borderColor: `${T.success}30`, borderRadius: 8, padding: 12, marginBottom: 12}}><Text style={{fontSize: fs(13), color: T.success}}>✓ {importMsg}</Text></View>}
+              {importStatus === 'error' && <View style={{backgroundColor: T.dangerBg, borderWidth: 1, borderColor: `${T.danger}30`, borderRadius: 7, padding: 10, marginBottom: 12}}><Text style={{fontSize: fs(13), color: T.danger}}>⚠ {importMsg}</Text></View>}
             </View>
           )}
           {importSource === 'backup' && (
@@ -1205,13 +1202,13 @@ export const ShareScreen = ({theme: T, system, members, front, history, journal,
               <Divider label={t('share.restoreBackup')} />
               <Text style={[s.para, {color: T.dim}]}>{t('share.restoreBackupDesc')}</Text>
               <TouchableOpacity onPress={handlePickBackup} activeOpacity={0.7} style={{borderWidth: 1.5, borderStyle: 'dashed', borderColor: restoreFile ? T.success : T.border, borderRadius: 10, padding: 22, alignItems: 'center', marginBottom: 14, gap: 6, backgroundColor: restoreFile ? T.successBg : 'transparent'}}>
-                <Text style={{fontSize: 20, color: T.dim}}>↑</Text>
-                <Text style={{fontSize: 13, color: restoreFile ? T.success : T.dim, textAlign: 'center'}}>{restoreFile || t('share.tapToSelect')}</Text>
+                <Text style={{fontSize: fs(20), color: T.dim}}>↑</Text>
+                <Text style={{fontSize: fs(13), color: restoreFile ? T.success : T.dim, textAlign: 'center'}}>{restoreFile || t('share.tapToSelect')}</Text>
               </TouchableOpacity>
-              {restoreError ? <View style={{backgroundColor: T.dangerBg, borderWidth: 1, borderColor: `${T.danger}30`, borderRadius: 7, padding: 10, marginBottom: 12}}><Text style={{fontSize: 13, color: T.danger}}>⚠ {restoreError}</Text></View> : null}
+              {restoreError ? <View style={{backgroundColor: T.dangerBg, borderWidth: 1, borderColor: `${T.danger}30`, borderRadius: 7, padding: 10, marginBottom: 12}}><Text style={{fontSize: fs(13), color: T.danger}}>⚠ {restoreError}</Text></View> : null}
               {restorePreview && (
                 <>
-                  <Text style={{fontSize: 10, letterSpacing: 1, textTransform: 'uppercase', color: T.dim, fontWeight: '600', marginBottom: 8}}>{t('share.restoreCategories')}</Text>
+                  <Text style={{fontSize: fs(10), letterSpacing: 1, textTransform: 'uppercase', color: T.dim, fontWeight: '600', marginBottom: 8}}>{t('share.restoreCategories')}</Text>
                   <View style={{backgroundColor: T.card, borderRadius: 10, borderWidth: 1, borderColor: T.border, overflow: 'hidden', marginBottom: 14}}>
                     {([
                       ['system', t('share.systemNameDesc')],
@@ -1232,22 +1229,22 @@ export const ShareScreen = ({theme: T, system, members, front, history, journal,
                       <SectionRow key={k} label={label} value={restoreSel[k as keyof typeof restoreSel]} onToggle={() => togR(k)} />
                     ))}
                   </View>
-                  {restoreDone ? <View style={{backgroundColor: T.successBg, borderWidth: 1, borderColor: `${T.success}30`, borderRadius: 8, padding: 12, alignItems: 'center'}}><Text style={{fontSize: 13, color: T.success, fontWeight: '500'}}>{t('share.restoreComplete')}</Text></View>
-                    : restoring ? <View style={{alignItems: 'center', paddingVertical: 16}}><ActivityIndicator color={T.accent} /><Text style={{fontSize: 12, color: T.dim, marginTop: 8}}>{t('share.importing')}</Text></View>
-                    : <TouchableOpacity onPress={handleRestore} activeOpacity={0.7} style={{alignItems: 'center', paddingVertical: 11, borderRadius: 8, borderWidth: 1, backgroundColor: T.dangerBg, borderColor: `${T.danger}40`}}><Text style={{fontSize: 14, fontWeight: '500', color: T.danger}}>{t('share.restoreSelectedData')}</Text></TouchableOpacity>}
+                  {restoreDone ? <View style={{backgroundColor: T.successBg, borderWidth: 1, borderColor: `${T.success}30`, borderRadius: 8, padding: 12, alignItems: 'center'}}><Text style={{fontSize: fs(13), color: T.success, fontWeight: '500'}}>{t('share.restoreComplete')}</Text></View>
+                    : restoring ? <View style={{alignItems: 'center', paddingVertical: 16}}><ActivityIndicator color={T.accent} /><Text style={{fontSize: fs(12), color: T.dim, marginTop: 8}}>{t('share.importing')}</Text></View>
+                    : <TouchableOpacity onPress={handleRestore} activeOpacity={0.7} style={{alignItems: 'center', paddingVertical: 11, borderRadius: 8, borderWidth: 1, backgroundColor: T.dangerBg, borderColor: `${T.danger}40`}}><Text style={{fontSize: fs(14), fontWeight: '500', color: T.danger}}>{t('share.restoreSelectedData')}</Text></TouchableOpacity>}
                 </>
               )}
               <Divider label={t('share.recoverData', {defaultValue: 'Recover Data'})} />
               <Text style={[s.para, {color: T.dim}]}>{t('share.recoverDataDesc', {defaultValue: "If your data disappeared after a restart (welcome screen returns, members or groups gone, etc.), Plural Star may still have on-disk backups separate from the app's main storage. Scan to see what can be recovered."})}</Text>
               {!recoverEntries ? (
                 <TouchableOpacity onPress={handleScanRecovery} disabled={recoverScanning} activeOpacity={0.7} style={{alignItems: 'center', paddingVertical: 11, borderRadius: 8, borderWidth: 1, backgroundColor: T.surface, borderColor: T.border, marginBottom: 14, opacity: recoverScanning ? 0.5 : 1}}>
-                  {recoverScanning ? <ActivityIndicator color={T.accent} size="small" /> : <Text style={{fontSize: 14, fontWeight: '500', color: T.text}}>{t('share.scanForBackups', {defaultValue: 'Scan for recoverable backups'})}</Text>}
+                  {recoverScanning ? <ActivityIndicator color={T.accent} size="small" /> : <Text style={{fontSize: fs(14), fontWeight: '500', color: T.text}}>{t('share.scanForBackups', {defaultValue: 'Scan for recoverable backups'})}</Text>}
                 </TouchableOpacity>
               ) : recoverEntries.length === 0 ? (
                 <View style={{padding: 14, borderRadius: 8, borderWidth: 1, borderColor: T.border, backgroundColor: T.surface, marginBottom: 14}}>
-                  <Text style={{fontSize: 13, color: T.dim, textAlign: 'center'}}>{t('share.noBackupsFound', {defaultValue: 'No recoverable backups found on disk.'})}</Text>
+                  <Text style={{fontSize: fs(13), color: T.dim, textAlign: 'center'}}>{t('share.noBackupsFound', {defaultValue: 'No recoverable backups found on disk.'})}</Text>
                   <TouchableOpacity onPress={() => {setRecoverEntries(null); setRecoverDone(false);}} activeOpacity={0.7} style={{alignSelf: 'center', marginTop: 8}}>
-                    <Text style={{fontSize: 12, color: T.accent}}>{t('share.scanAgain', {defaultValue: 'Scan again'})}</Text>
+                    <Text style={{fontSize: fs(12), color: T.accent}}>{t('share.scanAgain', {defaultValue: 'Scan again'})}</Text>
                   </TouchableOpacity>
                 </View>
               ) : (
@@ -1261,11 +1258,11 @@ export const ShareScreen = ({theme: T, system, members, front, history, journal,
                         <TouchableOpacity key={entry.key} onPress={() => setRecoverSel(s => ({...s, [entry.key]: !s[entry.key]}))} activeOpacity={0.7}
                           style={{flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 11, borderBottomWidth: 1, borderBottomColor: T.border, gap: 12}}>
                           <View style={{width: 18, height: 18, borderRadius: 4, borderWidth: 1.5, borderColor: checked ? T.accent : T.border, backgroundColor: checked ? T.accent : 'transparent', alignItems: 'center', justifyContent: 'center'}}>
-                            {checked ? <Text style={{fontSize: 11, color: '#fff', fontWeight: '700'}}>✓</Text> : null}
+                            {checked ? <Text style={{fontSize: fs(11), color: '#fff', fontWeight: '700'}}>✓</Text> : null}
                           </View>
                           <View style={{flex: 1}}>
-                            <Text style={{fontSize: 14, color: T.text, fontWeight: '500'}}>{friendlyKeyName(entry.key)}</Text>
-                            <Text style={{fontSize: 11, color: T.muted, marginTop: 2}}>{entry.preview} · {sizeLabel}{dateLabel ? ` · ${dateLabel}` : ''}</Text>
+                            <Text style={{fontSize: fs(14), color: T.text, fontWeight: '500'}}>{friendlyKeyName(entry.key)}</Text>
+                            <Text style={{fontSize: fs(11), color: T.muted, marginTop: 2}}>{entry.preview} · {sizeLabel}{dateLabel ? ` · ${dateLabel}` : ''}</Text>
                           </View>
                         </TouchableOpacity>
                       );
@@ -1273,15 +1270,15 @@ export const ShareScreen = ({theme: T, system, members, front, history, journal,
                   </View>
                   {recoverDone ? (
                     <View style={{backgroundColor: T.successBg, borderWidth: 1, borderColor: `${T.success}30`, borderRadius: 8, padding: 12, alignItems: 'center', marginBottom: 14}}>
-                      <Text style={{fontSize: 13, color: T.success, fontWeight: '500'}}>{t('share.recoverComplete', {defaultValue: '✓ Recovery complete — reloading…'})}</Text>
+                      <Text style={{fontSize: fs(13), color: T.success, fontWeight: '500'}}>{t('share.recoverComplete', {defaultValue: '✓ Recovery complete — reloading…'})}</Text>
                     </View>
                   ) : (
                     <View style={{flexDirection: 'row', gap: 8, marginBottom: 14}}>
                       <TouchableOpacity onPress={() => {setRecoverEntries(null); setRecoverSel({}); setRecoverDone(false);}} activeOpacity={0.7} style={{flex: 1, alignItems: 'center', paddingVertical: 11, borderRadius: 8, borderWidth: 1, backgroundColor: T.surface, borderColor: T.border}}>
-                        <Text style={{fontSize: 13, fontWeight: '500', color: T.dim}}>{t('common.cancel')}</Text>
+                        <Text style={{fontSize: fs(13), fontWeight: '500', color: T.dim}}>{t('common.cancel')}</Text>
                       </TouchableOpacity>
                       <TouchableOpacity onPress={handleApplyRecovery} activeOpacity={0.7} disabled={Object.values(recoverSel).every(v => !v)} style={{flex: 2, alignItems: 'center', paddingVertical: 11, borderRadius: 8, borderWidth: 1, backgroundColor: T.accentBg, borderColor: `${T.accent}40`, opacity: Object.values(recoverSel).every(v => !v) ? 0.4 : 1}}>
-                        <Text style={{fontSize: 14, fontWeight: '500', color: T.accent}}>{t('share.recoverSelected', {defaultValue: 'Recover selected'})}</Text>
+                        <Text style={{fontSize: fs(14), fontWeight: '500', color: T.accent}}>{t('share.recoverSelected', {defaultValue: 'Recover selected'})}</Text>
                       </TouchableOpacity>
                     </View>
                   )}
@@ -1290,7 +1287,7 @@ export const ShareScreen = ({theme: T, system, members, front, history, journal,
               <Divider label={t('share.deleteAccount')} />
               <Text style={[s.para, {color: T.dim}]}>{t('share.deleteAccountDesc')}</Text>
               <TouchableOpacity onPress={handleDeleteAccount} activeOpacity={0.7} style={{alignItems: 'center', paddingVertical: 11, borderRadius: 8, borderWidth: 1, backgroundColor: T.dangerBg, borderColor: `${T.danger}40`}}>
-                <Text style={{fontSize: 14, fontWeight: '500', color: T.danger}}>{t('share.deleteAllData')}</Text>
+                <Text style={{fontSize: fs(14), fontWeight: '500', color: T.danger}}>{t('share.deleteAllData')}</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -1299,19 +1296,19 @@ export const ShareScreen = ({theme: T, system, members, front, history, journal,
               <Divider label={importSource === 'simplyplural' ? t('share.spImport') : t('share.pkImport')} />
               <Text style={[s.para, {color: T.dim}]}>{importSource === 'simplyplural' ? t('share.spTokenHint') : t('share.pkTokenHint')}</Text>
               <TextInput value={extToken} onChangeText={setExtToken} placeholder={importSource === 'simplyplural' ? t('share.spTokenPlaceholder') : t('share.pkTokenPlaceholder')} placeholderTextColor={T.muted} autoCapitalize="none" autoCorrect={false}
-                style={{backgroundColor: T.surface, color: T.text, borderWidth: 1, borderColor: T.border, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, marginBottom: 10, fontFamily: 'monospace'}} />
+                style={{backgroundColor: T.surface, color: T.text, borderWidth: 1, borderColor: T.border, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, fontSize: fs(14), marginBottom: 10, fontFamily: 'monospace'}} />
               <TouchableOpacity onPress={importSource === 'simplyplural' ? handleSimplyPluralFetch : handlePluralKitFetch} disabled={extLoading} activeOpacity={0.7}
                 style={{alignItems: 'center', paddingVertical: 11, borderRadius: 8, borderWidth: 1, backgroundColor: T.accentBg, borderColor: `${T.accent}40`, marginBottom: 10, opacity: extLoading ? 0.5 : 1}}>
-                <Text style={{fontSize: 14, fontWeight: '500', color: T.accent}}>{extLoading ? t('share.fetching') : t('share.fetchData')}</Text>
+                <Text style={{fontSize: fs(14), fontWeight: '500', color: T.accent}}>{extLoading ? t('share.fetching') : t('share.fetchData')}</Text>
               </TouchableOpacity>
               {extLoading && <ActivityIndicator color={T.accent} style={{marginTop: 12}} />}
               {extPreview && (
                 <View>
                   <View style={{backgroundColor: T.card, borderRadius: 10, borderWidth: 1, borderColor: T.border, padding: 14, marginBottom: 14}}>
-                    <Text style={{fontSize: 16, fontWeight: '600', color: T.accent}}>{extPreview.system?.content?.username || extPreview.system?.name || extPreview.system?.username || t('share.system')}</Text>
-                    <Text style={{fontSize: 12, color: T.dim, marginTop: 2}}>{t('share.membersCount', {count: extPreview.members.length})} · {t('share.frontEntries', {count: extPreview.switches.length})}</Text>
+                    <Text style={{fontSize: fs(16), fontWeight: '600', color: T.accent}}>{extPreview.system?.content?.username || extPreview.system?.name || extPreview.system?.username || t('share.system')}</Text>
+                    <Text style={{fontSize: fs(12), color: T.dim, marginTop: 2}}>{t('share.membersCount', {count: extPreview.members.length})} · {t('share.frontEntries', {count: extPreview.switches.length})}</Text>
                   </View>
-                  <Text style={{fontSize: 10, letterSpacing: 1, textTransform: 'uppercase', color: T.dim, fontWeight: '600', marginBottom: 8}}>{t('share.importCategories')}</Text>
+                  <Text style={{fontSize: fs(10), letterSpacing: 1, textTransform: 'uppercase', color: T.dim, fontWeight: '600', marginBottom: 8}}>{t('share.importCategories')}</Text>
                   <View style={{backgroundColor: T.card, borderRadius: 10, borderWidth: 1, borderColor: T.border, overflow: 'hidden', marginBottom: 14}}>
                     <SectionRow label={t('share.systemNameDesc')} value={extSel.system} onToggle={() => togE('system')} />
                     <SectionRow label={t('share.memberProfiles')} sublabel={t('share.membersCount', {count: extPreview.members.length})} value={extSel.members} onToggle={() => togE('members')} />
@@ -1325,7 +1322,7 @@ export const ShareScreen = ({theme: T, system, members, front, history, journal,
                     )}
                   </View>
                   <TouchableOpacity onPress={handleExtImport} activeOpacity={0.7} style={{alignItems: 'center', paddingVertical: 11, borderRadius: 8, borderWidth: 1, backgroundColor: T.accentBg, borderColor: `${T.accent}40`, marginBottom: 10}}>
-                    <Text style={{fontSize: 14, fontWeight: '500', color: T.accent}}>{t('share.importSelected')}</Text>
+                    <Text style={{fontSize: fs(14), fontWeight: '500', color: T.accent}}>{t('share.importSelected')}</Text>
                   </TouchableOpacity>
                 </View>
               )}
@@ -1337,15 +1334,15 @@ export const ShareScreen = ({theme: T, system, members, front, history, journal,
               <Text style={[s.para, {color: T.dim}]}>{t('share.spFileHint')}</Text>
               <TouchableOpacity onPress={handleSPFileImport} activeOpacity={0.7}
                 style={{alignItems: 'center', paddingVertical: 11, borderRadius: 8, borderWidth: 1, backgroundColor: T.accentBg, borderColor: `${T.accent}40`, marginBottom: 10}}>
-                <Text style={{fontSize: 14, fontWeight: '500', color: T.accent}}>{t('share.pickSPFile')}</Text>
+                <Text style={{fontSize: fs(14), fontWeight: '500', color: T.accent}}>{t('share.pickSPFile')}</Text>
               </TouchableOpacity>
               {extPreview && (
                 <View>
                   <View style={{backgroundColor: T.card, borderRadius: 10, borderWidth: 1, borderColor: T.border, padding: 14, marginBottom: 14}}>
-                    <Text style={{fontSize: 16, fontWeight: '600', color: T.accent}}>{extPreview.system?.content?.username || extPreview.system?.username || t('share.system')}</Text>
-                    <Text style={{fontSize: 12, color: T.dim, marginTop: 2}}>{t('share.membersCount', {count: extPreview.members.length})} · {t('share.frontEntries', {count: extPreview.switches.length})}</Text>
+                    <Text style={{fontSize: fs(16), fontWeight: '600', color: T.accent}}>{extPreview.system?.content?.username || extPreview.system?.username || t('share.system')}</Text>
+                    <Text style={{fontSize: fs(12), color: T.dim, marginTop: 2}}>{t('share.membersCount', {count: extPreview.members.length})} · {t('share.frontEntries', {count: extPreview.switches.length})}</Text>
                   </View>
-                  <Text style={{fontSize: 10, letterSpacing: 1, textTransform: 'uppercase', color: T.dim, fontWeight: '600', marginBottom: 8}}>{t('share.importCategories')}</Text>
+                  <Text style={{fontSize: fs(10), letterSpacing: 1, textTransform: 'uppercase', color: T.dim, fontWeight: '600', marginBottom: 8}}>{t('share.importCategories')}</Text>
                   <View style={{backgroundColor: T.card, borderRadius: 10, borderWidth: 1, borderColor: T.border, overflow: 'hidden', marginBottom: 14}}>
                     <SectionRow label={t('share.systemNameDesc')} value={extSel.system} onToggle={() => togE('system')} />
                     <SectionRow label={t('share.memberProfiles')} sublabel={t('share.membersCount', {count: extPreview.members.length})} value={extSel.members} onToggle={() => togE('members')} />
@@ -1356,7 +1353,7 @@ export const ShareScreen = ({theme: T, system, members, front, history, journal,
                     )}
                   </View>
                   <TouchableOpacity onPress={handleSPFileConfirmImport} activeOpacity={0.7} style={{alignItems: 'center', paddingVertical: 11, borderRadius: 8, borderWidth: 1, backgroundColor: T.accentBg, borderColor: `${T.accent}40`, marginBottom: 10}}>
-                    <Text style={{fontSize: 14, fontWeight: '500', color: T.accent}}>{t('share.importSelected')}</Text>
+                    <Text style={{fontSize: fs(14), fontWeight: '500', color: T.accent}}>{t('share.importSelected')}</Text>
                   </TouchableOpacity>
                 </View>
               )}
@@ -1377,26 +1374,26 @@ export const ShareScreen = ({theme: T, system, members, front, history, journal,
           </View>
           <Divider label={t('share.preview')} />
           <View style={{backgroundColor: T.surface, borderRadius: 12, borderWidth: 1, borderColor: T.border, padding: 16}}>
-            <Text style={{fontFamily: 'Georgia', fontSize: 20, color: T.accent, marginBottom: 4, fontStyle: 'italic'}}>{system.name}</Text>
-            {system.description ? <Text style={{fontSize: 12, color: T.dim, lineHeight: 18, marginBottom: 12}}>{system.description}</Text> : null}
+            <Text style={{fontFamily: 'Georgia', fontSize: fs(20), color: T.accent, marginBottom: 4, fontStyle: 'italic'}}>{system.name}</Text>
+            {system.description ? <Text style={{fontSize: fs(12), color: T.dim, lineHeight: 18, marginBottom: 12}}>{system.description}</Text> : null}
             {shareSettings.showFront && (
               <View>
                 {primaryFronters.length === 0 && coFronters.length === 0 && coConsciousFronters.length === 0
-                  ? <Text style={{fontSize: 12, color: T.muted, marginTop: 8}}>{t('share.nobodySet')}</Text>
+                  ? <Text style={{fontSize: fs(12), color: T.muted, marginTop: 8}}>{t('share.nobodySet')}</Text>
                   : (<><PreviewTier label={t('tier.primaryFront')} fronters={primaryFronters} color={T.accent} /><PreviewTier label={t('tier.coFront')} fronters={coFronters} color={T.info} /><PreviewTier label={t('tier.coConscious')} fronters={coConsciousFronters} color={T.success} /></>)}
               </View>
             )}
             {shareSettings.showMembers && members.length > 0 && (
               <View style={{marginTop: 10}}>
-                <Text style={{fontSize: 10, letterSpacing: 1, textTransform: 'uppercase', color: T.dim, fontWeight: '600', marginBottom: 6}}>{t('share.membersLabel', {count: members.length})}</Text>
+                <Text style={{fontSize: fs(10), letterSpacing: 1, textTransform: 'uppercase', color: T.dim, fontWeight: '600', marginBottom: 6}}>{t('share.membersLabel', {count: members.length})}</Text>
                 {members.slice(0, 4).map(m => (
                   <View key={m.id} style={{flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 5}}>
                     <View style={{width: 7, height: 7, borderRadius: 3.5, backgroundColor: m.color}} />
-                    <Text style={{fontSize: 13, color: T.text}}>{m.name}</Text>
-                    {m.pronouns ? <Text style={{fontSize: 11, color: T.dim}}>({m.pronouns})</Text> : null}
+                    <Text style={{fontSize: fs(13), color: T.text}}>{m.name}</Text>
+                    {m.pronouns ? <Text style={{fontSize: fs(11), color: T.dim}}>({m.pronouns})</Text> : null}
                   </View>
                 ))}
-                {members.length > 4 && <Text style={{fontSize: 11, color: T.muted, marginTop: 2}}>{t('share.more', {count: members.length - 4})}</Text>}
+                {members.length > 4 && <Text style={{fontSize: fs(11), color: T.muted, marginTop: 2}}>{t('share.more', {count: members.length - 4})}</Text>}
               </View>
             )}
           </View>
