@@ -1,8 +1,8 @@
 import React, {useState, useEffect} from 'react';
-import {View, ScrollView, TouchableOpacity, Alert, Linking} from 'react-native';
+import {View, ScrollView, TouchableOpacity, Alert, Linking, StyleSheet} from 'react-native';
 import {Text, TextInput} from '../components/AppText';
 import {useTranslation} from 'react-i18next';
-import {Fonts} from '../theme';
+import {Fonts, UI} from '../theme';
 import {Member, HistoryEntry, FrontState, FrontTierKey, fmtTime, fmtDur, allFrontMemberIds, sortMembersBySearch, singletStatuses} from '../utils';
 import {DateTimeEditor} from '../components/DateTimeEditor';
 import {Avatar} from '../components/Avatar';
@@ -303,7 +303,7 @@ const RetroHistoryScreen = ({T, members, history, front, onSaveHistory, onSetFro
           style={{flexDirection: 'row', alignItems: 'center', gap: 8}}>
           <Text style={{fontSize: fs(12), color: isCurrent ? T.accent : T.dim}}>{t('hub.current')}</Text>
           <View style={{width: 40, height: 22, borderRadius: 11, backgroundColor: isCurrent ? T.accent : T.toggleOff, justifyContent: 'center'}}>
-            <View style={{width: 16, height: 16, borderRadius: 8, backgroundColor: '#fff', position: 'absolute', left: isCurrent ? 20 : 3}} />
+            <View style={{width: 16, height: 16, borderRadius: 8, backgroundColor: T.surface, position: 'absolute', left: isCurrent ? 20 : 3}} />
           </View>
         </TouchableOpacity>
       </View>
@@ -533,8 +533,8 @@ export const HubScreen = ({theme: T, singlet = false, selfId, members, history, 
 
   if (activeTile === 'credits') {
     const credits: {name: string; role: string; url: string}[] = [
-      {name: 'The Loud House System', role: t('hub.creditLogo'), url: 'https://x.com/theloudhousesys?s=21'},
-      {name: 'sparklecatdev', role: t('hub.creditIos'), url: 'https://github.com/sparklecatdev'},
+      {name: 'sparklecatdev', role: 'Major contributor: UI redesign and functionality', url: 'https://sparklecat.dev'},
+      {name: 'The Loud House System', role: t('hub.creditLogo'), url: 'https://sparklecat.dev'},
     ];
     return (
       <View style={{flex: 1, backgroundColor: T.bg}}>
@@ -561,21 +561,21 @@ export const HubScreen = ({theme: T, singlet = false, selfId, members, history, 
     );
   }
 
-  const tiles: {id: HubTile; icon: string; label: string; external?: boolean}[] = [
+  const tiles: {id: HubTile; icon: string; label: string; detail?: string; external?: boolean}[] = [
     {id: 'retroHistory', icon: '◷', label: t('hub.retroHistory')},
     {id: 'medical', icon: '⚕', label: t('medical.title')},
     {id: 'statistics', icon: '⊞', label: t('hub.statistics')},
-    {id: 'chat', icon: '⌨', label: t('hub.systemChat')},
+    {id: 'chat', icon: '⌨', label: t('hub.chatShort')},
     {id: 'polls', icon: '📊', label: t('polls.title')},
-    {id: 'systemMap', icon: '🕸', label: t('systemMap.title')},
-    {id: 'customFields', icon: '☰', label: t('customFields.title')},
-    {id: 'systemManager', icon: '🗂', label: t('systemManager.title')},
+    {id: 'systemMap', icon: '🕸', label: t('hub.mapShort')},
+    {id: 'customFields', icon: '☰', label: t('hub.fieldsShort')},
+    {id: 'systemManager', icon: '🗂', label: t('hub.managerShort')},
     {id: 'archive', icon: '🗃', label: t('hub.archive')},
-    {id: 'share', icon: '⇅', label: t('hub.importExport')},
+    {id: 'share', icon: '⇅', label: t('hub.shareShort')},
     {id: 'credits', icon: '✦', label: t('hub.credits')},
     {id: 'discord', icon: '💬', label: t('hub.discord'), external: true},
-    {id: 'supportPS', icon: '☕', label: t('hub.supportPS'), external: true},
-  ].filter(tile => !singlet || (tile.id !== 'chat' && tile.id !== 'systemManager' && tile.id !== 'customFields' && tile.id !== 'polls' && tile.id !== 'archive' && tile.id !== 'systemMap')) as {id: HubTile; icon: string; label: string; external?: boolean}[];
+    {id: 'supportPS', icon: '☕', label: t('hub.supportShort'), external: true},
+  ].filter(tile => !singlet || (tile.id !== 'chat' && tile.id !== 'systemManager' && tile.id !== 'customFields' && tile.id !== 'polls' && tile.id !== 'archive' && tile.id !== 'systemMap')) as {id: HubTile; icon: string; label: string; detail?: string; external?: boolean}[];
 
   const handleTilePress = (tile: typeof tiles[0]) => {
     if (tile.external && tile.id === 'discord') {
@@ -588,29 +588,46 @@ export const HubScreen = ({theme: T, singlet = false, selfId, members, history, 
   };
 
   return (
-    <ScrollView style={{flex: 1, backgroundColor: T.bg}} contentContainerStyle={{padding: 16, paddingBottom: 32}}>
-      <Text
-        accessibilityRole="header"
-        style={{fontFamily: Fonts.display, fontSize: fs(22), fontWeight: '600', fontStyle: 'italic', color: T.text, marginBottom: 20}}
-        numberOfLines={1}
-        maxFontSizeMultiplier={1.2}>
-        {t('hub.title')}
-      </Text>
-      <View style={{flexDirection: 'row', flexWrap: 'wrap', gap: 10, justifyContent: 'space-between', alignItems: 'flex-start'}}>
+    <ScrollView style={{flex: 1, backgroundColor: T.bg}} contentContainerStyle={{padding: UI.screenPadding, paddingBottom: 32}}>
+      <View style={s.heroCard}>
+        <View style={{flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16}}>
+          <Text
+            accessibilityRole="header"
+            style={[s.heading, {fontSize: fs(22), color: T.text}]}
+            numberOfLines={1}
+            maxFontSizeMultiplier={1.2}>
+            {t('hub.title')}
+          </Text>
+        <View style={[s.heroCount, {backgroundColor: T.surface}]}>
+            <Text style={{fontSize: fs(12), color: T.accent, fontWeight: '700'}}>{String(tiles.length).padStart(2, '0')}</Text>
+          </View>
+        </View>
+        <View style={s.tileGrid}>
         {tiles.map(tile => (
           <TouchableOpacity key={tile.id} onPress={() => handleTilePress(tile)} activeOpacity={0.7} accessibilityRole="button" accessibilityLabel={tile.label}
-            style={{width: '31%', aspectRatio: 1, borderRadius: 14, borderWidth: 1, backgroundColor: T.card, borderColor: T.border, alignItems: 'center', justifyContent: 'center', padding: 10}}>
+              style={[s.tileCard, {backgroundColor: T.card}]}>
             <View style={{flex: 1, alignSelf: 'stretch'}}>
-              <View style={{flex: 1, alignItems: 'center', justifyContent: 'flex-end', paddingBottom: 4}}>
+              <View style={{flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14}}>
+                <View style={[s.tileIconWrap, {backgroundColor: T.accentBg}]}>
                 <Text style={{fontSize: fs(26), lineHeight: fs(28), color: T.accent, textAlign: 'center', includeFontPadding: false}}>{tile.icon}</Text>
+                </View>
+                {tile.external ? <Text style={{fontSize: fs(11), color: T.muted}}>↗</Text> : null}
               </View>
-              <View style={{flex: 1, alignItems: 'center', justifyContent: 'flex-start', paddingTop: 4}}>
-                <Text style={{fontSize: fs(11), lineHeight: fs(14), fontWeight: '600', color: T.text, textAlign: 'center', includeFontPadding: false}} numberOfLines={2}>{tile.label}</Text>
-              </View>
+              <Text style={{fontSize: fs(12), lineHeight: fs(14), fontWeight: '700', color: T.text, includeFontPadding: false}} numberOfLines={2}>{tile.label}</Text>
             </View>
           </TouchableOpacity>
         ))}
+        </View>
       </View>
     </ScrollView>
   );
 };
+
+const s = StyleSheet.create({
+  heroCard: {paddingVertical: 2},
+  heading: {fontFamily: Fonts.display, letterSpacing: -0.5, flex: 1, marginRight: 12},
+  heroCount: {minWidth: 42, alignItems: 'center', paddingHorizontal: 10, paddingVertical: 7, borderRadius: 12},
+  tileGrid: {flexDirection: 'row', flexWrap: 'wrap', gap: 10, justifyContent: 'space-between', alignItems: 'flex-start'},
+  tileCard: {width: '31.5%', minHeight: 104, borderRadius: 22, padding: 14},
+  tileIconWrap: {width: 40, height: 40, borderRadius: 14, alignItems: 'center', justifyContent: 'center'},
+});

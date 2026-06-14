@@ -8,7 +8,7 @@ import {
 import {Text} from '../components/AppText';
 import {Avatar} from '../components/Avatar';
 import {useTranslation} from 'react-i18next';
-import {Fonts} from '../theme';
+import {Fonts, UI} from '../theme';
 import {
   FrontState,
   FrontTier,
@@ -68,8 +68,8 @@ const TierCard = ({
     isPrimary ? T.accent : tierKey === 'coFront' ? T.info : T.success;
 
   return (
-    <View style={{marginBottom: 14}}>
-      <View style={{flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8}}>
+    <View style={{marginBottom: UI.sectionGap}}>
+      <View style={{flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10}}>
         <View
           style={{
             width: 8,
@@ -95,7 +95,7 @@ const TierCard = ({
       <View
         style={[
           s.tierCard,
-          {backgroundColor: T.card, borderColor: `${accentColor}40`},
+          {backgroundColor: T.surface, borderColor: `${accentColor}18`},
         ]}>
         <View style={{gap: 12, marginBottom: 10}}>
           {fronters.length > 0 ? (
@@ -127,7 +127,7 @@ const TierCard = ({
         </View>
 
         {isPrimary && (
-          <View style={{borderTopWidth: 1, borderTopColor: T.border, paddingTop: 8, marginBottom: 8}}>
+          <View style={{borderTopWidth: 1, borderTopColor: T.border, paddingTop: 10, marginBottom: 10}}>
             <Text style={{fontSize: fs(11), color: T.muted}}>
               {t('front.frontingFor')}{' '}
               <Text style={{color: T.accent}}>{fmtDur(front.startTime)}</Text>{' '}
@@ -136,12 +136,12 @@ const TierCard = ({
           </View>
         )}
 
-        <TouchableOpacity onPress={() => onEditDetails(tierKey)} activeOpacity={0.7} accessibilityRole="button" accessibilityLabel={`${t('front.frontNote')}, ${t('common.edit')}`} style={{borderTopWidth: 1, borderTopColor: T.border, paddingTop: 8}}>
+        <TouchableOpacity onPress={() => onEditDetails(tierKey)} activeOpacity={0.7} accessibilityRole="button" accessibilityLabel={`${t('front.frontNote')}, ${t('common.edit')}`} style={{borderTopWidth: 1, borderTopColor: T.border, paddingTop: 10}}>
           <View style={{flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between'}}>
             <Text style={{fontSize: fs(9), letterSpacing: 1, color: T.dim}}>
               {t('front.frontNote')}
             </Text>
-            <View style={{paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, borderWidth: 1, backgroundColor: T.accentBg, borderColor: `${T.accent}40`}}>
+            <View style={{paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, backgroundColor: T.card}}>
               <Text style={{fontSize: fs(11), fontWeight: '500', color: T.accent}} numberOfLines={1} maxFontSizeMultiplier={1.2}>{t('common.edit')}</Text>
             </View>
           </View>
@@ -171,38 +171,51 @@ export const FrontScreen = ({
       <ScrollView
         style={{flex: 1, backgroundColor: T.bg}}
         contentContainerStyle={{
-          padding: 16,
+          padding: UI.screenPadding,
           paddingBottom: 140,
         }}>
-
-        <View style={{marginBottom: 16}}>
-          <Text
-            accessibilityRole="header"
-            style={[s.heading, {color: T.text, marginBottom: 10}]}
-            numberOfLines={1}
-            maxFontSizeMultiplier={1.2}>
-            {t('front.currentlyFronting')}
-          </Text>
-          <TouchableOpacity
-            onPress={onSetFront}
-            accessibilityRole="button"
-            accessibilityLabel={t('front.update')}
-            style={[
-              s.btn,
-              {backgroundColor: T.accentBg, borderColor: `${T.accent}40`, alignSelf: 'flex-start'},
-            ]}>
-            <Text
-              style={[s.btnText, {color: T.accent}]}
-              numberOfLines={1}
-              maxFontSizeMultiplier={1.2}>
-              {t('front.update')}
-            </Text>
-          </TouchableOpacity>
+        <View style={[s.headerCard, {backgroundColor: T.surface, borderColor: T.border}]}>
+          <View style={s.headerRow}>
+            <View style={{flex: 1}}>
+              <Text
+                style={{fontSize: fs(10), fontWeight: '700', letterSpacing: 1.4, color: T.accent, textTransform: 'uppercase', marginBottom: 8}}>
+                {t('front.currentlyFronting')}
+              </Text>
+              <Text
+                accessibilityRole="header"
+                style={[s.heading, {color: T.text}]}
+                numberOfLines={1}
+                maxFontSizeMultiplier={1.2}>
+                {empty ? t('front.noOneFronting') : t('front.currentlyFronting')}
+              </Text>
+              <Text style={{fontSize: fs(12), color: T.dim, marginTop: 6}}>
+                {empty ? t('front.update') : t('front.frontNote')}
+              </Text>
+            </View>
+            <TouchableOpacity
+              onPress={onSetFront}
+              accessibilityRole="button"
+              accessibilityLabel={t('front.update')}
+              style={[
+                s.btn,
+                {backgroundColor: T.accent, borderColor: `${T.accent}40`},
+              ]}>
+              <Text
+                style={[s.btnText, {color: T.bg}]}
+                numberOfLines={1}
+                maxFontSizeMultiplier={1.2}>
+                {t('front.update')}
+              </Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         {empty ? (
-          <View style={[s.emptyCard, {backgroundColor: T.card, borderColor: T.border}]}>
-            <Text style={{color: T.muted, fontSize: fs(13)}}>
+          <View style={[s.emptyCard, {backgroundColor: T.surface, borderColor: T.border}]}>
+            <Text style={{fontSize: fs(11), fontWeight: '700', letterSpacing: 1.2, textTransform: 'uppercase', color: T.dim, marginBottom: 8}}>
+              {t('front.currentlyFronting')}
+            </Text>
+            <Text style={{color: T.muted, fontSize: fs(13), textAlign: 'center'}}>
               {t('front.noOneFronting')}
             </Text>
           </View>
@@ -247,34 +260,39 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 16,
+    gap: 12,
+  },
+  headerCard: {
+    borderRadius: UI.radiusLg,
+    borderWidth: 0,
+    padding: 22,
+    marginBottom: UI.sectionGap,
   },
   heading: {
     fontFamily: Fonts.display,
-    fontSize: 22,
+    fontSize: 24,
     fontWeight: '600',
-    fontStyle: 'italic',
   },
   btn: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-    borderWidth: 1,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: UI.pill,
+    borderWidth: 0,
   },
   btnText: {
-    fontSize: 13,
-    fontWeight: '500',
+    fontSize: 12,
+    fontWeight: '700',
   },
   tierCard: {
-    borderRadius: 14,
-    borderWidth: 1,
-    padding: 16,
+    borderRadius: UI.radiusLg,
+    borderWidth: 0,
+    padding: 18,
   },
   emptyCard: {
-    borderRadius: 16,
-    borderWidth: 1,
-    padding: 18,
-    minHeight: 100,
+    borderRadius: UI.radiusLg,
+    borderWidth: 0,
+    padding: 28,
+    minHeight: 140,
     alignItems: 'center',
     justifyContent: 'center',
   },

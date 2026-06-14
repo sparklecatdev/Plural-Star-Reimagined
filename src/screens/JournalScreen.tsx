@@ -2,7 +2,7 @@ import React, {useState} from 'react';
 import {View, ScrollView, TouchableOpacity, Modal, Alert, Image, StyleSheet} from 'react-native';
 import {Text, TextInput} from '../components/AppText';
 import {useTranslation} from 'react-i18next';
-import {Fonts} from '../theme';
+import {Fonts, UI} from '../theme';
 import {JournalEntry, JournalTemplate, Member, fmtTime, sortMembersBySearch} from '../utils';
 import {exportEntryTxt, exportEntryMd, exportEntryJSON} from '../export/exportUtils';
 import {RichText} from '../components/MarkdownRenderer';
@@ -118,63 +118,71 @@ export const JournalScreen = ({theme: T, journal, templates, members, systemJour
 
   if (!journalUnlocked) {
     return (
-      <View style={{flex: 1, backgroundColor: T.bg, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32}}>
-        <Text style={{fontSize: fs(44), color: T.accent, marginBottom: 16}}>◉</Text>
+      <View style={{flex: 1, backgroundColor: T.bg, alignItems: 'center', justifyContent: 'center', paddingHorizontal: UI.screenPadding}}>
+        <View style={{width: '100%', maxWidth: 420, backgroundColor: T.card, borderRadius: UI.radiusLg, borderWidth: 1, borderColor: `${T.accent}24`, padding: 22}}>
+        <Text style={{fontSize: fs(11), letterSpacing: 1.6, textTransform: 'uppercase', color: T.dim, marginBottom: 10, fontWeight: '700'}}>{t('journal.title')}</Text>
         <Text accessibilityRole="header" style={[s.heading, {color: T.text, marginBottom: 8}]}>{t('journal.locked')}</Text>
-        <Text style={{fontSize: fs(13), color: T.dim, textAlign: 'center', marginBottom: 24}}>{t('journal.enterPasswordToContinue')}</Text>
+        <Text style={{fontSize: fs(13), color: T.dim, lineHeight: fs(18), marginBottom: 24}}>{t('journal.enterPasswordToContinue')}</Text>
         <TextInput value={globalPwInput} onChangeText={v => {setGlobalPwInput(v); setGlobalPwError(false);}}
           placeholder={t('journal.password')} placeholderTextColor={T.muted} secureTextEntry
           style={[s.input, {width: '100%', backgroundColor: T.surface, color: T.text, borderColor: globalPwError ? T.danger : T.border, marginBottom: 6}]}
           onSubmitEditing={handleGlobalUnlock} />
         {globalPwError && <Text style={{fontSize: fs(12), color: T.danger, marginBottom: 10, alignSelf: 'flex-start'}}>{t('journal.incorrectPassword')}</Text>}
         <TouchableOpacity onPress={handleGlobalUnlock} activeOpacity={0.8} accessibilityRole="button" accessibilityLabel={t('journal.unlockJournal')}
-          style={{width: '100%', backgroundColor: T.accent, borderRadius: 8, paddingVertical: 13, alignItems: 'center', marginTop: 8}}>
+          style={{width: '100%', backgroundColor: T.accent, borderRadius: UI.radiusMd, paddingVertical: 13, alignItems: 'center', marginTop: 8}}>
           <Text style={{fontSize: fs(15), fontWeight: '700', color: '#0a0508'}}>{t('journal.unlockJournal')}</Text>
         </TouchableOpacity>
+        </View>
       </View>
     );
   }
 
   return (
     <ScrollView style={{flex: 1, backgroundColor: T.bg}} contentContainerStyle={s.content} keyboardShouldPersistTaps="handled">
-      <View style={s.headerRow}>
-        <Text
-          accessibilityRole="header"
-          style={[s.heading, {color: T.text, flex: 1, marginRight: 8}]}
-          numberOfLines={1}
-          maxFontSizeMultiplier={1.2}>
-          {t('journal.title')}
-        </Text>
-        <TouchableOpacity
-          onPress={() => subTab === 'entries' ? onAdd() : setEditingTemplate('new')}
-          activeOpacity={0.7}
-          accessibilityRole="button"
-          style={{paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, borderWidth: 1, backgroundColor: T.accentBg, borderColor: `${T.accent}40`}}>
-          <Text style={{fontSize: fs(13), fontWeight: '500', color: T.accent}}>
-            {subTab === 'entries'
-              ? t('journal.new')
-              : t('journal.newTemplate')}
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      <View style={{flexDirection: 'row', gap: 0, marginBottom: 14, borderBottomWidth: 1, borderBottomColor: T.border}}>
-        {(['entries', 'templates'] as JournalSubTab[]).map(tab => (
-          <TouchableOpacity key={tab} onPress={() => setSubTab(tab)} activeOpacity={0.7}
-            accessibilityRole="tab" accessibilityState={{selected: subTab === tab}}
-            style={{paddingVertical: 10, paddingHorizontal: 16, borderBottomWidth: 2, borderBottomColor: subTab === tab ? T.accent : 'transparent'}}>
-            <Text style={{fontSize: fs(13), color: subTab === tab ? T.accent : T.dim, fontWeight: subTab === tab ? '600' : '400'}}>
-              {tab === 'entries'
-                ? t('journal.entriesTab')
-                : t('journal.templatesTab')}
+      <View style={{backgroundColor: T.card, borderRadius: UI.radiusLg, borderWidth: 1, borderColor: `${T.accent}24`, padding: 18, marginBottom: 16}}>
+        <View style={s.headerRow}>
+          <View style={{flex: 1, marginRight: 12}}>
+            <Text style={{fontSize: fs(10), letterSpacing: 1.5, textTransform: 'uppercase', color: T.dim, marginBottom: 6, fontWeight: '700'}}>
+              {subTab === 'entries' ? t('journal.entriesTab') : t('journal.templatesTab')}
+            </Text>
+            <Text
+              accessibilityRole="header"
+              style={[s.heading, {color: T.text}]}
+              numberOfLines={1}
+              maxFontSizeMultiplier={1.2}>
+              {t('journal.title')}
+            </Text>
+          </View>
+          <TouchableOpacity
+            onPress={() => subTab === 'entries' ? onAdd() : setEditingTemplate('new')}
+            activeOpacity={0.7}
+            accessibilityRole="button"
+            style={{paddingHorizontal: 14, paddingVertical: 8, borderRadius: UI.pill, borderWidth: 1, backgroundColor: T.accentBg, borderColor: `${T.accent}40`}}>
+            <Text style={{fontSize: fs(13), fontWeight: '600', color: T.accent}}>
+              {subTab === 'entries'
+                ? t('journal.new')
+                : t('journal.newTemplate')}
             </Text>
           </TouchableOpacity>
-        ))}
+        </View>
+        <View style={{flexDirection: 'row', gap: 8, marginTop: 16}}>
+          {(['entries', 'templates'] as JournalSubTab[]).map(tab => (
+            <TouchableOpacity key={tab} onPress={() => setSubTab(tab)} activeOpacity={0.7}
+              accessibilityRole="tab" accessibilityState={{selected: subTab === tab}}
+              style={{paddingVertical: 9, paddingHorizontal: 14, borderRadius: UI.pill, borderWidth: 1, backgroundColor: subTab === tab ? T.accentBg : T.surface, borderColor: subTab === tab ? `${T.accent}40` : T.border}}>
+              <Text style={{fontSize: fs(13), color: subTab === tab ? T.accent : T.dim, fontWeight: subTab === tab ? '700' : '500'}}>
+                {tab === 'entries'
+                  ? t('journal.entriesTab')
+                  : t('journal.templatesTab')}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
       </View>
 
       {subTab === 'templates' ? (
         templates.length === 0 ? (
-          <View style={{alignItems: 'center', paddingVertical: 48}}>
+          <View style={{alignItems: 'center', paddingVertical: 48, backgroundColor: T.card, borderRadius: UI.radiusLg, borderWidth: 1, borderColor: T.border}}>
             <Text style={{fontSize: fs(36), opacity: 0.4, marginBottom: 12}}>◫</Text>
             <Text style={{fontSize: fs(13), color: T.dim, textAlign: 'center', marginBottom: 16}}>
               {t('journal.noTemplates')}
@@ -191,7 +199,7 @@ export const JournalScreen = ({theme: T, journal, templates, members, systemJour
             {templates.map(tpl => (
               <TouchableOpacity key={tpl.id} onPress={() => setEditingTemplate(tpl)} activeOpacity={0.7}
                 accessibilityRole="button" accessibilityLabel={`${tpl.name}, ${t('common.edit')}`}
-                style={{backgroundColor: T.card, borderRadius: 10, borderWidth: 1, borderColor: T.border, padding: 14}}>
+                style={{backgroundColor: T.card, borderRadius: UI.radiusLg, borderWidth: 1, borderColor: T.border, padding: 14}}>
                 <View style={{flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4}}>
                   <Text style={{fontSize: fs(14), fontWeight: '600', color: T.text, flex: 1}} numberOfLines={1}>{tpl.name}</Text>
                   <Text style={{fontSize: fs(11), color: T.muted}} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">✎</Text>
@@ -219,7 +227,8 @@ export const JournalScreen = ({theme: T, journal, templates, members, systemJour
       <>
 
       {allTags.length > 0 && (
-        <View style={{marginBottom: 8}}>
+        <View style={{marginBottom: 8, backgroundColor: T.card, borderRadius: UI.radiusLg, borderWidth: 1, borderColor: T.border, padding: 14}}>
+          <Text style={{fontSize: fs(10), letterSpacing: 1.4, textTransform: 'uppercase', color: T.dim, marginBottom: 8, fontWeight: '700'}}>{t('journal.searchTags')}</Text>
           <View style={{flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4}}>
             {activeTag && (
               <TouchableOpacity onPress={() => {setActiveTag(null); setTagSearch('');}} activeOpacity={0.7}
@@ -250,7 +259,8 @@ export const JournalScreen = ({theme: T, journal, templates, members, systemJour
       )}
 
       {activeAuthors.length > 0 && (
-        <View style={{marginBottom: 14}}>
+        <View style={{marginBottom: 14, backgroundColor: T.card, borderRadius: UI.radiusLg, borderWidth: 1, borderColor: T.border, padding: 14}}>
+          <Text style={{fontSize: fs(10), letterSpacing: 1.4, textTransform: 'uppercase', color: T.dim, marginBottom: 8, fontWeight: '700'}}>{t('journal.searchAuthors')}</Text>
           <View style={{flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4}}>
             {activeAuthor && (() => {
               const m = getMember(activeAuthor);
@@ -287,7 +297,7 @@ export const JournalScreen = ({theme: T, journal, templates, members, systemJour
       )}
 
       {!filteredJournal.length ? (
-        <View style={{alignItems: 'center', paddingVertical: 48}}>
+        <View style={{alignItems: 'center', paddingVertical: 48, backgroundColor: T.card, borderRadius: UI.radiusLg, borderWidth: 1, borderColor: T.border}}>
           <Text style={{fontSize: fs(36), opacity: 0.4, marginBottom: 12}}>◉</Text>
           <Text style={{fontSize: fs(13), color: T.dim, textAlign: 'center', marginBottom: 16}}>
             {activeTag ? t('journal.noEntriesTagged', {tag: activeTag}) : t('journal.noEntries')}
@@ -419,13 +429,13 @@ export const JournalScreen = ({theme: T, journal, templates, members, systemJour
 };
 
 const s = StyleSheet.create({
-  content: {padding: 16, paddingBottom: 32},
-  headerRow: {flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14},
-  heading: {fontFamily: Fonts.display, fontSize: 22, fontWeight: '600', fontStyle: 'italic'},
-  input: {borderWidth: 1, borderRadius: 8, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15},
-  card: {borderRadius: 12, borderWidth: 1, padding: 14},
+  content: {padding: UI.screenPadding, paddingBottom: 32},
+  headerRow: {flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 0},
+  heading: {fontFamily: Fonts.display, fontSize: 24, fontWeight: '600', fontStyle: 'italic'},
+  input: {borderWidth: 1, borderRadius: UI.radiusMd, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15},
+  card: {borderRadius: UI.radiusLg, borderWidth: 1, padding: 14},
   tagChip: {paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999, borderWidth: 1},
   overlay: {flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', alignItems: 'center', justifyContent: 'center', padding: 24},
-  modalCard: {borderRadius: 16, borderWidth: 1, padding: 24, width: '100%', maxWidth: 360},
+  modalCard: {borderRadius: UI.radiusLg, borderWidth: 1, padding: 24, width: '100%', maxWidth: 360},
   modalTitle: {fontFamily: Fonts.display, fontSize: 20, fontWeight: '600', fontStyle: 'italic', marginBottom: 6},
 });

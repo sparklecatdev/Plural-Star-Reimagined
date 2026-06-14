@@ -2,7 +2,7 @@ import React, {useState, useMemo} from 'react';
 import {View, ScrollView, TouchableOpacity} from 'react-native';
 import {Text} from '../components/AppText';
 import {useTranslation} from 'react-i18next';
-import {Fonts} from '../theme';
+import {Fonts, UI} from '../theme';
 import {Member, HistoryEntry, ChatMessage, fmtDur, translateMood, SINGLET_HIDDEN_STATUS_NAMES, buildEffectiveEnd} from '../utils';
 import {DateTimeEditor} from '../components/DateTimeEditor';
 import {Avatar} from '../components/Avatar';
@@ -162,20 +162,25 @@ export const StatsScreen = ({theme: T, history, members, chatMessages, singlet =
   }, [filteredHistory, filteredChat, members, history, singlet, selfId]);
 
   const getMember = (id: string) => members.find(m => m.id === id);
+  const sectionLabel = (label: string) => (
+    <Text accessibilityRole="header" style={{fontSize: fs(10), letterSpacing: 1.4, textTransform: 'uppercase', color: T.dim, fontWeight: '700', marginBottom: 10}}>
+      {label}
+    </Text>
+  );
 
   const RangeBtn = ({id, label}: {id: TimeRange; label: string}) => (
     <TouchableOpacity onPress={() => setRange(id)} activeOpacity={0.7}
       accessibilityRole="button" accessibilityState={{selected: range === id}}
-      style={{paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, borderWidth: 1,
-        backgroundColor: range === id ? `${T.accent}20` : T.surface, borderColor: range === id ? `${T.accent}60` : T.border}}>
-      <Text style={{fontSize: fs(12), color: range === id ? T.accent : T.dim, fontWeight: range === id ? '600' : '400'}}>{label}</Text>
+      style={{paddingHorizontal: 14, paddingVertical: 8, borderRadius: UI.pill, borderWidth: 1,
+        backgroundColor: range === id ? T.accentBg : T.surface, borderColor: range === id ? `${T.accent}50` : T.border}}>
+      <Text style={{fontSize: fs(12), color: range === id ? T.accent : T.dim, fontWeight: range === id ? '700' : '500'}}>{label}</Text>
     </TouchableOpacity>
   );
 
   const StatCard = ({label, value, accent}: {label: string; value: string; accent?: boolean}) => (
-    <View style={{flex: 1, backgroundColor: T.card, borderRadius: 10, borderWidth: 1, borderColor: T.border, padding: 12}}>
-      <Text style={{fontSize: fs(9), letterSpacing: 1, textTransform: 'uppercase', color: T.dim, marginBottom: 4, fontWeight: '600'}}>{label}</Text>
-      <Text style={{fontSize: fs(16), fontWeight: '700', color: accent ? T.accent : T.text}}>{value}</Text>
+    <View style={{flex: 1, minWidth: 0, backgroundColor: T.card, borderRadius: UI.radiusLg, borderWidth: 1, borderColor: accent ? `${T.accent}35` : T.border, padding: 14}}>
+      <Text style={{fontSize: fs(9), letterSpacing: 1.3, textTransform: 'uppercase', color: T.dim, marginBottom: 6, fontWeight: '700'}}>{label}</Text>
+      <Text style={{fontSize: fs(18), fontWeight: '700', color: accent ? T.accent : T.text}} numberOfLines={1}>{value}</Text>
     </View>
   );
 
@@ -204,8 +209,8 @@ export const StatsScreen = ({theme: T, history, members, chatMessages, singlet =
     const total = entries.reduce((s, [, v]) => s + v, 0) || 1;
     return (
       <View style={{marginBottom: 18}}>
-        <Text accessibilityRole="header" style={{fontSize: fs(10), letterSpacing: 1, textTransform: 'uppercase', color: T.dim, fontWeight: '600', marginBottom: 8}}>{title}</Text>
-        <View style={{backgroundColor: T.card, borderRadius: 10, borderWidth: 1, borderColor: T.border}}>
+        {sectionLabel(title)}
+        <View style={{backgroundColor: T.card, borderRadius: UI.radiusLg, borderWidth: 1, borderColor: T.border, overflow: 'hidden'}}>
           {shown.map(([key, value], i) => {
             const member = getMember(key);
             const isLast = i === shown.length - 1;
@@ -241,8 +246,8 @@ export const StatsScreen = ({theme: T, history, members, chatMessages, singlet =
     const totalT = stats.topFronters.reduce((s, e) => s + e.time, 0) || 1;
     return (
       <View style={{marginBottom: 18}}>
-        <Text accessibilityRole="header" style={{fontSize: fs(10), letterSpacing: 1, textTransform: 'uppercase', color: T.dim, fontWeight: '600', marginBottom: 8}}>{singlet ? t('stats.topStatuses') : t('stats.topFronters')}</Text>
-        <View style={{backgroundColor: T.card, borderRadius: 10, borderWidth: 1, borderColor: T.border}}>
+        {sectionLabel(singlet ? t('stats.topStatuses') : t('stats.topFronters'))}
+        <View style={{backgroundColor: T.card, borderRadius: UI.radiusLg, borderWidth: 1, borderColor: T.border, overflow: 'hidden'}}>
           {shown.map((entry, i) => {
             const member = getMember(entry.id);
             const isLast = i === shown.length - 1;
@@ -272,16 +277,27 @@ export const StatsScreen = ({theme: T, history, members, chatMessages, singlet =
   };
 
   return (
-    <ScrollView style={{flex: 1, backgroundColor: T.bg}} contentContainerStyle={{padding: 16, paddingBottom: 40}}>
-      <View style={{flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 16}}>
-        <RangeBtn id="all" label={t('stats.allTime')} />
-        <RangeBtn id="7d" label={t('stats.last7')} />
-        <RangeBtn id="30d" label={t('stats.last30')} />
-        <RangeBtn id="custom" label={t('stats.customRange')} />
+    <ScrollView style={{flex: 1, backgroundColor: T.bg}} contentContainerStyle={{padding: UI.screenPadding, paddingBottom: 40, gap: UI.sectionGap}}>
+      <View style={{backgroundColor: T.card, borderRadius: UI.radiusLg, borderWidth: 1, borderColor: `${T.accent}22`, padding: 18}}>
+        <Text style={{fontSize: fs(10), letterSpacing: 1.6, textTransform: 'uppercase', color: T.dim, fontWeight: '700', marginBottom: 8}}>
+          {t('hub.statistics')}
+        </Text>
+        <Text accessibilityRole="header" style={{fontFamily: Fonts.display, fontSize: fs(28), color: T.text, marginBottom: 6}}>
+          {singlet ? t('stats.topStatuses') : t('hub.statistics')}
+        </Text>
+        <Text style={{fontSize: fs(13), color: T.muted, lineHeight: fs(18), marginBottom: 16}}>
+          {t('stats.totalSessions')}: {stats.totalSessions} · {t('stats.totalTime')}: {fmtDur(0, stats.totalMs)}
+        </Text>
+        <View style={{flexDirection: 'row', flexWrap: 'wrap', gap: 8}}>
+          <RangeBtn id="all" label={t('stats.allTime')} />
+          <RangeBtn id="7d" label={t('stats.last7')} />
+          <RangeBtn id="30d" label={t('stats.last30')} />
+          <RangeBtn id="custom" label={t('stats.customRange')} />
+        </View>
       </View>
 
       {range === 'custom' && (
-        <View style={{backgroundColor: T.card, borderRadius: 10, borderWidth: 1, borderColor: T.border, padding: 12, marginBottom: 16}}>
+        <View style={{backgroundColor: T.card, borderRadius: UI.radiusLg, borderWidth: 1, borderColor: T.border, padding: 14}}>
           <DateTimeEditor
             date={new Date(customStart)}
             onChange={d => {
@@ -334,7 +350,7 @@ export const StatsScreen = ({theme: T, history, members, chatMessages, singlet =
         </View>
       )}
 
-      <View style={{flexDirection: 'row', gap: 8, marginBottom: 16}}>
+      <View style={{flexDirection: 'row', gap: 10}}>
         <StatCard label={t('stats.totalTime')} value={fmtDur(0, stats.totalMs)} accent />
         <StatCard label={t('stats.sessions')} value={String(stats.totalSessions)} />
         {!singlet && <StatCard label={t('stats.messages')} value={String(stats.totalMessages)} />}
@@ -349,7 +365,7 @@ export const StatsScreen = ({theme: T, history, members, chatMessages, singlet =
 
       {stats.energyAvgs.length > 0 && (
         <View style={{marginBottom: 16}}>
-          <Text accessibilityRole="header" style={{fontSize: fs(10), letterSpacing: 1, textTransform: 'uppercase', color: T.dim, fontWeight: '600', marginBottom: 8}}>{t('energy.avgEnergy')}</Text>
+          {sectionLabel(t('stats.avgEnergy'))}
           {stats.energyAvgs.slice(0, 8).map(({id, avg}) => {
             const m = getMember(id);
             return (
@@ -367,8 +383,8 @@ export const StatsScreen = ({theme: T, history, members, chatMessages, singlet =
       )}
 
       {stats.peakHours.some((v: number) => v > 0) && (
-        <View style={{marginBottom: 16}}>
-          <Text accessibilityRole="header" style={{fontSize: fs(10), letterSpacing: 1, textTransform: 'uppercase', color: T.dim, fontWeight: '600', marginBottom: 8}}>{t('stats.peakHours')}</Text>
+        <View style={{marginBottom: 16, backgroundColor: T.card, borderRadius: UI.radiusLg, borderWidth: 1, borderColor: T.border, padding: 14}}>
+          {sectionLabel(t('stats.peakHours'))}
           <View style={{flexDirection: 'row', alignItems: 'flex-end', height: 50, gap: 1}}>
             {stats.peakHours.map((count: number, h: number) => {
               const max = Math.max(...stats.peakHours as number[], 1);
@@ -390,9 +406,9 @@ export const StatsScreen = ({theme: T, history, members, chatMessages, singlet =
       )}
 
       {stats.energyByHour.some((v: number) => v > 0) && (
-        <View style={{marginBottom: 16}}>
+        <View style={{marginBottom: 16, backgroundColor: T.card, borderRadius: UI.radiusLg, borderWidth: 1, borderColor: T.border, padding: 14}}>
           <View style={{flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8}}>
-            <Text accessibilityRole="header" style={{fontSize: fs(10), letterSpacing: 1, textTransform: 'uppercase', color: T.dim, fontWeight: '600'}}>{t('stats.energyByHour')}</Text>
+            {sectionLabel(t('stats.energyByHour'))}
             <Text style={{fontSize: fs(9), color: T.muted}}>{t('energy.outOf10')}</Text>
           </View>
           <View style={{flexDirection: 'row', alignItems: 'flex-end', height: 50, gap: 1}}>
@@ -413,7 +429,7 @@ export const StatsScreen = ({theme: T, history, members, chatMessages, singlet =
       )}
 
       <View style={{marginBottom: 16}}>
-        <Text accessibilityRole="header" style={{fontSize: fs(10), letterSpacing: 1, textTransform: 'uppercase', color: T.dim, fontWeight: '600', marginBottom: 8}}>{singlet ? t('stats.statusDetails') : t('stats.topCoMembers')}</Text>
+        {sectionLabel(singlet ? t('stats.statusDetails') : t('stats.topCoMembers'))}
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{marginBottom: 10, flexGrow: 0}}>
           <View style={{flexDirection: 'row', gap: 6}}>
             {members.filter((m: Member) => !m.archived && (!singlet || (m.isCustomFront && !SINGLET_HIDDEN_STATUS_NAMES.includes(m.name)))).map((m: Member) => (
@@ -451,7 +467,7 @@ export const StatsScreen = ({theme: T, history, members, chatMessages, singlet =
           const avgE = eCount > 0 ? Math.round((eSum / eCount) * 10) / 10 : null;
 
           return (
-            <View style={{backgroundColor: T.card, borderRadius: 10, borderWidth: 1, borderColor: T.border, padding: 12}}>
+            <View style={{backgroundColor: T.card, borderRadius: UI.radiusLg, borderWidth: 1, borderColor: T.border, padding: 14}}>
               <View style={{flexDirection: 'row', gap: 16, marginBottom: 10}}>
                 <View><Text style={{fontSize: fs(18), fontWeight: '700', color: sm?.color || T.accent}}>{entries.length}</Text><Text style={{fontSize: fs(10), color: T.muted}}>{t('stats.sessionsSuffix')}</Text></View>
                 {avgE !== null && <View><Text style={{fontSize: fs(18), fontWeight: '700', color: sm?.color || T.accent}}>{avgE}</Text><Text style={{fontSize: fs(10), color: T.muted}}>{t('energy.outOf10')}</Text></View>}

@@ -6,7 +6,8 @@ import {safePick, isPickerCancel, getPickedFilePath} from '../utils/safePicker';
 import ReactNativeBlobUtil from 'react-native-blob-util';
 import {exportJSON, exportBundle, exportHTML, exportEmail, exportAllJournalJSON, exportAllJournalTxt, exportAllJournalMd, ExportCategories, readZipBundle, base64FromU8} from '../export/exportUtils';
 import {store, KEYS, chatMsgKey, listRecoverableBackups, restoreFromBackup, RecoverableEntry} from '../storage';
-import {SystemInfo, Member, MemberGroup, FrontState, HistoryEntry, JournalEntry, ShareSettings, AppSettings, ExportPayload, CustomFieldDef, CustomFieldType, CustomFieldValue, ChatChannel, ChatMessage, MemberPoll, uid, allFrontMemberIds, findOpenFrontInHistory} from '../utils';
+import {SystemInfo, Member, MemberGroup, FrontState, HistoryEntry, JournalEntry, ShareSettings, AppSettings, ExportPayload, CustomFieldDef, CustomFieldType, CustomFieldValue, ChatChannel, ChatMessage, MemberPoll, uid, allFrontMemberIds, findOpenFrontInHistory, normalizeAppearanceSettings} from '../utils';
+import {Fonts, UI} from '../theme';
 
 type Section = 'export' | 'import' | 'shareview';
 type ImportSource = 'backup' | 'journal' | 'simplyplural' | 'pluralkit' | 'spfile' | 'ampersand' | 'pluralspace';
@@ -268,7 +269,7 @@ export const ShareScreen = ({theme: T, system, members, front, history, journal,
                 if (!restoreSel.moods) newSettings.customMoods = currentSettings.customMoods || [];
               }
               if (restoreSel.moods) newSettings.customMoods = data.customMoods || data.settings?.customMoods || [];
-              await store.set(KEYS.settings, newSettings);
+              await store.set(KEYS.settings, normalizeAppearanceSettings(newSettings, T.isLight ? 'light' : 'dark'));
             }
             if (restoreSel.palettes && data.palettes) await store.set(KEYS.palettes, data.palettes);
             if (restoreSel.frontHistory && data.front !== undefined) await store.set(KEYS.front, data.front);
@@ -691,7 +692,7 @@ export const ShareScreen = ({theme: T, system, members, front, history, journal,
             if (restoreSel.moods) {
               newSettings.customMoods = data.customMoods || data.settings?.customMoods || [];
             }
-            await store.set(KEYS.settings, newSettings);
+            await store.set(KEYS.settings, normalizeAppearanceSettings(newSettings, T.isLight ? 'light' : 'dark'));
           }
           if (restoreSel.palettes && data.palettes) await store.set(KEYS.palettes, data.palettes);
           if (restoreSel.frontHistory && data.front !== undefined) await store.set(KEYS.front, data.front);
@@ -2037,7 +2038,7 @@ export const ShareScreen = ({theme: T, system, members, front, history, journal,
   const SectionBtn = ({id, label}: {id: Section; label: string}) => (
     <TouchableOpacity onPress={() => setSection(id)} activeOpacity={0.7}
       accessibilityRole="tab" accessibilityState={{selected: section === id}} accessibilityLabel={label}
-      style={{flex: 1, paddingVertical: 8, borderRadius: 7, borderWidth: 1, alignItems: 'center',
+      style={{flex: 1, paddingVertical: 10, borderRadius: UI.pill, borderWidth: 1, alignItems: 'center',
         backgroundColor: section === id ? T.accentBg : 'transparent', borderColor: section === id ? `${T.accent}40` : T.border}}>
       <Text style={{fontSize: fs(12), color: section === id ? T.accent : T.dim, fontWeight: section === id ? '600' : '400'}}>{label}</Text>
     </TouchableOpacity>
@@ -2046,7 +2047,7 @@ export const ShareScreen = ({theme: T, system, members, front, history, journal,
   const SourceBtn = ({id, label}: {id: ImportSource; label: string}) => (
     <TouchableOpacity onPress={() => {setImportSource(id); setExtPreview(null); setExtToken('');}} activeOpacity={0.7}
       accessibilityRole="tab" accessibilityState={{selected: importSource === id}} accessibilityLabel={label}
-      style={{paddingVertical: 7, paddingHorizontal: 12, borderRadius: 7, borderWidth: 1,
+      style={{paddingVertical: 8, paddingHorizontal: 12, borderRadius: UI.pill, borderWidth: 1,
         backgroundColor: importSource === id ? T.accentBg : 'transparent', borderColor: importSource === id ? `${T.accent}40` : T.border}}>
       <Text style={{fontSize: fs(12), color: importSource === id ? T.accent : T.dim, fontWeight: importSource === id ? '600' : '400'}}>{label}</Text>
     </TouchableOpacity>
@@ -2062,7 +2063,7 @@ export const ShareScreen = ({theme: T, system, members, front, history, journal,
 
   const Toggle = ({value, onToggle, label}: {value: boolean; onToggle: () => void; label?: string}) => (
     <TouchableOpacity onPress={onToggle} activeOpacity={0.8} accessibilityRole="switch" accessibilityState={{checked: value}} accessibilityLabel={label} style={{width: 40, height: 22, borderRadius: 11, backgroundColor: value ? T.accent : T.toggleOff, justifyContent: 'center'}}>
-      <View style={{width: 16, height: 16, borderRadius: 8, backgroundColor: '#fff', position: 'absolute', left: value ? 20 : 3}} />
+      <View style={{width: 16, height: 16, borderRadius: 8, backgroundColor: T.surface, position: 'absolute', left: value ? 20 : 3}} />
     </TouchableOpacity>
   );
 
@@ -2091,10 +2092,17 @@ export const ShareScreen = ({theme: T, system, members, front, history, journal,
 
   return (
     <ScrollView style={{flex: 1, backgroundColor: T.bg}} contentContainerStyle={s.content} keyboardShouldPersistTaps="handled">
-      <View style={{flexDirection: 'row', gap: 6, marginBottom: 4}}>
-        <SectionBtn id="export" label={t('share.export')} />
-        <SectionBtn id="import" label={t('share.import')} />
-        <SectionBtn id="shareview" label={t('share.shareView')} />
+      <View style={{backgroundColor: T.card, borderWidth: 1, borderColor: `${T.accent}24`, borderRadius: UI.radiusLg, padding: 20, marginBottom: UI.sectionGap}}>
+        <Text style={{fontSize: fs(11), letterSpacing: 1.6, textTransform: 'uppercase', color: T.accent, fontWeight: '700', marginBottom: 10}}>{t('share.title')}</Text>
+        <Text accessibilityRole="header" style={{fontFamily: Fonts.display, fontSize: fs(28), fontWeight: '600', fontStyle: 'italic', color: T.text, marginBottom: 8}}>{t('share.title')}</Text>
+        <Text style={[s.para, {color: T.dim, marginBottom: 14}]}>
+          {section === 'shareview' ? t('share.controlVisibility') : t('share.downloadsDirectly')}
+        </Text>
+        <View style={{flexDirection: 'row', gap: 6}}>
+          <SectionBtn id="export" label={t('share.export')} />
+          <SectionBtn id="import" label={t('share.import')} />
+          <SectionBtn id="shareview" label={t('share.shareView')} />
+        </View>
       </View>
 
       {section === 'export' && (

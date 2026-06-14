@@ -4,7 +4,7 @@ import {Text, TextInput} from '../components/AppText';
 import {Avatar} from '../components/Avatar';
 import {FlashList, FlashListRef} from '@shopify/flash-list';
 import {useTranslation} from 'react-i18next';
-import {Fonts, PALETTE} from '../theme';
+import {Fonts, PALETTE, UI} from '../theme';
 import {Member, MemberGroup, GroupNodeKind, FrontState, FrontTierKey, MemberSortMode, allFrontMemberIds, uid, isValidHex, normalizeHex, sortMembers, childrenOf, descendantsOf, isDescendant, groupKind} from '../utils';
 
 const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
@@ -58,15 +58,15 @@ const MemberCard = React.memo(function MemberCard({
   );
   const isFirst = index === 0;
   const cardBorder = selectionMode
-    ? (isSelected ? T.accent : T.border)
-    : (isFronting ? `${m.color}60` : T.border);
+    ? (isSelected ? `${T.accent}55` : 'transparent')
+    : (isFronting ? `${m.color}26` : 'transparent');
   return (
     <TouchableOpacity
       activeOpacity={0.75}
       accessibilityRole="button"
       accessibilityLabel={[m.name, badgeCfg ? t(badgeCfg.i18nKey) : null, m.pronouns].filter(Boolean).join(', ')}
       accessibilityState={selectionMode ? {selected: isSelected} : undefined}
-      style={[s.card, {backgroundColor: T.card, borderColor: cardBorder, borderWidth: selectionMode && isSelected ? 2 : 1, marginBottom: 8}]}
+      style={[s.card, {backgroundColor: T.surface, borderColor: cardBorder, borderWidth: selectionMode && isSelected ? 1 : 0, marginBottom: 10}]}
       onPress={selectionMode ? () => onToggleSelect(m.id) : () => onActivate(m)}
       onLongPress={() => onEnterSelection(m.id)}
       delayLongPress={350}
@@ -92,7 +92,7 @@ const MemberCard = React.memo(function MemberCard({
         <View style={{flex: 1, overflow: 'hidden'}}>
           <View style={{flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 2}}>
             <Text style={{fontSize: fs(15), fontWeight: '500', color: T.text, flexShrink: 1}} numberOfLines={1} maxFontSizeMultiplier={1.4}>{m.name}</Text>
-            {badgeCfg && (<View style={{paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999, backgroundColor: `${badgeColor}18`, borderWidth: 1, borderColor: `${badgeColor}35`, flexShrink: 0}}><Text style={{fontSize: fs(10), color: badgeColor, fontWeight: '500'}} numberOfLines={1} maxFontSizeMultiplier={1.3}>{t(badgeCfg.i18nKey)}</Text></View>)}
+            {badgeCfg && (<View style={{paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999, backgroundColor: `${badgeColor}16`, flexShrink: 0}}><Text style={{fontSize: fs(10), color: badgeColor, fontWeight: '500'}} numberOfLines={1} maxFontSizeMultiplier={1.3}>{t(badgeCfg.i18nKey)}</Text></View>)}
           </View>
           {[m.pronouns, m.role].filter(Boolean).length > 0 ? <Text style={{fontSize: fs(12), color: T.dim}}>{[m.pronouns, m.role].filter(Boolean).join(' · ')}</Text> : null}
           {memberGroups.length > 0 && (
@@ -104,7 +104,7 @@ const MemberCard = React.memo(function MemberCard({
         {!selectionMode && (
           <TouchableOpacity onPress={() => onEditMember(m)} activeOpacity={0.7} hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}
             accessibilityRole="button" accessibilityLabel={`${t('common.edit')}, ${m.name}`}
-            style={{paddingHorizontal: 10, paddingVertical: 5, borderRadius: 6, borderWidth: 1, backgroundColor: T.accentBg, borderColor: `${T.accent}40`}}>
+            style={{paddingHorizontal: 12, paddingVertical: 8, borderRadius: 999, backgroundColor: T.card}}>
             <Text style={{fontSize: fs(12), fontWeight: '500', color: T.accent}}>{t('common.edit')}</Text>
           </TouchableOpacity>
         )}
@@ -333,7 +333,7 @@ export const MembersScreen = ({theme: T, members, front, groups, initialSortMode
           </View>
         </View>
       ) : (
-        <View style={{marginBottom: 14}}>
+        <View style={[s.headerCard, {backgroundColor: T.surface, borderColor: T.border}]}>
           {!archiveOnly && (
             <Text
               accessibilityRole="header"
@@ -350,12 +350,12 @@ export const MembersScreen = ({theme: T, members, front, groups, initialSortMode
           </Text>
           <View style={{flexDirection: 'row', gap: 6, flexWrap: 'wrap'}}>
             <TouchableOpacity onPress={() => enterSelection()} activeOpacity={0.7} accessibilityRole="button"
-              style={[s.addBtn, {backgroundColor: T.surface, borderColor: T.border}]}>
+              style={[s.addBtn, {backgroundColor: T.card, borderColor: 'transparent'}]}>
               <Text style={{fontSize: fs(12), fontWeight: '500', color: T.dim}} numberOfLines={1} maxFontSizeMultiplier={1.2}>{t('members.select')}</Text>
             </TouchableOpacity>
             {!archiveOnly && (
-              <TouchableOpacity onPress={memberTab === 'customFronts' ? (onAddCustomFront || onAdd) : onAdd} activeOpacity={0.7} accessibilityRole="button" accessibilityLabel={memberTab === 'customFronts' ? t('members.addCustomFront') : t('members.add')} style={[s.addBtn, {backgroundColor: T.accentBg, borderColor: `${T.accent}40`}]}>
-                <Text style={{fontSize: fs(13), fontWeight: '500', color: T.accent}} numberOfLines={1} maxFontSizeMultiplier={1.2}>{memberTab === 'customFronts' ? `+ ${t('members.customFront')}` : t('members.add')}</Text>
+              <TouchableOpacity onPress={memberTab === 'customFronts' ? (onAddCustomFront || onAdd) : onAdd} activeOpacity={0.7} accessibilityRole="button" accessibilityLabel={memberTab === 'customFronts' ? t('members.addCustomFront') : t('members.add')} style={[s.addBtn, {backgroundColor: T.accent, borderColor: 'transparent'}]}>
+                <Text style={{fontSize: fs(13), fontWeight: '600', color: T.bg}} numberOfLines={1} maxFontSizeMultiplier={1.2}>{memberTab === 'customFronts' ? `+ ${t('members.customFront')}` : t('members.add')}</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -366,35 +366,35 @@ export const MembersScreen = ({theme: T, members, front, groups, initialSortMode
         <View style={{flexDirection: 'row', gap: 8, marginBottom: 14}}>
           {memberTab === 'active' && onBulkAddGroups && groups.length > 0 && (
             <TouchableOpacity onPress={() => {setGroupAssignSel(new Set()); setShowGroupAssign(true);}} activeOpacity={0.7} accessibilityRole="button"
-              style={{flex: 1, alignItems: 'center', paddingVertical: 10, borderRadius: 8, borderWidth: 1, backgroundColor: T.surface, borderColor: T.border}}>
+              style={{flex: 1, alignItems: 'center', paddingVertical: 11, borderRadius: UI.radiusSm, backgroundColor: T.surface}}>
               <Text style={{fontSize: fs(13), fontWeight: '500', color: T.text}} numberOfLines={1}>{t('members.assignGroup')}</Text>
             </TouchableOpacity>
           )}
           {(memberTab === 'active' || memberTab === 'customFronts') && (
             <TouchableOpacity onPress={confirmBulkArchive} activeOpacity={0.7} accessibilityRole="button"
-              style={{flex: 1, alignItems: 'center', paddingVertical: 10, borderRadius: 8, borderWidth: 1, backgroundColor: T.surface, borderColor: T.border}}>
+              style={{flex: 1, alignItems: 'center', paddingVertical: 11, borderRadius: UI.radiusSm, backgroundColor: T.surface}}>
               <Text style={{fontSize: fs(13), fontWeight: '500', color: T.text}} numberOfLines={1}>{t('members.archive')}</Text>
             </TouchableOpacity>
           )}
           {(memberTab === 'archived' || memberTab === 'customFronts') && (
             <TouchableOpacity onPress={confirmBulkRestore} activeOpacity={0.7} accessibilityRole="button"
-              style={{flex: 1, alignItems: 'center', paddingVertical: 10, borderRadius: 8, borderWidth: 1, backgroundColor: T.surface, borderColor: T.border}}>
+              style={{flex: 1, alignItems: 'center', paddingVertical: 11, borderRadius: UI.radiusSm, backgroundColor: T.surface}}>
               <Text style={{fontSize: fs(13), fontWeight: '500', color: T.text}} numberOfLines={1}>{t('members.restore')}</Text>
             </TouchableOpacity>
           )}
           <TouchableOpacity onPress={confirmBulkDelete} activeOpacity={0.7} accessibilityRole="button"
-            style={{flex: 1, alignItems: 'center', paddingVertical: 10, borderRadius: 8, borderWidth: 1, backgroundColor: `${T.danger}15`, borderColor: `${T.danger}50`}}>
+            style={{flex: 1, alignItems: 'center', paddingVertical: 11, borderRadius: UI.radiusSm, backgroundColor: `${T.danger}14`}}>
             <Text style={{fontSize: fs(13), fontWeight: '600', color: T.danger}} numberOfLines={1}>{t('common.delete')}</Text>
           </TouchableOpacity>
         </View>
       )}
 
       {!archiveOnly && (
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{marginBottom: 14}} contentContainerStyle={{borderBottomWidth: 1, borderBottomColor: T.border}}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{marginBottom: 14}} contentContainerStyle={[s.segmentWrap, {backgroundColor: T.card, borderColor: T.border}]}>
         {(['active', 'customFronts'] as const).map(tab => (
           <TouchableOpacity key={tab} onPress={() => switchTab(tab)} activeOpacity={0.7}
             accessibilityRole="tab" accessibilityState={{selected: memberTab === tab}}
-            style={{paddingVertical: 10, paddingHorizontal: 14, borderBottomWidth: 2, borderBottomColor: memberTab === tab ? T.accent : 'transparent'}}>
+            style={[s.segmentBtn, memberTab === tab && {backgroundColor: T.surface, borderColor: 'transparent'}]}>
             <Text style={{fontSize: fs(13), color: memberTab === tab ? T.accent : T.dim, fontWeight: memberTab === tab ? '600' : '400'}} numberOfLines={1}>
               {tab === 'active' ? t('members.active')
                 : `${t('members.customFronts')}${customFrontCount > 0 ? ` (${customFrontCount})` : ''}`}
@@ -409,9 +409,9 @@ export const MembersScreen = ({theme: T, members, front, groups, initialSortMode
           {(['alphabetical', 'reverse-alphabetical', 'age', 'color', 'role', 'manual'] as const).map(mode => (
             <TouchableOpacity key={mode} onPress={() => {setSortMode(mode); onSaveSortMode && onSaveSortMode(mode);}} activeOpacity={0.7}
               accessibilityRole="button" accessibilityState={{selected: sortMode === mode}} accessibilityLabel={t(`memberSort.${mode}`)}
-              style={{paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999, borderWidth: 1,
-                backgroundColor: sortMode === mode ? `${T.accent}20` : T.surface,
-                borderColor: sortMode === mode ? `${T.accent}50` : T.border}}>
+              style={{paddingHorizontal: 12, paddingVertical: 7, borderRadius: 999,
+                backgroundColor: sortMode === mode ? T.surface : T.card,
+                borderColor: 'transparent'}}>
               <Text style={{fontSize: fs(11), color: sortMode === mode ? T.accent : T.dim, fontWeight: sortMode === mode ? '600' : '400'}}>
                 {t(`memberSort.${mode}`)}
               </Text>
@@ -425,13 +425,13 @@ export const MembersScreen = ({theme: T, members, front, groups, initialSortMode
           <View style={{flexDirection: 'row', gap: 6}}>
             <TouchableOpacity onPress={() => setActiveGroup(null)} activeOpacity={0.7}
               accessibilityRole="button" accessibilityState={{selected: !activeGroup}} accessibilityLabel={t('memberGroups.allGroups')}
-              style={[s.chip, {backgroundColor: !activeGroup ? `${T.accent}18` : T.surface, borderColor: !activeGroup ? `${T.accent}50` : T.border}]}>
+              style={[s.chip, {backgroundColor: !activeGroup ? T.surface : T.card, borderColor: 'transparent'}]}>
               <Text style={{fontSize: fs(11), color: !activeGroup ? T.accent : T.dim, fontWeight: !activeGroup ? '600' : '400'}}>{t('memberGroups.allGroups')}</Text>
             </TouchableOpacity>
             {groups.map(g => (
               <TouchableOpacity key={g.id} onPress={() => setActiveGroup(activeGroup === g.id ? null : g.id)} activeOpacity={0.7}
                 accessibilityRole="button" accessibilityState={{selected: activeGroup === g.id}} accessibilityLabel={g.name}
-                style={[s.chip, {backgroundColor: activeGroup === g.id ? `${g.color || T.accent}18` : T.surface, borderColor: activeGroup === g.id ? `${g.color || T.accent}50` : T.border}]}>
+                style={[s.chip, {backgroundColor: activeGroup === g.id ? T.surface : T.card, borderColor: 'transparent'}]}>
                 <View style={{flexDirection: 'row', alignItems: 'center', gap: 5}}>
                   <View style={{width: 6, height: 6, borderRadius: 3, backgroundColor: g.color || T.accent}} />
                   <Text style={{fontSize: fs(11), color: activeGroup === g.id ? (g.color || T.accent) : T.dim, fontWeight: activeGroup === g.id ? '600' : '400'}}>{g.name}</Text>
@@ -447,13 +447,13 @@ export const MembersScreen = ({theme: T, members, front, groups, initialSortMode
           <View style={{flexDirection: 'row', gap: 6}}>
             <TouchableOpacity onPress={() => setActiveTag(null)} activeOpacity={0.7}
               accessibilityRole="button" accessibilityState={{selected: !activeTag}} accessibilityLabel={t('members.allTags')}
-              style={[s.chip, {backgroundColor: !activeTag ? `${T.info}18` : T.surface, borderColor: !activeTag ? `${T.info}50` : T.border}]}>
+              style={[s.chip, {backgroundColor: !activeTag ? T.surface : T.card, borderColor: 'transparent'}]}>
               <Text style={{fontSize: fs(11), color: !activeTag ? T.info : T.dim, fontWeight: !activeTag ? '600' : '400'}}>{t('members.allTags')}</Text>
             </TouchableOpacity>
             {allTags.map(tag => (
               <TouchableOpacity key={tag} onPress={() => setActiveTag(activeTag === tag ? null : tag)} activeOpacity={0.7}
                 accessibilityRole="button" accessibilityState={{selected: activeTag === tag}} accessibilityLabel={tag}
-                style={[s.chip, {backgroundColor: activeTag === tag ? `${T.info}18` : T.surface, borderColor: activeTag === tag ? `${T.info}50` : T.border}]}>
+                style={[s.chip, {backgroundColor: activeTag === tag ? T.surface : T.card, borderColor: 'transparent'}]}>
                 <Text style={{fontSize: fs(11), color: activeTag === tag ? T.info : T.dim, fontWeight: activeTag === tag ? '600' : '400'}}>{tag}</Text>
               </TouchableOpacity>
             ))}
@@ -464,7 +464,7 @@ export const MembersScreen = ({theme: T, members, front, groups, initialSortMode
       {tabMembers.length > 3 && (
         <TextInput ref={searchRef} defaultValue="" onChangeText={setQuery} placeholder={t('members.search')} placeholderTextColor={T.muted}
           autoCorrect={false} autoComplete="off" spellCheck={false} textContentType="none"
-          style={[s.search, {backgroundColor: T.surface, color: T.text, borderColor: T.border}]} />
+          style={[s.search, {backgroundColor: T.surface, color: T.text, borderColor: 'transparent'}]} />
       )}
     </View>
   );
@@ -478,7 +478,7 @@ export const MembersScreen = ({theme: T, members, front, groups, initialSortMode
       keyExtractor={(m: Member) => m.id}
       extraData={flashExtraData}
       maintainVisibleContentPosition={{disabled: true}}
-      contentContainerStyle={{padding: 16, paddingBottom: 32, backgroundColor: T.bg}}
+      contentContainerStyle={{padding: UI.screenPadding, paddingBottom: 32, backgroundColor: T.bg}}
       keyboardShouldPersistTaps="handled"
       onScroll={e => setShowTop((e.nativeEvent.contentOffset?.y || 0) > 500)}
       scrollEventThrottle={32}
@@ -488,13 +488,13 @@ export const MembersScreen = ({theme: T, members, front, groups, initialSortMode
           <Text style={{fontSize: fs(36), opacity: 0.4, marginBottom: 12}}>◇</Text>
           <Text style={{fontSize: fs(13), color: T.dim, textAlign: 'center', marginBottom: 16}}>{memberTab === 'archived' ? t('members.noArchived') : memberTab === 'customFronts' ? t('members.noCustomFronts') : t('members.noMembers')}</Text>
           {memberTab === 'active' && (
-            <TouchableOpacity onPress={onAdd} activeOpacity={0.7} accessibilityRole="button" style={[s.addBtn, {backgroundColor: T.accentBg, borderColor: `${T.accent}40`}]}>
-              <Text style={{fontSize: fs(13), fontWeight: '500', color: T.accent}}>{t('members.addMember')}</Text>
+            <TouchableOpacity onPress={onAdd} activeOpacity={0.7} accessibilityRole="button" style={[s.addBtn, {backgroundColor: T.accent, borderColor: 'transparent'}]}>
+              <Text style={{fontSize: fs(13), fontWeight: '600', color: T.bg}}>{t('members.addMember')}</Text>
             </TouchableOpacity>
           )}
           {memberTab === 'customFronts' && (
-            <TouchableOpacity onPress={onAddCustomFront || onAdd} activeOpacity={0.7} accessibilityRole="button" style={[s.addBtn, {backgroundColor: T.accentBg, borderColor: `${T.accent}40`}]}>
-              <Text style={{fontSize: fs(13), fontWeight: '500', color: T.accent}}>{t('members.addCustomFront')}</Text>
+            <TouchableOpacity onPress={onAddCustomFront || onAdd} activeOpacity={0.7} accessibilityRole="button" style={[s.addBtn, {backgroundColor: T.accent, borderColor: 'transparent'}]}>
+              <Text style={{fontSize: fs(13), fontWeight: '600', color: T.bg}}>{t('members.addCustomFront')}</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -517,13 +517,13 @@ export const MembersScreen = ({theme: T, members, front, groups, initialSortMode
     )}
     <Modal visible={showGroupAssign} transparent animationType="fade" onRequestClose={() => setShowGroupAssign(false)}>
       <View style={{flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', padding: 24}}>
-        <View style={{backgroundColor: T.card, borderRadius: 14, borderWidth: 1, borderColor: T.border, maxHeight: '70%', overflow: 'hidden'}}>
+        <View style={{backgroundColor: T.surface, borderRadius: UI.radiusLg, maxHeight: '70%', overflow: 'hidden'}}>
           <Text accessibilityRole="header" style={{fontSize: fs(15), fontWeight: '600', color: T.text, padding: 16, paddingBottom: 8}}>{t('members.addToGroups')}</Text>
           <ScrollView style={{maxHeight: 320}}>
             {groups.map(g => { const on = groupAssignSel.has(g.id); return (
               <TouchableOpacity key={g.id} onPress={() => toggleGroupAssign(g.id)} activeOpacity={0.7}
                 accessibilityRole="checkbox" accessibilityState={{checked: on}} accessibilityLabel={g.name}
-                style={{flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingVertical: 11, borderBottomWidth: 1, borderBottomColor: T.border}}>
+                style={{flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingVertical: 11}}>
                 <View style={{width: 18, height: 18, borderRadius: 4, borderWidth: 1.5, borderColor: on ? T.accent : T.border, backgroundColor: on ? T.accent : 'transparent', alignItems: 'center', justifyContent: 'center'}}>
                   {on ? <Text style={{fontSize: fs(11), color: T.bg, fontWeight: '700'}} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">✓</Text> : null}
                 </View>
@@ -532,14 +532,14 @@ export const MembersScreen = ({theme: T, members, front, groups, initialSortMode
               </TouchableOpacity>
             ); })}
           </ScrollView>
-          <View style={{flexDirection: 'row', gap: 8, padding: 12, borderTopWidth: 1, borderTopColor: T.border}}>
+          <View style={{flexDirection: 'row', gap: 8, padding: 12}}>
             <TouchableOpacity onPress={() => setShowGroupAssign(false)} activeOpacity={0.7} accessibilityRole="button" accessibilityLabel={t('common.cancel')}
-              style={{flex: 1, alignItems: 'center', paddingVertical: 11, borderRadius: 8, borderWidth: 1, borderColor: T.border}}>
+              style={{flex: 1, alignItems: 'center', paddingVertical: 11, borderRadius: UI.radiusSm, backgroundColor: T.card}}>
               <Text style={{fontSize: fs(13), color: T.dim}}>{t('common.cancel')}</Text>
             </TouchableOpacity>
             <TouchableOpacity onPress={applyGroupAssign} disabled={groupAssignSel.size === 0} activeOpacity={0.7} accessibilityRole="button" accessibilityState={{disabled: groupAssignSel.size === 0}} accessibilityLabel={t('common.add')}
-              style={{flex: 2, alignItems: 'center', paddingVertical: 11, borderRadius: 8, borderWidth: 1, backgroundColor: T.accentBg, borderColor: `${T.accent}40`, opacity: groupAssignSel.size === 0 ? 0.4 : 1}}>
-              <Text style={{fontSize: fs(13), fontWeight: '600', color: T.accent}}>{t('common.add')}</Text>
+              style={{flex: 2, alignItems: 'center', paddingVertical: 11, borderRadius: UI.radiusSm, backgroundColor: T.accent, opacity: groupAssignSel.size === 0 ? 0.4 : 1}}>
+              <Text style={{fontSize: fs(13), fontWeight: '600', color: T.bg}}>{t('common.add')}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -551,10 +551,13 @@ export const MembersScreen = ({theme: T, members, front, groups, initialSortMode
 
 const s = StyleSheet.create({
   headerRow: {flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14},
-  heading: {fontFamily: Fonts.display, fontSize: 22, fontWeight: '600', fontStyle: 'italic'},
-  addBtn: {paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, borderWidth: 1},
-  search: {borderWidth: 1, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 9, fontSize: 13, marginBottom: 14},
+  headerCard: {borderRadius: UI.radiusLg, borderWidth: 0, padding: 18, marginBottom: 16},
+  heading: {fontFamily: Fonts.display, fontSize: 22, letterSpacing: -0.5},
+  addBtn: {paddingHorizontal: 14, paddingVertical: 10, borderRadius: 999, borderWidth: 0},
+  segmentWrap: {padding: 4, borderWidth: 0, borderRadius: UI.radiusMd},
+  segmentBtn: {paddingVertical: 10, paddingHorizontal: 14, borderRadius: 16, borderWidth: 0, borderColor: 'transparent'},
+  search: {borderWidth: 0, borderRadius: UI.radiusMd, paddingHorizontal: 16, paddingVertical: 13, fontSize: 13, marginBottom: 14},
   empty: {alignItems: 'center', paddingVertical: 48, paddingHorizontal: 24},
-  card: {borderRadius: 12, borderWidth: 1, padding: 14},
-  chip: {paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999, borderWidth: 1},
+  card: {borderRadius: UI.radiusLg, borderWidth: 0, padding: 18},
+  chip: {paddingHorizontal: 12, paddingVertical: 7, borderRadius: 999, borderWidth: 0},
 });

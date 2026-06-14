@@ -365,6 +365,8 @@ export interface ShareSettings {
 export type TextScale = 1.0 | 1.25 | 1.5;
 
 export type AccountMode = 'system' | 'singlet';
+export type ThemeMode = 'system' | 'light' | 'dark';
+export const DEFAULT_THEME_MODE: ThemeMode = 'system';
 
 export const SINGLET_HIDDEN_STATUS_NAMES = ['Blurry', 'Blendy', 'Rapid Switching', 'Dissociated'];
 export const singletStatuses = (members: Member[]): Member[] =>
@@ -373,6 +375,7 @@ export const singletStatuses = (members: Member[]): Member[] =>
 export interface AppSettings {
   accountMode?: AccountMode;
   selfMemberId?: string;
+  themeMode?: ThemeMode;
   locations: string[];
   customMoods: string[];
   lightMode: boolean;
@@ -415,6 +418,20 @@ export interface ExportPayload {
   relationshipTypes?: RelationshipTypeDef[];
   medical?: MedicalData;
 }
+
+export const paletteIdForThemeMode = (themeMode: ThemeMode, systemScheme: 'light' | 'dark'): string =>
+  themeMode === 'light' ? '__light__' : themeMode === 'dark' ? '__dark__' : (systemScheme === 'light' ? '__light__' : '__dark__');
+
+export const normalizeAppearanceSettings = (settings: AppSettings, systemScheme: 'light' | 'dark'): AppSettings => {
+  let themeMode = settings.themeMode;
+  if (!themeMode) {
+    if (settings.activePaletteId === '__light__' || settings.lightMode) themeMode = 'light';
+    else if (settings.activePaletteId === '__dark__') themeMode = 'dark';
+    else themeMode = DEFAULT_THEME_MODE;
+  }
+  const activePaletteId = paletteIdForThemeMode(themeMode, systemScheme);
+  return {...settings, themeMode, activePaletteId, lightMode: activePaletteId === '__light__'};
+};
 
 export type ChatMessageType = 'text' | 'image' | 'file' | 'reply' | 'reaction';
 

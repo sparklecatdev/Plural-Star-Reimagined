@@ -2,7 +2,7 @@ import React, {useState, useRef} from 'react';
 import {View, ScrollView, TouchableOpacity, Alert, KeyboardAvoidingView, AccessibilityInfo, findNodeHandle} from 'react-native';
 import {Text, TextInput} from '../components/AppText';
 import {useTranslation} from 'react-i18next';
-import {PALETTE} from '../theme';
+import {Fonts, PALETTE, UI} from '../theme';
 import {useKeyboardBehavior} from '../hooks/useKeyboardBehavior';
 import {Member, MemberGroup, GroupNodeKind, uid, childrenOf, descendantsOf, isDescendant, groupKind, groupParent} from '../utils';
 
@@ -27,6 +27,7 @@ export const SystemManagerScreen = ({theme: T, members, groups, onSaveGroups}: P
   const [movingIds, setMovingIds] = useState<string[] | null>(null);
   const [selectMode, setSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const addNode = () => {
     const name = newName.trim();
@@ -85,6 +86,7 @@ export const SystemManagerScreen = ({theme: T, members, groups, onSaveGroups}: P
   const exitSelectMode = () => {
     setSelectMode(false);
     setSelectedIds([]);
+    setExpandedId(null);
   };
 
   const nearestSurvivor = (g: MemberGroup, removedSet: Set<string>): string | null => {
@@ -175,47 +177,60 @@ export const SystemManagerScreen = ({theme: T, members, groups, onSaveGroups}: P
     const isSelected = selectedIds.includes(g.id);
     const sibs = childrenOf(groups, groupParent(g));
     const sibIdx = sibs.findIndex(s => s.id === g.id);
+    const isExpanded = expandedId === g.id;
     return (
       <View key={g.id}>
-        <View style={{flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8, paddingLeft: depth * 16}}>
-          {depth > 0 && <Text style={{color: T.muted, fontSize: fs(12)}}>└</Text>}
-          {selectMode && !moving && (
-            <TouchableOpacity onPress={() => toggleSelected(g.id)} accessibilityRole="checkbox" accessibilityState={{checked: isSelected}} accessibilityLabel={g.name} style={{padding: 2}}>
-              <Text style={{fontSize: fs(16), color: isSelected ? T.accent : T.muted}}>{isSelected ? '☑' : '☐'}</Text>
-            </TouchableOpacity>
-          )}
-          {isEditing ? (
-            <TouchableOpacity onPress={() => { const idx = PALETTE.indexOf(editColor); setEditColor(PALETTE[(idx + 1) % PALETTE.length]); }} accessibilityRole="button" accessibilityLabel={t('memberGroups.changeColor')}
-              style={{width: 18, height: 18, borderRadius: isSub ? 4 : 9, backgroundColor: editColor, borderWidth: 2, borderColor: 'rgba(255,255,255,0.15)'}} />
-          ) : (
-            <View style={{width: 12, height: 12, borderRadius: isSub ? 3 : 6, backgroundColor: g.color || T.accent}} />
-          )}
-          {isEditing ? (
-            <View style={{flex: 1, flexDirection: 'row', gap: 6, alignItems: 'center'}}>
-              <TextInput value={editName} onChangeText={setEditName} autoFocus style={{flex: 1, backgroundColor: T.surface, color: T.text, borderWidth: 1, borderColor: T.border, borderRadius: 6, paddingHorizontal: 10, paddingVertical: 5, fontSize: fs(13)}} onSubmitEditing={() => renameNode(g.id)} returnKeyType="done" />
-              <TouchableOpacity onPress={() => renameNode(g.id)} accessibilityRole="button" accessibilityLabel={t('common.save')}><Text style={{color: T.success, fontSize: fs(14)}}>✓</Text></TouchableOpacity>
-              <TouchableOpacity onPress={() => setEditId(null)} accessibilityRole="button" accessibilityLabel={t('common.cancel')}><Text style={{color: T.dim, fontSize: fs(12)}}>✕</Text></TouchableOpacity>
+        <View style={{marginBottom: 8, marginLeft: depth * 16}}>
+          <View style={{flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: isExpanded ? T.surface : T.card, borderRadius: UI.radiusMd, paddingHorizontal: 12, paddingVertical: 10}}>
+            {depth > 0 && <Text style={{color: T.muted, fontSize: fs(12)}}>└</Text>}
+            {selectMode && !moving && (
+              <TouchableOpacity onPress={() => toggleSelected(g.id)} accessibilityRole="checkbox" accessibilityState={{checked: isSelected}} accessibilityLabel={g.name} style={{padding: 2}}>
+                <Text style={{fontSize: fs(16), color: isSelected ? T.accent : T.muted}}>{isSelected ? '☑' : '☐'}</Text>
+              </TouchableOpacity>
+            )}
+            {isEditing ? (
+              <TouchableOpacity onPress={() => { const idx = PALETTE.indexOf(editColor); setEditColor(PALETTE[(idx + 1) % PALETTE.length]); }} accessibilityRole="button" accessibilityLabel={t('memberGroups.changeColor')}
+                style={{width: 18, height: 18, borderRadius: isSub ? 4 : 9, backgroundColor: editColor, borderWidth: 2, borderColor: 'rgba(255,255,255,0.15)'}} />
+            ) : (
+              <View style={{width: 12, height: 12, borderRadius: isSub ? 3 : 6, backgroundColor: g.color || T.accent}} />
+            )}
+            {isEditing ? (
+              <View style={{flex: 1, flexDirection: 'row', gap: 6, alignItems: 'center'}}>
+                <TextInput value={editName} onChangeText={setEditName} autoFocus style={{flex: 1, backgroundColor: T.bg, color: T.text, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 7, fontSize: fs(13)}} onSubmitEditing={() => renameNode(g.id)} returnKeyType="done" />
+                <TouchableOpacity onPress={() => renameNode(g.id)} accessibilityRole="button" accessibilityLabel={t('common.save')}><Text style={{color: T.success, fontSize: fs(14)}}>✓</Text></TouchableOpacity>
+                <TouchableOpacity onPress={() => setEditId(null)} accessibilityRole="button" accessibilityLabel={t('common.cancel')}><Text style={{color: T.dim, fontSize: fs(12)}}>✕</Text></TouchableOpacity>
+              </View>
+            ) : (
+              <>
+                <TouchableOpacity
+                  onPress={() => {
+                    if (selectMode && !moving) toggleSelected(g.id);
+                    else setExpandedId(cur => cur === g.id ? null : g.id);
+                  }}
+                  activeOpacity={0.7}
+                  accessibilityRole="button"
+                  accessibilityLabel={g.name}
+                  style={{flex: 1, flexDirection: 'row', alignItems: 'center'}}>
+                  <Text style={{flex: 1, fontSize: fs(14), color: T.text, fontWeight: '500'}} numberOfLines={1}>{isSub ? '⊟ ' : ''}{g.name}</Text>
+                  <Text style={{fontSize: fs(11), color: T.muted, marginRight: 8}}>{memberCount}</Text>
+                  {!selectMode && !moving && <Text style={{fontSize: fs(12), color: T.dim}}>{isExpanded ? '−' : '+'}</Text>}
+                </TouchableOpacity>
+                {canDrop ? (
+                  <TouchableOpacity onPress={() => moveNodes(moving!, g.id)} accessibilityRole="button" accessibilityLabel={`${t('memberGroups.moveHere')}: ${g.name}`} style={{paddingHorizontal: 8, paddingVertical: 3, borderRadius: UI.pill, backgroundColor: T.successBg}}><Text style={{fontSize: fs(11), color: T.success}}>{t('memberGroups.moveHere')}</Text></TouchableOpacity>
+                ) : moving && moving.includes(g.id) ? (
+                  <Text style={{fontSize: fs(11), color: T.muted, fontStyle: 'italic'}}>{t('memberGroups.moving')}</Text>
+                ) : null}
+              </>
+            )}
+          </View>
+          {!isEditing && isExpanded && !selectMode && !moving && (
+            <View style={{flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 12, paddingTop: 8}}>
+              <TouchableOpacity ref={(el) => { moveBtnRefs.current[g.id] = el; }} onPress={() => reorderNode(g.id, 'up')} disabled={sibIdx <= 0} accessibilityRole="button" accessibilityState={{disabled: sibIdx <= 0}} accessibilityLabel={`${t('members.moveUp')} ${g.name}`} style={{padding: 2, opacity: sibIdx <= 0 ? 0.25 : 1}}><Text style={{fontSize: fs(13), color: T.dim}}>▲</Text></TouchableOpacity>
+              <TouchableOpacity onPress={() => reorderNode(g.id, 'down')} disabled={sibIdx === sibs.length - 1} accessibilityRole="button" accessibilityState={{disabled: sibIdx === sibs.length - 1}} accessibilityLabel={`${t('members.moveDown')} ${g.name}`} style={{padding: 2, opacity: sibIdx === sibs.length - 1 ? 0.25 : 1}}><Text style={{fontSize: fs(13), color: T.dim}}>▼</Text></TouchableOpacity>
+              <TouchableOpacity onPress={() => setMovingIds([g.id])} accessibilityRole="button" accessibilityLabel={`${t('memberGroups.move')} ${g.name}`} style={{padding: 2}}><Text style={{fontSize: fs(14), color: T.dim}}>⇄</Text></TouchableOpacity>
+              <TouchableOpacity onPress={() => {setEditId(g.id); setEditName(g.name); setEditColor(g.color || PALETTE[0]);}} activeOpacity={0.7} accessibilityRole="button" accessibilityLabel={`${t('common.edit')} ${g.name}`} style={{padding: 2}}><Text style={{fontSize: fs(13), color: T.accent}}>✎</Text></TouchableOpacity>
+              <TouchableOpacity onPress={() => deleteNode(g.id)} style={{padding: 2}} accessibilityRole="button" accessibilityLabel={`${t('common.delete')} ${g.name}`}><Text style={{fontSize: fs(13), color: T.danger}}>✕</Text></TouchableOpacity>
             </View>
-          ) : (
-            <>
-              <Text onPress={selectMode && !moving ? () => toggleSelected(g.id) : undefined} style={{flex: 1, fontSize: fs(14), color: T.text, fontWeight: '500'}} numberOfLines={1}>{isSub ? '⊟ ' : ''}{g.name}</Text>
-              {canDrop ? (
-                <TouchableOpacity onPress={() => moveNodes(moving!, g.id)} accessibilityRole="button" accessibilityLabel={`${t('memberGroups.moveHere')}: ${g.name}`} style={{paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, borderWidth: 1, backgroundColor: T.successBg, borderColor: `${T.success}40`}}><Text style={{fontSize: fs(11), color: T.success}}>{t('memberGroups.moveHere')}</Text></TouchableOpacity>
-              ) : moving && moving.includes(g.id) ? (
-                <Text style={{fontSize: fs(11), color: T.muted, fontStyle: 'italic'}}>{t('memberGroups.moving')}</Text>
-              ) : selectMode || moving ? (
-                <Text style={{fontSize: fs(11), color: T.muted}}>{memberCount}</Text>
-              ) : (
-                <>
-                  <Text style={{fontSize: fs(11), color: T.muted}}>{memberCount}</Text>
-                  <TouchableOpacity ref={(el) => { moveBtnRefs.current[g.id] = el; }} onPress={() => reorderNode(g.id, 'up')} disabled={sibIdx <= 0} accessibilityRole="button" accessibilityState={{disabled: sibIdx <= 0}} accessibilityLabel={`${t('members.moveUp')} ${g.name}`} style={{padding: 2, opacity: sibIdx <= 0 ? 0.25 : 1}}><Text style={{fontSize: fs(13), color: T.dim}}>▲</Text></TouchableOpacity>
-                  <TouchableOpacity onPress={() => reorderNode(g.id, 'down')} disabled={sibIdx === sibs.length - 1} accessibilityRole="button" accessibilityState={{disabled: sibIdx === sibs.length - 1}} accessibilityLabel={`${t('members.moveDown')} ${g.name}`} style={{padding: 2, opacity: sibIdx === sibs.length - 1 ? 0.25 : 1}}><Text style={{fontSize: fs(13), color: T.dim}}>▼</Text></TouchableOpacity>
-                  <TouchableOpacity onPress={() => setMovingIds([g.id])} accessibilityRole="button" accessibilityLabel={`${t('memberGroups.move')} ${g.name}`}><Text style={{fontSize: fs(15), color: T.dim}}>⇄</Text></TouchableOpacity>
-                  <TouchableOpacity onPress={() => {setEditId(g.id); setEditName(g.name); setEditColor(g.color || PALETTE[0]);}} activeOpacity={0.7} accessibilityRole="button" accessibilityLabel={`${t('common.edit')} ${g.name}`} style={{paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, borderWidth: 1, backgroundColor: T.accentBg, borderColor: `${T.accent}40`}}><Text style={{fontSize: fs(11), fontWeight: '500', color: T.accent}} numberOfLines={1} maxFontSizeMultiplier={1.2}>{t('common.edit')}</Text></TouchableOpacity>
-                  <TouchableOpacity onPress={() => deleteNode(g.id)} style={{padding: 4}} accessibilityRole="button" accessibilityLabel={`${t('common.delete')} ${g.name}`}><Text style={{fontSize: fs(12), color: T.danger}}>✕</Text></TouchableOpacity>
-                </>
-              )}
-            </>
           )}
         </View>
         {childrenOf(groups, g.id).map(c => renderNode(c, depth + 1))}
@@ -224,11 +239,16 @@ export const SystemManagerScreen = ({theme: T, members, groups, onSaveGroups}: P
   };
 
   return (
-    <KeyboardAvoidingView style={{flex: 1}} behavior={behavior}>
+    <KeyboardAvoidingView style={{flex: 1, backgroundColor: T.bg}} behavior={behavior}>
+    <View style={{flex: 1, backgroundColor: T.bg}}>
     <ScrollView style={{flex: 1, backgroundColor: T.bg}} contentContainerStyle={{padding: 16, paddingBottom: 120}} keyboardShouldPersistTaps="handled">
-      <Text style={{fontSize: fs(11), color: T.dim, marginBottom: 14, lineHeight: 18}}>{t('systemManager.desc')}</Text>
+      <View style={{marginBottom: 12}}>
+        <Text accessibilityRole="header" style={{fontFamily: Fonts.display, fontSize: fs(28), fontWeight: '700', color: T.text, marginBottom: 4}}>{t('systemManager.title')}</Text>
+        <Text style={{fontSize: fs(11), color: T.dim, lineHeight: 16}}>{t('systemManager.desc')}</Text>
+      </View>
+      <View style={{backgroundColor: T.bg, borderWidth: 0}}>
       {groups.length > 0 && !movingIds && (
-        <View style={{flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12}}>
+        <View style={{flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12, backgroundColor: T.card, borderRadius: UI.radiusLg, paddingHorizontal: 12, paddingVertical: 10}}>
           {selectMode ? (
             <>
               <Text style={{fontSize: fs(11), color: T.dim}}>{t('members.selectedCount', {count: selectedIds.length})}</Text>
@@ -236,11 +256,11 @@ export const SystemManagerScreen = ({theme: T, members, groups, onSaveGroups}: P
               <TouchableOpacity onPress={() => setSelectedIds([])} accessibilityRole="button" accessibilityLabel={t('members.selectNone')}><Text style={{fontSize: fs(11), color: T.accent}}>{t('members.selectNone')}</Text></TouchableOpacity>
               <View style={{flex: 1}} />
               <TouchableOpacity onPress={() => { if (selectedIds.length > 0) setMovingIds([...selectedIds]); }} disabled={selectedIds.length === 0} accessibilityRole="button" accessibilityState={{disabled: selectedIds.length === 0}} accessibilityLabel={t('memberGroups.move')}
-                style={{paddingHorizontal: 10, paddingVertical: 5, borderRadius: 6, borderWidth: 1, backgroundColor: T.accentBg, borderColor: `${T.accent}40`, opacity: selectedIds.length === 0 ? 0.45 : 1}}>
+                style={{paddingHorizontal: 10, paddingVertical: 5, borderRadius: UI.pill, backgroundColor: T.accentBg, opacity: selectedIds.length === 0 ? 0.45 : 1}}>
                 <Text style={{fontSize: fs(11), fontWeight: '600', color: T.accent}}>{t('memberGroups.move')}</Text>
               </TouchableOpacity>
               <TouchableOpacity onPress={massDelete} disabled={selectedIds.length === 0} accessibilityRole="button" accessibilityState={{disabled: selectedIds.length === 0}} accessibilityLabel={t('common.delete')}
-                style={{paddingHorizontal: 10, paddingVertical: 5, borderRadius: 6, borderWidth: 1, backgroundColor: T.dangerBg, borderColor: `${T.danger}40`, opacity: selectedIds.length === 0 ? 0.45 : 1}}>
+                style={{paddingHorizontal: 10, paddingVertical: 5, borderRadius: UI.pill, backgroundColor: T.dangerBg, opacity: selectedIds.length === 0 ? 0.45 : 1}}>
                 <Text style={{fontSize: fs(11), fontWeight: '600', color: T.danger}}>{t('common.delete')}</Text>
               </TouchableOpacity>
               <TouchableOpacity onPress={exitSelectMode} accessibilityRole="button" accessibilityLabel={t('common.cancel')}><Text style={{fontSize: fs(11), color: T.dim}}>{t('common.cancel')}</Text></TouchableOpacity>
@@ -249,7 +269,7 @@ export const SystemManagerScreen = ({theme: T, members, groups, onSaveGroups}: P
             <>
               <View style={{flex: 1}} />
               <TouchableOpacity onPress={() => setSelectMode(true)} accessibilityRole="button" accessibilityLabel={t('members.select')}
-                style={{paddingHorizontal: 10, paddingVertical: 5, borderRadius: 6, borderWidth: 1, backgroundColor: T.surface, borderColor: T.border}}>
+                style={{paddingHorizontal: 10, paddingVertical: 5, borderRadius: UI.pill, backgroundColor: T.surface}}>
                 <Text style={{fontSize: fs(11), color: T.dim}}>{t('members.select')}</Text>
               </TouchableOpacity>
             </>
@@ -257,7 +277,7 @@ export const SystemManagerScreen = ({theme: T, members, groups, onSaveGroups}: P
         </View>
       )}
       {movingIds && (
-        <View style={{flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10, padding: 8, borderRadius: 8, backgroundColor: T.surface, borderWidth: 1, borderColor: `${T.accent}40`}}>
+        <View style={{flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10, padding: 10, borderRadius: UI.radiusMd, backgroundColor: T.card}}>
           <Text style={{flex: 1, fontSize: fs(11), color: T.dim}}>{t('memberGroups.movePrompt')}</Text>
           <TouchableOpacity onPress={() => moveNodes(movingIds!, null)} accessibilityRole="button"><Text style={{fontSize: fs(11), color: T.accent, fontWeight: '600'}}>{t('memberGroups.toRoot')}</Text></TouchableOpacity>
           <TouchableOpacity onPress={() => setMovingIds(null)} accessibilityRole="button"><Text style={{fontSize: fs(11), color: T.dim}}>{t('common.cancel')}</Text></TouchableOpacity>
@@ -265,21 +285,23 @@ export const SystemManagerScreen = ({theme: T, members, groups, onSaveGroups}: P
       )}
       {childrenOf(groups, null).map(g => renderNode(g, 0))}
       {groups.length === 0 && <Text style={{fontSize: fs(12), color: T.muted, fontStyle: 'italic', marginBottom: 10}}>{t('memberGroups.none')}</Text>}
-      <View style={{flexDirection: 'row', gap: 6, alignItems: 'center', marginTop: 8}}>
+      <View style={{flexDirection: 'row', gap: 6, alignItems: 'center', marginTop: 8, backgroundColor: T.card, borderRadius: UI.radiusLg, padding: 12}}>
         <TouchableOpacity onPress={() => { const idx = PALETTE.indexOf(newColor); setNewColor(PALETTE[(idx + 1) % PALETTE.length]); }}
           accessibilityRole="button" accessibilityLabel={t('memberGroups.changeColor')}
           style={{width: 28, height: 28, borderRadius: newKind === 'subsystem' ? 6 : 14, backgroundColor: newColor, borderWidth: 2, borderColor: 'rgba(255,255,255,0.15)'}} />
         <TextInput value={newName} onChangeText={setNewName} placeholder={t('memberGroups.addPlaceholder')} placeholderTextColor={T.muted}
-          style={{flex: 1, backgroundColor: T.surface, color: T.text, borderWidth: 1, borderColor: T.border, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 7, fontSize: fs(13)}} onSubmitEditing={addNode} returnKeyType="done" />
+          style={{flex: 1, backgroundColor: T.bg, color: T.text, borderRadius: UI.radiusMd, paddingHorizontal: 12, paddingVertical: 9, fontSize: fs(13)}} onSubmitEditing={addNode} returnKeyType="done" />
         <TouchableOpacity onPress={() => setNewKind(k => k === 'group' ? 'subsystem' : 'group')} activeOpacity={0.7} accessibilityRole="button"
-          style={{paddingHorizontal: 10, paddingVertical: 7, borderRadius: 8, borderWidth: 1, backgroundColor: T.surface, borderColor: T.border}}>
+          style={{paddingHorizontal: 10, paddingVertical: 7, borderRadius: UI.pill, backgroundColor: T.bg}}>
           <Text style={{fontSize: fs(11), color: T.dim}}>{newKind === 'subsystem' ? t('memberGroups.subsystem') : t('memberGroups.group')}</Text>
         </TouchableOpacity>
-        <TouchableOpacity onPress={addNode} activeOpacity={0.7} accessibilityRole="button" accessibilityLabel={t('common.add')} style={{paddingHorizontal: 12, paddingVertical: 7, borderRadius: 8, borderWidth: 1, backgroundColor: T.accentBg, borderColor: `${T.accent}40`}}>
+        <TouchableOpacity onPress={addNode} activeOpacity={0.7} accessibilityRole="button" accessibilityLabel={t('common.add')} style={{paddingHorizontal: 12, paddingVertical: 7, borderRadius: UI.pill, backgroundColor: T.bg}}>
           <Text style={{fontSize: fs(12), fontWeight: '500', color: T.accent}}>{t('common.add')}</Text>
         </TouchableOpacity>
       </View>
+      </View>
     </ScrollView>
+    </View>
     </KeyboardAvoidingView>
   );
 };

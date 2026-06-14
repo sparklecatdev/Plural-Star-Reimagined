@@ -3,7 +3,7 @@ import {View, ScrollView, TouchableOpacity, StyleSheet, Alert} from 'react-nativ
 import {Text, TextInput} from '../components/AppText';
 import {Avatar} from '../components/Avatar';
 import {useTranslation} from 'react-i18next';
-import {Fonts} from '../theme';
+import {Fonts, UI} from '../theme';
 import {AccentText} from '../components/AccentText';
 import {HistoryEntry, JournalEntry, Member, FrontTierKey, fmtTime, fmtDate, fmtDur, TIER_LABELS, translateMood, sortMembersBySearch, singletStatuses, buildEffectiveEnd} from '../utils';
 import {store, KEYS} from '../storage';
@@ -104,8 +104,8 @@ const FrontHistoryEntryRow = React.memo(function FrontHistoryEntryRow({
         {!isLastInGroup &&
           <View style={{flex: 1, width: 1, backgroundColor: T.border, marginTop: 2}} />}
       </View>
-      <View style={[s.card, {flex: 1, backgroundColor: T.card,
-        borderColor: isOpen ? `${T.accent}40` : T.border, marginBottom: 8}]}>
+      <View style={[s.card, {flex: 1, backgroundColor: T.surface,
+        borderColor: isOpen ? `${T.accent}22` : 'transparent', marginBottom: 10}]}>
         <View style={{flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 4}}>
           <View style={{flexDirection: 'row'}}>
             {primaryFronters.slice(0, 3).map((m, j) => (
@@ -134,13 +134,13 @@ const FrontHistoryEntryRow = React.memo(function FrontHistoryEntryRow({
         {(entry.mood || entry.location) && (
           <View style={{flexDirection: 'row', gap: 8, flexWrap: 'wrap', marginBottom: 4}}>
             {entry.mood && (
-              <View style={[s.badge, {backgroundColor: T.surface}]}>
+              <View style={[s.badge, {backgroundColor: T.card}]}>
                 <Text style={{fontSize: fs(10), color: T.dim}}>{t('history.mood')} </Text>
                 <Text style={{fontSize: fs(11), color: T.text, fontWeight: '500'}}>{translateMood(entry.mood, t)}</Text>
               </View>
             )}
             {entry.location && (
-              <View style={[s.badge, {backgroundColor: T.surface}]}>
+              <View style={[s.badge, {backgroundColor: T.card}]}>
                 <Text style={{fontSize: fs(10), color: T.dim}}>{t('history.at')} </Text>
                 <Text style={{fontSize: fs(11), color: T.text, fontWeight: '500'}}>{entry.location}</Text>
               </View>
@@ -148,7 +148,7 @@ const FrontHistoryEntryRow = React.memo(function FrontHistoryEntryRow({
           </View>
         )}
         {entry.note ? (
-          <View style={{backgroundColor: T.surface, borderRadius: 6, padding: 8}}>
+          <View style={{backgroundColor: T.card, borderRadius: UI.radiusSm, padding: 10}}>
             <Text style={{fontSize: fs(12), color: T.dim, lineHeight: 18}}>{entry.note}</Text>
           </View>
         ) : null}
@@ -364,25 +364,26 @@ export const HistoryScreen = ({theme: T, history, journal, getMember, members, s
 
   return (
     <View style={{flex: 1, backgroundColor: T.bg}}>
-      <View style={{backgroundColor: T.bg, paddingHorizontal: 16, paddingTop: 16}}>
-        <Text
-          accessibilityRole="header"
-          style={[s.heading, {color: T.text}]}
-          numberOfLines={1}
-          maxFontSizeMultiplier={1.2}>
-          {t('history.title')}
-        </Text>
-        <View style={{flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: T.border, marginTop: 4}}>
+      <View style={{backgroundColor: T.bg, paddingHorizontal: UI.screenPadding, paddingTop: UI.screenPadding}}>
+        <View style={[s.headerCard, {backgroundColor: T.surface, borderColor: 'transparent'}]}>
+          <Text
+            accessibilityRole="header"
+            style={[s.heading, {color: T.text}]}
+            numberOfLines={1}
+            maxFontSizeMultiplier={1.2}>
+            {t('history.title')}
+          </Text>
+          <View style={[s.segmentWrap, {backgroundColor: T.card, borderColor: 'transparent'}]}>
           {(['front', 'member'] as SubTab[]).map(tab => (
             <TouchableOpacity key={tab} onPress={() => setSubTab(tab)} activeOpacity={0.7}
               accessibilityRole="tab" accessibilityState={{selected: subTab === tab}}
               style={[s.subtab, {
-                borderBottomWidth: 2,
-                borderBottomColor: subTab === tab ? T.accent : 'transparent',
+                backgroundColor: subTab === tab ? T.surface : 'transparent',
+                borderColor: 'transparent',
               }]}>
               <AccentText T={T} style={{
-                fontSize: fs(13),
-                fontWeight: subTab === tab ? '600' : '400',
+                fontSize: fs(12),
+                fontWeight: subTab === tab ? '700' : '500',
                 color: subTab === tab ? T.accent : T.dim,
               }}>
                 {tab === 'front'
@@ -391,6 +392,7 @@ export const HistoryScreen = ({theme: T, history, journal, getMember, members, s
               </AccentText>
             </TouchableOpacity>
           ))}
+          </View>
         </View>
       </View>
 
@@ -399,9 +401,9 @@ export const HistoryScreen = ({theme: T, history, journal, getMember, members, s
           data={deferredRows}
           keyExtractor={(item) => item.key}
           getItemType={(item) => item.kind}
-          contentContainerStyle={{padding: 16, paddingBottom: 32}}
+          contentContainerStyle={{padding: UI.screenPadding, paddingBottom: 32}}
           ListEmptyComponent={
-            <View style={{alignItems: 'center', paddingVertical: 48}}>
+            <View style={[s.emptyState, {backgroundColor: T.surface, borderColor: 'transparent'}]}>
               <Text style={{fontSize: fs(36), opacity: 0.4, marginBottom: 12}}>◷</Text>
               <Text style={{fontSize: fs(13), color: T.dim, textAlign: 'center'}}>
                 {singlet ? t('history.noHistorySinglet') : t('history.noHistory')}
@@ -420,10 +422,10 @@ export const HistoryScreen = ({theme: T, history, journal, getMember, members, s
             </View>
           ) : (
             <>
-              <View style={{margin: 16, marginBottom: 0}}>
+              <View style={{margin: UI.screenPadding, marginBottom: 0}}>
                 {selectedMember && (
-                  <View style={{flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, borderRadius: 10, borderWidth: 1,
-                    backgroundColor: T.card, borderColor: `${selectedMember.color}50`, marginBottom: 8}}>
+                  <View style={{flexDirection: 'row', alignItems: 'center', gap: 10, padding: 14, borderRadius: UI.radiusMd,
+                    backgroundColor: T.surface, marginBottom: 8}}>
                     <Avatar member={selectedMember} size={32} T={T} />
                     <View style={{flex: 1}}>
                       <Text style={{fontSize: fs(15), fontWeight: '500', color: T.text}}>{selectedMember.name}</Text>
@@ -435,9 +437,9 @@ export const HistoryScreen = ({theme: T, history, journal, getMember, members, s
                   </View>
                 )}
                 <TextInput value={memberSearch} onChangeText={setMemberSearch} placeholder={singlet ? t('history.searchStatus') : t('history.searchMember')} placeholderTextColor={T.muted}
-                  style={{backgroundColor: T.surface, color: T.text, borderWidth: 1, borderColor: T.border, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 9, fontSize: fs(13)}} />
+                  style={{backgroundColor: T.card, color: T.text, borderWidth: 0, borderColor: 'transparent', borderRadius: UI.radiusMd, paddingHorizontal: 16, paddingVertical: 12, fontSize: fs(13)}} />
                 {memberSearch.length > 0 && (
-                  <View style={{backgroundColor: T.card, borderRadius: 10, borderWidth: 1, borderColor: T.border, overflow: 'hidden', marginTop: 4, maxHeight: 280}}>
+                  <View style={{backgroundColor: T.surface, borderRadius: UI.radiusMd, borderWidth: 0, borderColor: 'transparent', overflow: 'hidden', marginTop: 6, maxHeight: 280}}>
                     <ScrollView nestedScrollEnabled showsVerticalScrollIndicator={true}>
                       {sortMembersBySearch(pickerMembers.filter(m => m.name.toLowerCase().includes(memberSearch.toLowerCase())), memberSearch).map(m => (
                         <TouchableOpacity key={m.id}
@@ -445,7 +447,8 @@ export const HistoryScreen = ({theme: T, history, journal, getMember, members, s
                           activeOpacity={0.7}
                           accessibilityRole="button" accessibilityState={{selected: selectedMemberId === m.id}} accessibilityLabel={m.name}
                           style={{flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12,
-                            borderBottomWidth: 1, borderBottomColor: T.border,
+                            borderBottomWidth: 0,
+                            borderBottomColor: 'transparent',
                             backgroundColor: selectedMemberId === m.id ? `${m.color}12` : 'transparent'}}>
                           <Avatar member={m} size={28} T={T} />
                           <Text style={{fontSize: fs(14), fontWeight: '500', color: T.text}}>{m.name}</Text>
@@ -470,23 +473,23 @@ export const HistoryScreen = ({theme: T, history, journal, getMember, members, s
                 memberHistoryEvents.forEach(e => {if (e.entry.location) locCounts[e.entry.location] = (locCounts[e.entry.location] || 0) + 1;});
                 const topLoc = Object.entries(locCounts).sort((a, b) => b[1] - a[1])[0];
                 return (
-                  <View style={{flexDirection: 'row', gap: 8, margin: 16, marginBottom: 8}}>
-                    <View style={[s.stat, {backgroundColor: T.card, borderColor: T.border}]}>
+                  <View style={{flexDirection: 'row', gap: 8, margin: UI.screenPadding, marginBottom: 8}}>
+                    <View style={[s.stat, {backgroundColor: T.surface, borderColor: 'transparent'}]}>
                       <Text style={{fontSize: fs(9), letterSpacing: 1, textTransform: 'uppercase', color: T.dim, marginBottom: 3}}>{t('history.totalTime')}</Text>
                       <AccentText T={T} style={{fontSize: fs(15), fontWeight: '700', color: T.accent}}>{fmtDur(0, totalMs)}</AccentText>
                     </View>
-                    <View style={[s.stat, {backgroundColor: T.card, borderColor: T.border}]}>
+                    <View style={[s.stat, {backgroundColor: T.surface, borderColor: 'transparent'}]}>
                       <Text style={{fontSize: fs(9), letterSpacing: 1, textTransform: 'uppercase', color: T.dim, marginBottom: 3}}>{t('history.sessions')}</Text>
                       <Text style={{fontSize: fs(15), fontWeight: '700', color: T.text}}>{mergedSessions.length}</Text>
                     </View>
                     {topMood && (
-                      <View style={[s.stat, {backgroundColor: T.card, borderColor: T.border}]}>
+                      <View style={[s.stat, {backgroundColor: T.surface, borderColor: 'transparent'}]}>
                         <Text style={{fontSize: fs(9), letterSpacing: 1, textTransform: 'uppercase', color: T.dim, marginBottom: 3}}>{t('history.topMood')}</Text>
                         <Text style={{fontSize: fs(12), fontWeight: '600', color: T.text}} numberOfLines={1}>{topMood[0]}</Text>
                       </View>
                     )}
                     {topLoc && (
-                      <View style={[s.stat, {backgroundColor: T.card, borderColor: T.border}]}>
+                      <View style={[s.stat, {backgroundColor: T.surface, borderColor: 'transparent'}]}>
                         <Text style={{fontSize: fs(9), letterSpacing: 1, textTransform: 'uppercase', color: T.dim, marginBottom: 3}}>{t('history.topLocation')}</Text>
                         <Text style={{fontSize: fs(12), fontWeight: '600', color: T.text}} numberOfLines={1}>{topLoc[0]}</Text>
                       </View>
@@ -495,9 +498,9 @@ export const HistoryScreen = ({theme: T, history, journal, getMember, members, s
                 );
               })()}
 
-              <ScrollView style={{flex: 1}} contentContainerStyle={{padding: 16, paddingTop: 8, paddingBottom: 32}}>
+              <ScrollView style={{flex: 1}} contentContainerStyle={{padding: UI.screenPadding, paddingTop: 8, paddingBottom: 32}}>
                 {allMemberEvents.length === 0 ? (
-                  <View style={{alignItems: 'center', paddingVertical: 32}}>
+                  <View style={[s.emptyState, {backgroundColor: T.surface, borderColor: 'transparent', paddingVertical: 32}]}>
                     <Text style={{fontSize: fs(13), color: T.dim, textAlign: 'center'}}>
                       {t('history.noActivity', {name: selectedMember?.name})}
                     </Text>
@@ -520,7 +523,7 @@ export const HistoryScreen = ({theme: T, history, journal, getMember, members, s
                           {i < allMemberEvents.length - 1 &&
                             <View style={{flex: 1, width: 1, backgroundColor: T.border, marginTop: 2}} />}
                         </View>
-                        <View style={[s.card, {flex: 1, backgroundColor: T.card, borderColor: T.border}]}>
+                        <View style={[s.card, {flex: 1, backgroundColor: T.surface, borderColor: 'transparent'}]}>
                           <View style={{flexDirection: 'row', alignItems: 'center', marginBottom: 4}}>
                             <Text style={{fontSize: fs(12), color, marginRight: 6, fontWeight: '600',
                               }}>{icon} {label}</Text>
@@ -541,13 +544,13 @@ export const HistoryScreen = ({theme: T, history, journal, getMember, members, s
                                 {(e.mood || e.location) && (
                                   <View style={{flexDirection: 'row', gap: 6, flexWrap: 'wrap', marginBottom: e.note ? 4 : 0}}>
                                     {e.mood && (
-                                      <View style={[s.badge, {backgroundColor: T.surface}]}>
+                                      <View style={[s.badge, {backgroundColor: T.card}]}>
                                         <Text style={{fontSize: fs(10), color: T.dim}}>{t('history.mood')} </Text>
                                         <Text style={{fontSize: fs(11), color: T.text, fontWeight: '500'}}>{translateMood(e.mood, t)}</Text>
                                       </View>
                                     )}
                                     {e.location && (
-                                      <View style={[s.badge, {backgroundColor: T.surface}]}>
+                                      <View style={[s.badge, {backgroundColor: T.card}]}>
                                         <Text style={{fontSize: fs(10), color: T.dim}}>{t('history.at')} </Text>
                                         <Text style={{fontSize: fs(11), color: T.text, fontWeight: '500'}}>{e.location}</Text>
                                       </View>
@@ -555,7 +558,7 @@ export const HistoryScreen = ({theme: T, history, journal, getMember, members, s
                                   </View>
                                 )}
                                 {e.note ? (
-                                  <View style={{backgroundColor: T.surface, borderRadius: 6, padding: 7}}>
+                                  <View style={{backgroundColor: T.card, borderRadius: UI.radiusSm, padding: 8}}>
                                     <Text style={{fontSize: fs(12), color: T.dim, lineHeight: 17}}>{e.note}</Text>
                                   </View>
                                 ) : null}
@@ -577,7 +580,7 @@ export const HistoryScreen = ({theme: T, history, journal, getMember, members, s
                                 <View style={{flexDirection: 'row', flexWrap: 'wrap', gap: 5, marginTop: 6}}>
                                   {(event.journalEntry.hashtags || []).map((t: string) => (
                                     <View key={t} style={{paddingHorizontal: 7, paddingVertical: 2, borderRadius: 999,
-                                      backgroundColor: `${T.info}12`, borderWidth: 1, borderColor: `${T.info}30`}}>
+                                      backgroundColor: `${T.info}12`, borderWidth: 0, borderColor: 'transparent'}}>
                                       <Text style={{fontSize: fs(10), color: T.info}}>{t}</Text>
                                     </View>
                                   ))}
@@ -600,9 +603,34 @@ export const HistoryScreen = ({theme: T, history, journal, getMember, members, s
 };
 
 const s = StyleSheet.create({
-  heading: {fontFamily: Fonts.display, fontSize: 22, fontWeight: '600', fontStyle: 'italic', marginBottom: 0},
-  subtab: {paddingHorizontal: 16, paddingVertical: 10, marginBottom: -1},
-  card: {borderRadius: 12, borderWidth: 1, padding: 12},
-  badge: {flexDirection: 'row', alignItems: 'center', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3},
-  stat: {flex: 1, borderRadius: 10, borderWidth: 1, padding: 10},
+  headerCard: {
+    borderRadius: UI.radiusLg,
+    padding: 18,
+    gap: 14,
+  },
+  heading: {fontFamily: Fonts.display, fontSize: 24, fontWeight: '600', marginBottom: 0},
+  segmentWrap: {
+    flexDirection: 'row',
+    borderRadius: UI.radiusMd,
+    padding: 6,
+    gap: 4,
+  },
+  subtab: {
+    flex: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: UI.radiusMd,
+    alignItems: 'center',
+  },
+  card: {borderRadius: UI.radiusLg, borderWidth: 0, padding: 16},
+  badge: {flexDirection: 'row', alignItems: 'center', borderRadius: UI.radiusSm, paddingHorizontal: 8, paddingVertical: 4},
+  stat: {flex: 1, borderRadius: UI.radiusMd, borderWidth: 0, padding: 14},
+  emptyState: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 48,
+    paddingHorizontal: 20,
+    borderRadius: UI.radiusLg,
+    borderWidth: 0,
+  },
 });

@@ -29,7 +29,7 @@ export const AccentText = ({children, style, T, numberOfLines, adjustsFontSizeTo
   return (
     <View style={[s.wrap, style && {width: undefined, height: undefined}]}>
       {OFFSETS.map(([dx, dy], i) => (
-        <Text key={i} style={[style, s.abs, {color: '#0A1F2E', left: dx, top: dy}]} {...textProps}>
+        <Text key={i} style={[style, s.abs, {color: T.bg, left: dx, top: dy}]} {...textProps}>
           {children}
         </Text>
       ))}

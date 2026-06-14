@@ -1,5 +1,5 @@
 import React, {useState, useEffect, useCallback, useMemo, useRef} from 'react';
-import {View, Image, TouchableOpacity, StyleSheet, StatusBar, Platform, PermissionsAndroid, Alert} from 'react-native';
+import {View, Image, TouchableOpacity, StyleSheet, StatusBar, Platform, PermissionsAndroid, Alert, useColorScheme} from 'react-native';
 import {Text, TextInput, setAppTextDyslexicEnabled, setAppTextFont} from './src/components/AppText';
 import {fontFamilyForChoice} from './src/theme';
 import {SafeAreaProvider, useSafeAreaInsets} from 'react-native-safe-area-context';
@@ -14,7 +14,7 @@ import {T, BUILTIN_PALETTES, deriveTheme} from './src/theme';
 import type {CustomPalette, ThemeColors} from './src/theme';
 import {AccentText} from './src/components/AccentText';
 import {store, KEYS} from './src/storage';
-import {SystemInfo, Member, MemberGroup, FrontState, FrontTier, FrontTierKey, HistoryEntry, JournalEntry, JournalTemplate, ShareSettings, AppSettings, ChatChannel, ChatMessage, NoteboardEntry, DeviceCodes, MedicalData, DEFAULT_MEDICAL, DEFAULT_CHANNELS, findOpenFrontInHistory, migrateFrontState, frontToHistoryEntry, uid, makeDefaultCustomFronts, isFrontEmpty, allFrontMemberIds, singletStatuses, generateFriendCode, generateSyncCode, emergencyNotificationLine} from './src/utils';
+import {SystemInfo, Member, MemberGroup, FrontState, FrontTier, FrontTierKey, HistoryEntry, JournalEntry, JournalTemplate, ShareSettings, AppSettings, ChatChannel, ChatMessage, NoteboardEntry, DeviceCodes, MedicalData, DEFAULT_MEDICAL, DEFAULT_CHANNELS, findOpenFrontInHistory, migrateFrontState, frontToHistoryEntry, uid, makeDefaultCustomFronts, isFrontEmpty, allFrontMemberIds, singletStatuses, generateFriendCode, generateSyncCode, emergencyNotificationLine, DEFAULT_THEME_MODE, paletteIdForThemeMode, normalizeAppearanceSettings} from './src/utils';
 import {migrateInlineAvatars, migrateInlineChatMedia, clearAllMedia, migrateStaleMediaPaths, rebaseChatMessageMedia} from './src/utils/mediaUtils';
 import {showFrontNotification, clearFrontNotification, scheduleFrontCheckReminder, cancelFrontCheckReminder, showNoteboardNotification, clearNoteboardNotification, scheduleFrontNotificationRefresh, cancelFrontNotificationRefresh, setEmergencyNotificationInfo, rescheduleMedicationReminders, rescheduleAppointmentReminders} from './src/services/NotificationService';
 
@@ -44,7 +44,7 @@ const TAB_ICONS: Record<Tab, string> = {
   front: '◈', members: '◇', hub: '⬡', journal: '◉', history: '◷',
 };
 
-const DEFAULT_SETTINGS: AppSettings = {locations: [], customMoods: [], lightMode: false, gpsEnabled: false, filesEnabled: true, language: 'en', notificationsEnabled: true, noteboardNotifications: true, activePaletteId: '__dark__', textScale: 1.0, useDyslexicFont: false};
+const DEFAULT_SETTINGS: AppSettings = {locations: [], customMoods: [], themeMode: DEFAULT_THEME_MODE, lightMode: false, gpsEnabled: false, filesEnabled: true, language: 'en', notificationsEnabled: true, noteboardNotifications: true, activePaletteId: '__dark__', textScale: 1.0, useDyslexicFont: false};
 
 const setDyslexicEnabled = (on: boolean) => {
   setAppTextDyslexicEnabled(on);
@@ -82,6 +82,7 @@ const getGPSLocation = (): Promise<string | null> =>
 
 function MainAppContent() {
   const {t} = useTranslation();
+  const systemScheme = useColorScheme() === 'light' ? 'light' : 'dark';
 
   const [loaded, setLoaded] = useState(false);
   const [firstRun, setFirstRun] = useState(false);
@@ -103,7 +104,6 @@ function MainAppContent() {
   const [appSettings, setAppSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
   const [groups, setGroups] = useState<MemberGroup[]>([]);
   const [palettes, setPalettes] = useState<CustomPalette[]>([]);
-  const [activePaletteId, setActivePaletteId] = useState<string>('__dark__');
   const [chatChannels, setChatChannels] = useState<ChatChannel[]>([]);
   const [allChatMessages, setAllChatMessages] = useState<ChatMessage[]>([]);
   const [medical, setMedical] = useState<MedicalData>(DEFAULT_MEDICAL);
@@ -133,12 +133,13 @@ function MainAppContent() {
   };
 
   const C: ThemeColors = useMemo(() => {
+    const resolvedPaletteId = paletteIdForThemeMode(appSettings.themeMode || DEFAULT_THEME_MODE, systemScheme);
     const allPals = [...BUILTIN_PALETTES, ...palettes];
-    const pal = allPals.find(p => p.id === activePaletteId) || BUILTIN_PALETTES[0];
+    const pal = allPals.find(p => p.id === resolvedPaletteId) || BUILTIN_PALETTES[0];
     const theme = deriveTheme(pal.bg, pal.accent, pal.text, pal.mid);
     theme.textScale = appSettings.textScale || 1;
     return theme;
-  }, [activePaletteId, palettes, appSettings.textScale]);
+  }, [appSettings.textScale, appSettings.themeMode, palettes, systemScheme]);
 
   const loadChatMessages = useCallback(async (channels: ChatChannel[]) => {
     const allMsgs: ChatMessage[] = [];
@@ -205,7 +206,7 @@ function MainAppContent() {
         loadedMembers = [...loadedMembers, ...makeDefaultCustomFronts()];
         loadedSettingsObj = {...loadedSettingsObj, customFrontsSeeded: true};
         await store.set(KEYS.members, loadedMembers);
-        await store.set(KEYS.settings, loadedSettingsObj);
+        await store.set(KEYS.settings, normalizeAppearanceSettings(loadedSettingsObj, systemScheme));
       }
       if (!loadedSystem) {
         console.warn('[STARTUP] No system info loaded — entering first-run state. If this is unexpected, check for AsyncStorage failures above.');
@@ -223,7 +224,7 @@ function MainAppContent() {
       setJournal(jour || []);
       setJournalTemplates(jourTemplates || []);
       setShareSettings(share || {showFront: true, showMembers: true, showDescriptions: false});
-      const mergedSettings = loadedSettingsObj;
+      const mergedSettings = normalizeAppearanceSettings(loadedSettingsObj, systemScheme);
       setAppSettings(mergedSettings);
       setGroups(grps || []);
       setPalettes(savedPalettes || []);
@@ -236,20 +237,15 @@ function MainAppContent() {
       setChatChannels(channels);
       await loadChatMessages(channels);
 
-      const paletteId = mergedSettings.activePaletteId || '__dark__';
-      if (mergedSettings.lightMode && !mergedSettings.activePaletteId) {
-        setActivePaletteId('__light__');
-      } else {
-        setActivePaletteId(paletteId);
-      }
-
       try {
         const savedMedical = await store.get<MedicalData>(KEYS.medical);
         const med: MedicalData = {...DEFAULT_MEDICAL, ...(savedMedical || {})};
         setMedical(med);
         setEmergencyNotificationInfo(emergencyNotificationLine(med.emergency));
-        await rescheduleMedicationReminders(med.medications || []);
-        await rescheduleAppointmentReminders(med.appointments || []);
+        if (Platform.OS === 'android') {
+          await rescheduleMedicationReminders(med.medications || []);
+          await rescheduleAppointmentReminders(med.appointments || []);
+        }
       } catch (e) {
         console.error('[PS] medical init error:', e);
       }
@@ -283,13 +279,13 @@ function MainAppContent() {
     } finally {
       setLoaded(true);
     }
-  }, []);
+  }, [loadChatMessages, systemScheme]);
 
   const requestPermissions = async () => {
+    if (Platform.OS !== 'android') return;
     try {
       await notifee.requestPermission();
     } catch (e) { console.error('[PS] notification permission error:', e); }
-    if (Platform.OS !== 'android') return;
     try {
       if (Platform.Version >= 33) {
         const result = await PermissionsAndroid.request(
@@ -338,7 +334,9 @@ function MainAppContent() {
     } catch (e) { console.error('[PS] File permission error:', e); }
   };
 
-  useEffect(() => { loadAll(); }, []);
+  const supportsPersistentNotifications = Platform.OS === 'android';
+
+  useEffect(() => { loadAll(); }, [loadAll]);
   useEffect(() => { if (loaded && !firstRun) requestPermissions(); }, [loaded, firstRun]);
 
   useEffect(() => {
@@ -348,15 +346,16 @@ function MainAppContent() {
   }, [appSettings.fontChoice, appSettings.useDyslexicFont]);
 
   useEffect(() => {
+    if (!supportsPersistentNotifications) return;
     if (appSettings.notificationsEnabled) { showFrontNotification(front, members, system.name).catch(e => console.error('[PS] notif error:', e)); }
     else { clearFrontNotification().catch(e => console.error('[PS] clear notif error:', e)); }
-  }, [front, members, appSettings.notificationsEnabled, system.name]);
+  }, [front, members, appSettings.notificationsEnabled, supportsPersistentNotifications, system.name]);
 
   useEffect(() => {
-    if (!front || !appSettings.notificationsEnabled) return;
+    if (!supportsPersistentNotifications || !front || !appSettings.notificationsEnabled) return;
     const interval = setInterval(() => { showFrontNotification(front, members, system.name).catch(e => console.error('[PS] notif refresh error:', e)); }, 5 * 60 * 1000);
     return () => clearInterval(interval);
-  }, [front, members, appSettings.notificationsEnabled, system.name]);
+  }, [front, members, appSettings.notificationsEnabled, supportsPersistentNotifications, system.name]);
 
   useEffect(() => {
     const interval = appSettings.frontCheckInterval || 0;
@@ -468,27 +467,23 @@ function MainAppContent() {
     setMedical(d);
     await store.set(KEYS.medical, d);
     setEmergencyNotificationInfo(emergencyNotificationLine(d.emergency));
-    await rescheduleMedicationReminders(d.medications || []);
-    await rescheduleAppointmentReminders(d.appointments || []);
-    if (appSettings.notificationsEnabled) {
+    if (Platform.OS === 'android') {
+      await rescheduleMedicationReminders(d.medications || []);
+      await rescheduleAppointmentReminders(d.appointments || []);
+    }
+    if (supportsPersistentNotifications && appSettings.notificationsEnabled) {
       showFrontNotification(front, members, system.name).catch(e => console.error('[PS] notif error:', e));
     }
   };
 
-  const selectPalette = async (id: string) => {
-    setActivePaletteId(id);
-    const updated = {...appSettings, activePaletteId: id, lightMode: id === '__light__'};
-    setAppSettings(updated);
-    await store.set(KEYS.settings, updated);
-    await store.set(KEYS.lightMode, id === '__light__');
-  };
-
   const saveAppSettings = async (d: AppSettings) => {
-    const gpsJustEnabled = d.gpsEnabled && !appSettings.gpsEnabled;
-    const filesJustEnabled = d.filesEnabled && !appSettings.filesEnabled;
-    setAppSettings(d);
-    await store.set(KEYS.settings, d);
-    if (d.language) { changeLanguage(d.language); await store.set(KEYS.language, d.language); }
+    const next = normalizeAppearanceSettings(d, systemScheme);
+    const gpsJustEnabled = next.gpsEnabled && !appSettings.gpsEnabled;
+    const filesJustEnabled = next.filesEnabled && !appSettings.filesEnabled;
+    setAppSettings(next);
+    await store.set(KEYS.settings, next);
+    await store.set(KEYS.lightMode, next.lightMode);
+    if (next.language) { changeLanguage(next.language); await store.set(KEYS.language, next.language); }
     if (gpsJustEnabled) { await requestGPSPermission(); }
     if (filesJustEnabled) { await requestFilesPermission(); }
   };
@@ -662,11 +657,13 @@ function MainAppContent() {
     setSystem({name: '', description: ''}); setMembers([]); setFront(null);
     setHistory([]); setJournal([]); setJournalTemplates([]);
     setShareSettings({showFront: true, showMembers: true, showDescriptions: false});
-    setAppSettings(DEFAULT_SETTINGS); setGroups([]); setPalettes([]); setActivePaletteId('__dark__');
+    setAppSettings(DEFAULT_SETTINGS); setGroups([]); setPalettes([]);
     setChatChannels([]); setAllChatMessages([]);
     setMedical(DEFAULT_MEDICAL); setEmergencyNotificationInfo(null);
-    await rescheduleMedicationReminders([]);
-    await rescheduleAppointmentReminders([]);
+    if (Platform.OS === 'android') {
+      await rescheduleMedicationReminders([]);
+      await rescheduleAppointmentReminders([]);
+    }
     setTab('front'); setMountedTabs(['front']); setFirstRun(true);
   };
 
@@ -794,7 +791,7 @@ function MainAppContent() {
           onAddCustomFront={() => {setEditCustomFront(null); setShowCustomFront(true);}}
           onEdit={m => { if (m.isCustomFront) {setEditCustomFront(m); setShowCustomFront(true);} else {setEditMember(m); setViewOnlyMember(false); setShowMember(true);} }}
           onView={m => { if (m.isCustomFront) {setEditCustomFront(m); setShowCustomFront(true);} else {setEditMember(m); setViewOnlyMember(true); setShowMember(true);} }}
-          onSaveGroups={saveGroups} onSaveSortMode={async (mode) => {const next = {...appSettings, memberSortMode: mode}; setAppSettings(next); await store.set(KEYS.settings, next);}} onReorderMember={async (id, direction) => {
+          onSaveGroups={saveGroups} onSaveSortMode={async (mode) => {const next = normalizeAppearanceSettings({...appSettings, memberSortMode: mode}, systemScheme); setAppSettings(next); await store.set(KEYS.settings, next);}} onReorderMember={async (id, direction) => {
           const active = members.filter(m => !m.archived);
           const archived = members.filter(m => m.archived);
           const needsInit = active.some(m => m.sortOrder === undefined);
@@ -825,8 +822,8 @@ function MainAppContent() {
   return (
     <View style={[styles.root, {backgroundColor: C.bg}]}>
       <StatusBar barStyle={C.isLight ? 'dark-content' : 'light-content'} backgroundColor={C.bg} translucent={false} />
-      <View style={{backgroundColor: C.bg, paddingTop: Platform.OS === 'ios' ? Math.max(insets.top - 6, 0) : Math.max(StatusBar.currentHeight || 0, insets.top || 0, 28)}}>
-        <View style={[styles.header, {borderBottomColor: C.border, backgroundColor: C.bg}]}>
+      <View style={{backgroundColor: C.bg, paddingTop: Platform.OS === 'ios' ? Math.max(insets.top - 6, 0) : Math.max(StatusBar.currentHeight || 0, insets.top || 0, 28), paddingHorizontal: 12, paddingBottom: 8}}>
+        <View style={[styles.header, {borderBottomColor: C.border, backgroundColor: C.surface}]}>
           <AccentText
             T={C}
             style={[styles.headerTitle, {color: C.accent, flex: 1, marginRight: 8}]}
@@ -841,10 +838,10 @@ function MainAppContent() {
               accessibilityRole="button"
               accessibilityLabel={t('a11y.lockApp')}
               accessibilityState={{disabled: !appSettings.appLockPassword}}
-              style={styles.settingsBtn}>
+              style={[styles.settingsBtn, {backgroundColor: C.card, borderColor: C.border}]}>
               <Text style={[styles.settingsIcon, {color: appSettings.appLockPassword ? C.dim : C.muted, opacity: appSettings.appLockPassword ? 1 : 0.35}]} maxFontSizeMultiplier={1.2} allowFontScaling={false} importantForAccessibility="no" accessibilityElementsHidden>🔒</Text>
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => setShowSystem(true)} activeOpacity={0.7} accessibilityRole="button" accessibilityLabel={t('a11y.settings')} style={styles.settingsBtn}>
+            <TouchableOpacity onPress={() => setShowSystem(true)} activeOpacity={0.7} accessibilityRole="button" accessibilityLabel={t('a11y.settings')} style={[styles.settingsBtn, {backgroundColor: C.card, borderColor: C.border}]}>
               <Text style={[styles.settingsIcon, {color: C.dim}]} maxFontSizeMultiplier={1.2} allowFontScaling={false} importantForAccessibility="no" accessibilityElementsHidden>⚙</Text>
             </TouchableOpacity>
           </View>
@@ -857,13 +854,15 @@ function MainAppContent() {
           </View>
         ) : null)}
       </View>
-      <View style={[styles.tabBar, {backgroundColor: C.surface, borderTopColor: C.border}]} accessibilityRole="tablist" accessibilityLabel={t('a11y.mainNav')}>
-        {TAB_IDS.map(id => (
-          <TouchableOpacity key={id} onPress={() => { if (id === 'hub' && tab === 'hub') setHubResetKey(k => k + 1); setTab(id); }} activeOpacity={0.7} accessibilityRole="tab" accessibilityState={{selected: tab === id}} accessibilityLabel={tabLabel(id)} style={[styles.tabBtn, {paddingBottom: 8 + (insets.bottom || 0)}]}>
-            <AccentText T={C} style={[styles.tabIcon, {color: tab === id ? C.accent : C.dim, fontSize: fs(18)}]} maxFontSizeMultiplier={1.2}>{TAB_ICONS[id]}</AccentText>
-            <AccentText T={C} style={[styles.tabLabel, {color: tab === id ? C.accent : C.dim, fontSize: fs(9)}]} numberOfLines={1} allowFontScaling={false}>{tabLabel(id)}</AccentText>
-          </TouchableOpacity>
-        ))}
+      <View style={[styles.tabBarWrap, {backgroundColor: 'transparent', paddingBottom: Math.max(insets.bottom, 8)}]}>
+        <View style={[styles.tabBar, {backgroundColor: C.surface, borderTopColor: C.border, borderColor: C.border}]} accessibilityRole="tablist" accessibilityLabel={t('a11y.mainNav')}>
+          {TAB_IDS.map(id => (
+            <TouchableOpacity key={id} onPress={() => { if (id === 'hub' && tab === 'hub') setHubResetKey(k => k + 1); setTab(id); }} activeOpacity={0.7} accessibilityRole="tab" accessibilityState={{selected: tab === id}} accessibilityLabel={tabLabel(id)} style={[styles.tabBtn, tab === id && {backgroundColor: C.card}]}>
+              <AccentText T={C} style={[styles.tabIcon, {color: tab === id ? C.accent : C.dim, fontSize: fs(18)}]} maxFontSizeMultiplier={1.2}>{TAB_ICONS[id]}</AccentText>
+              <AccentText T={C} style={[styles.tabLabel, {color: tab === id ? C.accent : C.dim, fontSize: fs(9)}]} numberOfLines={1} allowFontScaling={false}>{tabLabel(id)}</AccentText>
+            </TouchableOpacity>
+          ))}
+        </View>
       </View>
 
       {isSinglet ? (
@@ -902,7 +901,6 @@ function MainAppContent() {
         onSave={async (e: JournalEntry) => {await saveEntry(e); setShowJournal(false);}}
         onClose={() => setShowJournal(false)} />
       <SystemModal visible={showSystem} theme={C} system={system} settings={appSettings}
-        palettes={palettes} activePaletteId={activePaletteId}
         onSave={async (s: SystemInfo) => {await saveSystem(s); setShowSystem(false);}}
         onSaveSettings={async (s: AppSettings) => {
           let next = s;
@@ -918,8 +916,6 @@ function MainAppContent() {
           }
           await saveAppSettings(next); setShowSystem(false);
         }}
-        onSavePalettes={savePalettes}
-        onSelectPalette={selectPalette}
         onClose={() => setShowSystem(false)} />
     </View>
   );
@@ -975,15 +971,44 @@ const styles = StyleSheet.create({
   root: {flex: 1},
   loading: {flex: 1, alignItems: 'center', justifyContent: 'center'},
   splashLogo: {width: 200, height: 200},
-  splashName: {fontFamily: 'OpenDyslexic', fontSize: 22, fontStyle: 'italic', letterSpacing: 2, marginTop: 16},
-  header: {flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1},
-  headerTitle: {fontFamily: 'OpenDyslexic', fontSize: 20, fontWeight: '600', fontStyle: 'italic', letterSpacing: 0.3},
+  splashName: {fontSize: 24, fontWeight: '700', letterSpacing: 1.2, marginTop: 16, textTransform: 'uppercase'},
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderWidth: 0,
+    borderRadius: 24,
+  },
+  headerTitle: {fontSize: 22, fontWeight: '700', letterSpacing: -0.3},
   headerRight: {flexDirection: 'row', alignItems: 'center', flexShrink: 0},
-  settingsBtn: {padding: 4, marginLeft: 8},
+  settingsBtn: {
+    width: 36,
+    height: 36,
+    marginLeft: 8,
+    borderRadius: 14,
+    borderWidth: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   settingsIcon: {fontSize: 18},
   content: {flex: 1},
-  tabBar: {flexDirection: 'row', borderTopWidth: 1},
-  tabBtn: {flex: 1, alignItems: 'center', paddingVertical: 8, paddingTop: 10},
-  tabIcon: {fontSize: 18, marginBottom: 2},
-  tabLabel: {fontSize: 9, letterSpacing: 0.6, textTransform: 'uppercase'},
+  tabBarWrap: {paddingHorizontal: 14},
+  tabBar: {
+    flexDirection: 'row',
+    borderWidth: 0,
+    borderRadius: 28,
+    padding: 8,
+    marginBottom: 4,
+  },
+  tabBtn: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 11,
+    borderRadius: 20,
+  },
+  tabIcon: {fontSize: 18, marginBottom: 3},
+  tabLabel: {fontSize: 9, letterSpacing: 0.8, textTransform: 'uppercase'},
 });

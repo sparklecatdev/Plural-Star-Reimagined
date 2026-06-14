@@ -5,6 +5,7 @@ import {useKeyboardBehavior} from '../hooks/useKeyboardBehavior';
 import {useTranslation} from 'react-i18next';
 import {MedicalData, Medication, MedicalAppointment, MedicalHistoryEntry, uid, fmtTime, fmtDate, isValidTimeHHMM} from '../utils';
 import {DateTimeEditor} from '../components/DateTimeEditor';
+import {Fonts, UI} from '../theme';
 
 type MedSection = 'medications' | 'appointments' | 'history' | 'emergency';
 
@@ -51,8 +52,8 @@ export const MedicalScreen = ({theme: T, medical, onSave}: Props) => {
   const [emNotes, setEmNotes] = useState(medical.emergency.notes || '');
   const [emShow, setEmShow] = useState(medical.emergency.showOnNotification);
 
-  const labelStyle = {fontSize: fs(10), letterSpacing: 1, textTransform: 'uppercase' as const, color: T.dim, marginBottom: 6, fontWeight: '600' as const};
-  const inputStyle = {backgroundColor: T.surface, color: T.text, borderWidth: 1, borderColor: T.border, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 9, fontSize: fs(13), marginBottom: 10};
+  const labelStyle = {fontSize: fs(10), letterSpacing: 1.1, textTransform: 'uppercase' as const, color: T.dim, marginBottom: 6, fontWeight: '700' as const};
+  const inputStyle = {backgroundColor: T.surface, color: T.text, borderWidth: 1, borderColor: T.border, borderRadius: UI.radiusMd, paddingHorizontal: 14, paddingVertical: 11, fontSize: fs(13), marginBottom: 10};
 
   const resetMedForm = () => {
     setMedFormId(null);
@@ -223,15 +224,15 @@ export const MedicalScreen = ({theme: T, medical, onSave}: Props) => {
   const SectionBtn = ({id, label}: {id: MedSection; label: string}) => (
     <TouchableOpacity onPress={() => setSection(id)} activeOpacity={0.7}
       accessibilityRole="tab" accessibilityState={{selected: section === id}}
-      style={{paddingHorizontal: 12, paddingVertical: 7, borderRadius: 8, borderWidth: 1,
-        backgroundColor: section === id ? `${T.accent}20` : T.surface, borderColor: section === id ? `${T.accent}60` : T.border}}>
+      style={{paddingHorizontal: 12, paddingVertical: 7, borderWidth: 1,
+        backgroundColor: section === id ? `${T.accent}20` : T.surface, borderColor: section === id ? `${T.accent}60` : T.border, borderRadius: UI.pill}}>
       <Text style={{fontSize: fs(11), fontWeight: section === id ? '600' : '400', color: section === id ? T.accent : T.dim}}>{label}</Text>
     </TouchableOpacity>
   );
 
   const AddBtn = ({label, onPress, expanded}: {label: string; onPress: () => void; expanded: boolean}) => (
     <TouchableOpacity onPress={onPress} activeOpacity={0.7} accessibilityRole="button" accessibilityState={{expanded}}
-      style={{backgroundColor: T.accentBg, borderWidth: 1, borderColor: `${T.accent}40`, borderRadius: 8, paddingHorizontal: 14, paddingVertical: 8, alignSelf: 'flex-start', marginBottom: 12}}>
+      style={{backgroundColor: T.accentBg, borderWidth: 1, borderColor: `${T.accent}40`, borderRadius: UI.pill, paddingHorizontal: 14, paddingVertical: 8, alignSelf: 'flex-start', marginBottom: 12}}>
       <Text style={{fontSize: fs(12), fontWeight: '600', color: T.accent}}>{label}</Text>
     </TouchableOpacity>
   );
@@ -239,11 +240,11 @@ export const MedicalScreen = ({theme: T, medical, onSave}: Props) => {
   const SaveCancelRow = ({onSave: onSavePress, onCancel, canSave}: {onSave: () => void; onCancel: () => void; canSave: boolean}) => (
     <View style={{flexDirection: 'row', gap: 10}}>
       <TouchableOpacity onPress={onCancel} activeOpacity={0.7} accessibilityRole="button" accessibilityLabel={t('common.cancel')}
-        style={{flex: 1, alignItems: 'center', paddingVertical: 11, borderRadius: 8, borderWidth: 1, backgroundColor: 'transparent', borderColor: T.border}}>
+        style={{flex: 1, alignItems: 'center', paddingVertical: 11, borderRadius: UI.pill, borderWidth: 1, backgroundColor: 'transparent', borderColor: T.border}}>
         <Text style={{fontSize: fs(13), fontWeight: '500', color: T.dim}}>{t('common.cancel')}</Text>
       </TouchableOpacity>
       <TouchableOpacity onPress={onSavePress} activeOpacity={0.7} accessibilityRole="button" accessibilityLabel={t('common.save')} disabled={!canSave}
-        style={{flex: 2, alignItems: 'center', paddingVertical: 11, borderRadius: 8, borderWidth: 1, backgroundColor: T.accentBg, borderColor: `${T.accent}40`, opacity: canSave ? 1 : 0.45}}>
+        style={{flex: 2, alignItems: 'center', paddingVertical: 11, borderRadius: UI.pill, borderWidth: 1, backgroundColor: T.accentBg, borderColor: `${T.accent}40`, opacity: canSave ? 1 : 0.45}}>
         <Text style={{fontSize: fs(13), fontWeight: '500', color: T.accent}}>{t('common.save')}</Text>
       </TouchableOpacity>
     </View>
@@ -252,7 +253,13 @@ export const MedicalScreen = ({theme: T, medical, onSave}: Props) => {
   return (
     <KeyboardAvoidingView style={{flex: 1}} behavior={behavior}>
       <ScrollView style={{flex: 1, backgroundColor: T.bg}} contentContainerStyle={{padding: 16, paddingBottom: 120}} keyboardShouldPersistTaps="handled">
-        <View style={{flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 16}}>
+        <View style={{backgroundColor: T.card, borderWidth: 1, borderColor: `${T.accent}24`, borderRadius: UI.radiusLg, padding: 20, marginBottom: UI.sectionGap}}>
+          <Text style={{fontSize: fs(11), letterSpacing: 1.6, textTransform: 'uppercase', color: T.accent, fontWeight: '700', marginBottom: 10}}>{t('medical.title')}</Text>
+          <Text accessibilityRole="header" style={{fontFamily: Fonts.display, fontSize: fs(28), fontWeight: '600', fontStyle: 'italic', color: T.text, marginBottom: 8}}>{t('medical.title')}</Text>
+          <Text style={{fontSize: fs(13), color: T.dim, lineHeight: 18}}>{t('medical.emergencyDesc')}</Text>
+        </View>
+
+        <View style={{flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 16, backgroundColor: T.card, borderWidth: 1, borderColor: T.border, borderRadius: UI.radiusLg, padding: 12}}>
           <SectionBtn id="medications" label={t('medical.medications')} />
           <SectionBtn id="appointments" label={t('medical.appointments')} />
           <SectionBtn id="history" label={t('medical.history')} />
@@ -310,7 +317,7 @@ export const MedicalScreen = ({theme: T, medical, onSave}: Props) => {
                   <TouchableOpacity onPress={() => toggleMedication(med.id)} activeOpacity={0.8}
                     accessibilityRole="switch" accessibilityState={{checked: med.enabled}} accessibilityLabel={med.name}
                     style={{width: 40, height: 22, borderRadius: 11, backgroundColor: med.enabled ? T.accent : T.toggleOff, justifyContent: 'center'}}>
-                    <View style={{width: 16, height: 16, borderRadius: 8, backgroundColor: '#fff', position: 'absolute', left: med.enabled ? 20 : 3}} />
+                    <View style={{width: 16, height: 16, borderRadius: 8, backgroundColor: T.surface, position: 'absolute', left: med.enabled ? 20 : 3}} />
                   </TouchableOpacity>
                   <TouchableOpacity onPress={() => deleteMedication(med.id)} activeOpacity={0.7} accessibilityRole="button" accessibilityLabel={`${t('common.delete')} ${med.name}`} style={{padding: 4}}>
                     <Text style={{fontSize: fs(12), color: T.danger}}>✕</Text>
@@ -422,12 +429,12 @@ export const MedicalScreen = ({theme: T, medical, onSave}: Props) => {
               accessibilityRole="switch" accessibilityState={{checked: emShow}} accessibilityLabel={t('medical.showOnNotification')}
               style={{flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 6, marginBottom: 16}}>
               <View style={{width: 40, height: 22, borderRadius: 11, backgroundColor: emShow ? T.accent : T.toggleOff, justifyContent: 'center'}}>
-                <View style={{width: 16, height: 16, borderRadius: 8, backgroundColor: '#fff', position: 'absolute', left: emShow ? 20 : 3}} />
+                <View style={{width: 16, height: 16, borderRadius: 8, backgroundColor: T.surface, position: 'absolute', left: emShow ? 20 : 3}} />
               </View>
               <Text style={{flex: 1, fontSize: fs(12), color: T.dim}}>{t('medical.showOnNotification')}</Text>
             </TouchableOpacity>
             <TouchableOpacity onPress={saveEmergency} activeOpacity={0.7} accessibilityRole="button" accessibilityLabel={t('common.save')}
-              style={{alignItems: 'center', paddingVertical: 11, borderRadius: 8, borderWidth: 1, backgroundColor: T.accentBg, borderColor: `${T.accent}40`}}>
+              style={{alignItems: 'center', paddingVertical: 11, borderRadius: UI.pill, borderWidth: 1, backgroundColor: T.accentBg, borderColor: `${T.accent}40`}}>
               <Text style={{fontSize: fs(13), fontWeight: '500', color: T.accent}}>{t('common.save')}</Text>
             </TouchableOpacity>
           </View>

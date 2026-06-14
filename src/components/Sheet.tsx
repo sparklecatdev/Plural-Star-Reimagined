@@ -60,11 +60,11 @@ export const Sheet = ({visible, title, theme: T, onClose, children, footer, head
       ref={sheetRef}
       detents={[0.92]}
       cornerRadius={20}
-      backgroundColor={T.card}
+      backgroundColor={T.bg}
       onDidDismiss={onClose}
       scrollable
       header={
-        <View style={[s.header, {borderBottomColor: T.border, backgroundColor: T.card}]}>
+        <View style={[s.header, {backgroundColor: T.bg}]}>
           <Text style={[s.title, {color: T.text, flex: 1, marginRight: 8}]} accessibilityRole="header" numberOfLines={1}>{title}</Text>
           {headerAction}
           <TouchableOpacity onPress={onClose} activeOpacity={0.7} accessibilityRole="button" accessibilityLabel={t('common.close')} style={s.closeBtn}>
@@ -76,7 +76,7 @@ export const Sheet = ({visible, title, theme: T, onClose, children, footer, head
         footer ? (
           <View
             onLayout={onFooterLayout}
-            style={[s.footer, {borderTopColor: T.border, backgroundColor: T.card, paddingBottom: 16 + bottomInset}]}
+            style={[s.footer, {backgroundColor: T.bg, paddingBottom: 16 + bottomInset}]}
           >
             {footer}
           </View>
@@ -104,7 +104,6 @@ const s = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 20,
     paddingVertical: 12,
-    borderBottomWidth: 1,
   },
   title: {fontFamily: Fonts.display, fontSize: 22, fontWeight: '600', fontStyle: 'italic'},
   closeBtn: {padding: 4},
@@ -116,6 +115,5 @@ const s = StyleSheet.create({
     gap: 8,
     paddingHorizontal: 20,
     paddingVertical: 16,
-    borderTopWidth: 1,
   },
 });

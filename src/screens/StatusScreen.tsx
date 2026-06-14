@@ -2,7 +2,7 @@ import React from 'react';
 import {View, ScrollView, StyleSheet, TouchableOpacity} from 'react-native';
 import {Text} from '../components/AppText';
 import {useTranslation} from 'react-i18next';
-import {Fonts} from '../theme';
+import {Fonts, UI} from '../theme';
 import {Member, FrontState, FrontTierKey, isFrontEmpty, fmtTime, fmtDur, translateMood} from '../utils';
 
 interface Props {
@@ -27,15 +27,22 @@ export const StatusScreen = ({theme: T, front, getMember, selfId, onSetStatus, o
 
   return (
     <View style={{flex: 1}}>
-      <ScrollView style={{flex: 1, backgroundColor: T.bg}} contentContainerStyle={{padding: 16, paddingBottom: 140}}>
-        <View style={{marginBottom: 16}}>
-          <Text accessibilityRole="header" style={[s.heading, {color: T.text, marginBottom: 10, fontSize: fs(22)}]} numberOfLines={1} maxFontSizeMultiplier={1.2}>
-            {t('status.current')}
-          </Text>
-          <TouchableOpacity onPress={onSetStatus} accessibilityRole="button" accessibilityLabel={t('status.update')}
-            style={[s.btn, {backgroundColor: T.accentBg, borderColor: `${T.accent}40`, alignSelf: 'flex-start'}]}>
-            <Text style={[s.btnText, {color: T.accent, fontSize: fs(13)}]} numberOfLines={1} maxFontSizeMultiplier={1.2}>{t('status.update')}</Text>
-          </TouchableOpacity>
+      <ScrollView style={{flex: 1, backgroundColor: T.bg}} contentContainerStyle={{padding: UI.screenPadding, paddingBottom: 140}}>
+        <View style={{marginBottom: 16, backgroundColor: T.card, borderRadius: UI.radiusLg, borderWidth: 1, borderColor: `${T.accent}24`, padding: 18}}>
+          <View style={{flexDirection: 'row', alignItems: 'center', gap: 12}}>
+            <View style={{flex: 1}}>
+              <Text style={{fontSize: fs(10), letterSpacing: 1.5, textTransform: 'uppercase', color: T.dim, fontWeight: '700', marginBottom: 6}}>
+                {t('status.current')}
+              </Text>
+              <Text accessibilityRole="header" style={[s.heading, {color: T.text, fontSize: fs(24)}]} numberOfLines={1} maxFontSizeMultiplier={1.2}>
+                {t('status.current')}
+              </Text>
+            </View>
+            <TouchableOpacity onPress={onSetStatus} accessibilityRole="button" accessibilityLabel={t('status.update')}
+              style={[s.btn, {backgroundColor: T.accentBg, borderColor: `${T.accent}40`}]}>
+              <Text style={[s.btnText, {color: T.accent, fontSize: fs(13)}]} numberOfLines={1} maxFontSizeMultiplier={1.2}>{t('status.update')}</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         {empty ? (
@@ -97,10 +104,10 @@ export const StatusScreen = ({theme: T, front, getMember, selfId, onSetStatus, o
 
 const s = StyleSheet.create({
   heading: {fontFamily: Fonts.display, fontWeight: '600', fontStyle: 'italic'},
-  btn: {paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, borderWidth: 1},
-  btnText: {fontWeight: '500'},
-  emptyCard: {borderRadius: 14, borderWidth: 1, padding: 24, alignItems: 'center'},
-  card: {borderRadius: 14, borderWidth: 1, padding: 16},
+  btn: {paddingHorizontal: 14, paddingVertical: 8, borderRadius: UI.pill, borderWidth: 1},
+  btnText: {fontWeight: '600'},
+  emptyCard: {borderRadius: UI.radiusLg, borderWidth: 1, padding: 24, alignItems: 'center'},
+  card: {borderRadius: UI.radiusLg, borderWidth: 1, padding: 16},
   row: {flexDirection: 'row', alignItems: 'baseline', gap: 10, marginBottom: 6},
-  rowLabel: {letterSpacing: 1, textTransform: 'uppercase', fontWeight: '600', minWidth: 64},
+  rowLabel: {letterSpacing: 1.2, textTransform: 'uppercase', fontWeight: '700', minWidth: 64},
 });

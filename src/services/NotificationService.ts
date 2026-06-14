@@ -10,7 +10,6 @@ import notifee, {
 } from '@notifee/react-native';
 import {Platform} from 'react-native';
 import {FrontState, Member, Medication, MedicalAppointment, fmtDur, fmtTime} from '../utils';
-import {endFrontLiveActivity, updateFrontLiveActivity} from './LiveActivityService';
 import i18n from '../i18n/i18n';
 
 export const NOTIF_CHANNEL_ID = 'plural-space-front';
@@ -19,8 +18,10 @@ export const NOTIF_ID = 'ps-front-status';
 export const REMINDER_CHANNEL_ID = 'plural-space-reminders';
 export const FRONT_CHECK_NOTIF_ID = 'ps-front-check';
 export const NOTEBOARD_NOTIF_ID = 'ps-noteboard-unread';
+const supportsLocalNotifications = Platform.OS === 'android';
 
 export const setupNotificationChannel = async () => {
+  if (!supportsLocalNotifications) return;
   await notifee.createChannel({
     id: NOTIF_CHANNEL_ID,
     name: 'Front Status',
@@ -31,6 +32,7 @@ export const setupNotificationChannel = async () => {
 };
 
 export const setupReminderChannel = async () => {
+  if (!supportsLocalNotifications) return;
   await notifee.createChannel({
     id: REMINDER_CHANNEL_ID,
     name: 'Reminders',
@@ -136,10 +138,7 @@ export const showFrontNotification = async (
   systemName = 'Plural Star',
 ) => {
   try {
-    if (Platform.OS === 'ios') {
-      await updateFrontLiveActivity(front, members, systemName);
-      return;
-    }
+    if (!supportsLocalNotifications) return;
 
     if (!front) {
       await clearFrontNotification();
@@ -198,6 +197,7 @@ export const scheduleFrontNotificationRefresh = async (
 
 export const cancelFrontNotificationRefresh = async () => {
   try {
+    if (!supportsLocalNotifications) return;
     await notifee.cancelTriggerNotification(NOTIF_ID);
   } catch (e) {
     console.error('[PluralSpace] Notification refresh cancel error:', e);
@@ -206,10 +206,7 @@ export const cancelFrontNotificationRefresh = async () => {
 
 export const clearFrontNotification = async () => {
   try {
-    if (Platform.OS === 'ios') {
-      await endFrontLiveActivity();
-      return;
-    }
+    if (!supportsLocalNotifications) return;
     try { await notifee.cancelTriggerNotification(NOTIF_ID); } catch {}
     await notifee.cancelNotification(NOTIF_ID);
     try { await notifee.stopForegroundService(); } catch {}
@@ -221,6 +218,7 @@ export const clearFrontNotification = async () => {
 export const scheduleFrontCheckReminder = async (intervalHours: number, singlet = false) => {
   try {
     await cancelFrontCheckReminder();
+    if (!supportsLocalNotifications) return;
     if (!intervalHours || intervalHours <= 0) return;
     const title = singlet
       ? `◈ ${i18n.t('notification.statusCheck', {defaultValue: 'Status Check'})}`
@@ -236,47 +234,16 @@ export const scheduleFrontCheckReminder = async (intervalHours: number, singlet 
       pressAction: {id: 'default'},
       color: '#DAA520',
     };
-
-    if (Platform.OS === 'android') {
-      await setupReminderChannel();
-      const trigger: IntervalTrigger = {
-        type: TriggerType.INTERVAL,
-        interval: intervalHours,
-        timeUnit: TimeUnit.HOURS,
-      };
-      await notifee.createTriggerNotification(
-        {id: FRONT_CHECK_NOTIF_ID, title, body, android: androidConfig},
-        trigger,
-      );
-      return;
-    }
-
-    if (intervalHours === 1) {
-      const trigger: TimestampTrigger = {
-        type: TriggerType.TIMESTAMP,
-        timestamp: Date.now() + 60 * 60 * 1000,
-        repeatFrequency: RepeatFrequency.HOURLY,
-      };
-      await notifee.createTriggerNotification(
-        {id: FRONT_CHECK_NOTIF_ID, title, body},
-        trigger,
-      );
-      return;
-    }
-
-    const slots = 24 % intervalHours === 0 ? 24 / intervalHours : 1;
-    const effectiveInterval = 24 % intervalHours === 0 ? intervalHours : 24;
-    for (let i = 0; i < slots; i++) {
-      const trigger: TimestampTrigger = {
-        type: TriggerType.TIMESTAMP,
-        timestamp: Date.now() + effectiveInterval * (i + 1) * 60 * 60 * 1000,
-        repeatFrequency: RepeatFrequency.DAILY,
-      };
-      await notifee.createTriggerNotification(
-        {id: `${FRONT_CHECK_NOTIF_ID}-${i}`, title, body},
-        trigger,
-      );
-    }
+    await setupReminderChannel();
+    const trigger: IntervalTrigger = {
+      type: TriggerType.INTERVAL,
+      interval: intervalHours,
+      timeUnit: TimeUnit.HOURS,
+    };
+    await notifee.createTriggerNotification(
+      {id: FRONT_CHECK_NOTIF_ID, title, body, android: androidConfig},
+      trigger,
+    );
   } catch (e) {
     console.error('[PluralSpace] Front-check schedule error:', e);
   }
@@ -284,6 +251,7 @@ export const scheduleFrontCheckReminder = async (intervalHours: number, singlet 
 
 export const cancelFrontCheckReminder = async () => {
   try {
+    if (!supportsLocalNotifications) return;
     await notifee.cancelTriggerNotification(FRONT_CHECK_NOTIF_ID);
     const ids = await notifee.getTriggerNotificationIds();
     await Promise.all(ids.filter(id => id.startsWith(`${FRONT_CHECK_NOTIF_ID}-`)).map(id => notifee.cancelTriggerNotification(id)));
@@ -336,6 +304,7 @@ export const showNoteboardNotification = async (
 
 export const clearNoteboardNotification = async () => {
   try {
+    if (!supportsLocalNotifications) return;
     await notifee.cancelNotification(NOTEBOARD_NOTIF_ID);
   } catch (e) {
     console.error('[PluralSpace] Noteboard notification clear error:', e);
@@ -355,6 +324,7 @@ const nextDailyOccurrence = (hhmm: string): number => {
 
 const cancelTriggersWithPrefix = async (prefix: string) => {
   try {
+    if (!supportsLocalNotifications) return;
     const ids = await notifee.getTriggerNotificationIds();
     await Promise.all(ids.filter(id => id.startsWith(prefix)).map(id => notifee.cancelTriggerNotification(id)));
   } catch (e) {
@@ -364,6 +334,7 @@ const cancelTriggersWithPrefix = async (prefix: string) => {
 
 export const rescheduleMedicationReminders = async (medications: Medication[]) => {
   try {
+    if (!supportsLocalNotifications) return;
     await cancelTriggersWithPrefix(MED_ID_PREFIX);
     await setupReminderChannel();
     for (const med of medications) {
@@ -399,6 +370,7 @@ export const rescheduleMedicationReminders = async (medications: Medication[]) =
 
 export const rescheduleAppointmentReminders = async (appointments: MedicalAppointment[]) => {
   try {
+    if (!supportsLocalNotifications) return;
     await cancelTriggersWithPrefix(APPT_ID_PREFIX);
     await setupReminderChannel();
     for (const appt of appointments) {

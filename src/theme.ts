@@ -54,26 +54,26 @@ export const deriveTheme = (bg: string, accent: string, text: string, mid: strin
   const lum = luminance(bg);
   const isLight = lum > 0.3;
 
-  const surfaceT = isLight ? 0.04 : 0.08;
-  const cardT = isLight ? 0.07 : 0.14;
-  const borderT = isLight ? 0.12 : 0.20;
-  const borderLtT = isLight ? 0.18 : 0.30;
+  const surfaceT = isLight ? 0.01 : 0.024;
+  const cardT = isLight ? 0.022 : 0.05;
+  const borderT = isLight ? 0.035 : 0.075;
+  const borderLtT = isLight ? 0.05 : 0.11;
 
   const surface = mix(bg, mid, surfaceT);
   const card = mix(bg, mid, cardT);
   const border = mix(bg, mid, borderT);
   const borderLt = mix(bg, mid, borderLtT);
 
-  const dim = mix(text, mid, 0.12);
-  const muted = mix(text, mid, 0.30);
-  const toggleOff = mix(bg, mid, 0.22);
+  const dim = mix(text, mid, 0.3);
+  const muted = mix(text, mid, 0.46);
+  const toggleOff = mix(bg, mid, isLight ? 0.11 : 0.18);
 
   const accentRgb = hexToRgb(accent);
   const bgRgb = hexToRgb(bg);
   const accentBg = rgbToHex(
-    bgRgb[0] + (accentRgb[0] - bgRgb[0]) * 0.12,
-    bgRgb[1] + (accentRgb[1] - bgRgb[1]) * 0.12,
-    bgRgb[2] + (accentRgb[2] - bgRgb[2]) * 0.12,
+    bgRgb[0] + (accentRgb[0] - bgRgb[0]) * (isLight ? 0.07 : 0.1),
+    bgRgb[1] + (accentRgb[1] - bgRgb[1]) * (isLight ? 0.07 : 0.1),
+    bgRgb[2] + (accentRgb[2] - bgRgb[2]) * (isLight ? 0.07 : 0.1),
   );
 
   const dangerBase = '#d9534f';
@@ -122,20 +122,20 @@ export const deriveTheme = (bg: string, accent: string, text: string, mid: strin
 
 export const DARK_PALETTE: CustomPalette = {
   id: '__dark__',
-  name: 'Obsidian',
-  bg: '#0A1F2E',
-  accent: '#DAA520',
-  text: '#C0C0C0',
-  mid: '#7A8A99',
+  name: 'Black',
+  bg: '#06080d',
+  accent: '#F3F6FB',
+  text: '#FFFFFF',
+  mid: '#1A212B',
 };
 
 export const LIGHT_PALETTE: CustomPalette = {
   id: '__light__',
-  name: 'Steel',
-  bg: '#7A8A99',
-  accent: '#DAA520',
-  text: '#0A1F2E',
-  mid: '#C0C0C0',
+  name: 'White',
+  bg: '#F6F7F9',
+  accent: '#0E1116',
+  text: '#0A0D12',
+  mid: '#CDD4DD',
 };
 
 export const T: ThemeColors = deriveTheme(DARK_PALETTE.bg, DARK_PALETTE.accent, DARK_PALETTE.text, DARK_PALETTE.mid);
@@ -150,15 +150,24 @@ export const PALETTE = [
 
 export const DYSLEXIC_FONT = 'OpenDyslexic';
 
+const fontFam =(android: string, ios: string): string => (Platform.OS === 'android' ? android : ios);
+
 export const Fonts = {
-  display: 'OpenDyslexic',
+  display: fontFam('Lexend_700Bold', 'Lexend-Bold'),
   body: 'System',
   mono: 'monospace',
 };
 
-export type FontChoice = 'default' | 'opendyslexic' | 'atkinson' | 'lexend' | 'comicneue' | 'cause' | 'gelasio' | 'anton';
+export const UI = {
+  screenPadding: 16,
+  sectionGap: 20,
+  radiusSm: 14,
+  radiusMd: 22,
+  radiusLg: 30,
+  pill: 999,
+};
 
-const fontFam =(android: string, ios: string): string => (Platform.OS === 'android' ? android : ios);
+export type FontChoice = 'default' | 'opendyslexic' | 'atkinson' | 'lexend' | 'comicneue' | 'cause' | 'gelasio' | 'anton';
 
 export const FONT_OPTIONS: {value: FontChoice; label: string; family: string | null}[] = [
   {value: 'default', label: 'Default', family: null},
