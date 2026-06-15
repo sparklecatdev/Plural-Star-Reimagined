@@ -420,6 +420,8 @@ export interface AppSettings {
   appLockPassword?: string;
   useDyslexicFont?: boolean;
   fontChoice?: import('./theme').FontChoice;
+  pkFrontSyncEnabled?: boolean;
+  pkToken?: string;
   customFrontsSeeded?: boolean;
   memberListFields?: {groups?: boolean; descriptions?: boolean; pronouns?: boolean; roles?: boolean};
 }

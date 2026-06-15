@@ -1375,6 +1375,8 @@ export const SystemModal = ({visible, theme: T, system, settings, onSave, onSave
   const [appLockPw, setAppLockPw] = useState<string>(settings?.appLockPassword || '');
   const [showAppLockPw, setShowAppLockPw] = useState<boolean>(!!settings?.appLockPassword);
   const [filesEnabled, setFilesEnabled] = useState<boolean>(settings?.filesEnabled ?? true);
+  const [pkFrontSyncEnabled, setPkFrontSyncEnabled] = useState<boolean>(settings?.pkFrontSyncEnabled ?? false);
+  const [pkToken, setPkToken] = useState<string>(settings?.pkToken || '');
   const [singletMode, setSingletMode] = useState<boolean>(settings?.accountMode === 'singlet');
   const [themeMode, setThemeMode] = useState<ThemeMode>(settings?.themeMode || 'system');
   const [textScale, setTextScale] = useState<TextScale>(settings?.textScale ?? 1.0);
@@ -1391,7 +1393,7 @@ export const SystemModal = ({visible, theme: T, system, settings, onSave, onSave
     finally { setAvatarLinking(false); }
   };
 
-  React.useEffect(() => { if (visible) { setShowAvatarLink(false); setAvatarLinkInput(''); setAvatarLinking(false); setF({...system}); setShowJournalPw(!!system.journalPassword); setLocs(settings?.locations || []); setMoods(settings?.customMoods || []); setNewLocation(''); setNewMood(''); setSelectedLang(settings?.language || 'en'); setNotifEnabled(settings?.notificationsEnabled ?? true); setFilesEnabled(settings?.filesEnabled ?? true); setSingletMode(settings?.accountMode === 'singlet'); setThemeMode(settings?.themeMode || 'system'); setTextScale(settings?.textScale ?? 1.0); setFontChoice(settings?.fontChoice ?? (settings?.useDyslexicFont === true ? 'opendyslexic' : 'default')); setShowLangPicker(false); setShowFrontCheckPicker(false); setFrontCheckInterval(settings?.frontCheckInterval || 0); setNotifRefreshMins(settings?.notificationRefreshMinutes || 0); setShowNotifRefreshPicker(false); setNoteboardNotifs(settings?.noteboardNotifications ?? false); setAppLockPw(settings?.appLockPassword || ''); setShowAppLockPw(!!settings?.appLockPassword); } }, [visible, system, settings]);
+  React.useEffect(() => { if (visible) { setShowAvatarLink(false); setAvatarLinkInput(''); setAvatarLinking(false); setF({...system}); setShowJournalPw(!!system.journalPassword); setLocs(settings?.locations || []); setMoods(settings?.customMoods || []); setNewLocation(''); setNewMood(''); setSelectedLang(settings?.language || 'en'); setNotifEnabled(settings?.notificationsEnabled ?? true); setFilesEnabled(settings?.filesEnabled ?? true); setPkFrontSyncEnabled(settings?.pkFrontSyncEnabled ?? false); setPkToken(settings?.pkToken || ''); setSingletMode(settings?.accountMode === 'singlet'); setThemeMode(settings?.themeMode || 'system'); setTextScale(settings?.textScale ?? 1.0); setFontChoice(settings?.fontChoice ?? (settings?.useDyslexicFont === true ? 'opendyslexic' : 'default')); setShowLangPicker(false); setShowFrontCheckPicker(false); setFrontCheckInterval(settings?.frontCheckInterval || 0); setNotifRefreshMins(settings?.notificationRefreshMinutes || 0); setShowNotifRefreshPicker(false); setNoteboardNotifs(settings?.noteboardNotifications ?? false); setAppLockPw(settings?.appLockPassword || ''); setShowAppLockPw(!!settings?.appLockPassword); } }, [visible, system, settings]);
 
   const addLoc = () => {if (newLocation.trim() && !locs.includes(newLocation.trim())) {setLocs([...locs, newLocation.trim()]); setNewLocation('');}};
   const addMood = () => {if (newMood.trim() && !moods.includes(newMood.trim())) {setMoods([...moods, newMood.trim()]); setNewMood('');}};
@@ -1403,6 +1405,8 @@ export const SystemModal = ({visible, theme: T, system, settings, onSave, onSave
     language: selectedLang,
     notificationsEnabled: notifEnabled,
     filesEnabled,
+    pkFrontSyncEnabled,
+    pkToken: pkToken.trim() || undefined,
     themeMode,
     textScale,
     fontChoice,
@@ -1524,6 +1528,14 @@ export const SystemModal = ({visible, theme: T, system, settings, onSave, onSave
       <View style={sectionStyle}>
         <View style={{flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between'}}><View style={{flex: 1}}><Text style={{fontSize: fs(10), letterSpacing: 1, textTransform: 'uppercase', color: T.dim, fontWeight: '600', marginBottom: 4}}>{t('modal.fileAccess')}</Text><Text style={{fontSize: fs(11), color: T.muted, lineHeight: 15}}>{t('modal.fileAccessDesc')}</Text></View>
           <TouchableOpacity onPress={() => setFilesEnabled(!filesEnabled)} activeOpacity={0.8} accessibilityRole="switch" accessibilityState={{checked: filesEnabled}} accessibilityLabel={t('modal.fileAccess')} style={{width: 40, height: 22, borderRadius: 11, backgroundColor: filesEnabled ? T.accent : T.toggleOff, justifyContent: 'center', marginLeft: 12}}><View style={{width: 16, height: 16, borderRadius: 8, backgroundColor: T.surface, position: 'absolute', left: filesEnabled ? 20 : 3}} /></TouchableOpacity></View>
+      </View>
+      <View style={sectionStyle}>
+        <View style={{flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between'}}><View style={{flex: 1}}><Text style={{fontSize: fs(10), letterSpacing: 1, textTransform: 'uppercase', color: T.dim, fontWeight: '600', marginBottom: 4}}>{t('modal.pkFrontSync')}</Text><Text style={{fontSize: fs(11), color: T.muted, lineHeight: 15}}>{t('modal.pkFrontSyncDesc')}</Text></View>
+          <TouchableOpacity onPress={() => setPkFrontSyncEnabled(!pkFrontSyncEnabled)} activeOpacity={0.8} accessibilityRole="switch" accessibilityState={{checked: pkFrontSyncEnabled}} accessibilityLabel={t('modal.pkFrontSync')} style={{width: 40, height: 22, borderRadius: 11, backgroundColor: pkFrontSyncEnabled ? T.accent : T.toggleOff, justifyContent: 'center', marginLeft: 12}}><View style={{width: 16, height: 16, borderRadius: 8, backgroundColor: T.surface, position: 'absolute', left: pkFrontSyncEnabled ? 20 : 3}} /></TouchableOpacity></View>
+        {pkFrontSyncEnabled ? (
+          <TextInput value={pkToken} onChangeText={setPkToken} placeholder={t('share.pkTokenPlaceholder')} placeholderTextColor={T.muted} secureTextEntry autoCapitalize="none" autoCorrect={false}
+            style={{...inputSurface, color: T.text, paddingHorizontal: 12, paddingVertical: 10, fontSize: fs(14), marginTop: 10}} />
+        ) : null}
       </View>
       <View style={sectionStyle}>
         <View style={{flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between'}}><View style={{flex: 1}}><Text style={{fontSize: fs(10), letterSpacing: 1, textTransform: 'uppercase', color: T.dim, fontWeight: '600', marginBottom: 4}}>{t('modal.notifications')}</Text><Text style={{fontSize: fs(11), color: T.muted, lineHeight: 15}}>{t('modal.notificationsDesc')}</Text></View>
