@@ -31,6 +31,7 @@
     "pickMember": "Nevn et medlem"
   },
   "systemManager": {
+    "browse": "Bla",
     "deleteSelectedMsg": "Fjerne {{count}} valgte element(er)? Medlemmer slettes ikke.",
     "desc": "Opprett, rediger, omorganiser og slett grupper og undersystemer. Trykk ⇄ på et element og deretter et mål for å neste det.",
     "title": "Systembehandler"
@@ -165,9 +166,16 @@
     "customFront": "Egendefinert front",
     "customFronts": "Egendefinerte fronter",
     "moveDown": "Flytt ned",
+    "moveAbove": "over {{name}}",
+    "moveBelow": "under {{name}}",
     "moveUp": "Flytt opp",
     "noCustomFronts": "Ingen egendefinerte fronter ennå.",
     "selectAction": "Velg",
+    "displayFields": "Vis felter",
+    "fieldGroups": "Grupper",
+    "fieldDescriptions": "Beskrivelser",
+    "fieldPronouns": "Pronomen",
+    "fieldRoles": "Roller",
     "title": "Medlemmer",
     "add": "+ Legg til",
     "search": "Søk...",
@@ -485,6 +493,7 @@
     "role": "Rolle",
     "rolePlaceholder": "f.eks. Vert, Beskytter",
     "color": "Farge",
+    "hue": "Fargetone",
     "invalidHex": "Ugyldig hekskode",
     "transparentColor": "Gjennomsiktig",
     "removeImageMsg": "Fjerne dette bildet?",
@@ -771,6 +780,7 @@
   },
   "systemMap": {
     "connections": "Forbindelser",
+    "showOnMap": "Vis på kartet",
     "addMember": "+ Medlem",
     "emptyMap": "Kartet er tomt. Trykk + Medlem for å legge til medlemmer, eller + Legg til relasjon for å koble dem.",
     "depth": "Forbindelser unna",

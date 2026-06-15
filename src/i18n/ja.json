@@ -31,6 +31,7 @@
     "pickMember": "メンバーをメンション"
   },
   "systemManager": {
+    "browse": "閲覧",
     "deleteSelectedMsg": "選択した {{count}} 件を削除しますか？メンバーは削除されません。",
     "desc": "グループとサブシステムの作成、編集、並べ替え、削除ができます。項目の ⇄ をタップしてから移動先をタップすると入れ子にできます。",
     "title": "システムマネージャー"
@@ -165,9 +166,16 @@
     "customFront": "カスタムフロント",
     "customFronts": "カスタムフロント",
     "moveDown": "下へ移動",
+    "moveAbove": "{{name}}の上",
+    "moveBelow": "{{name}}の下",
     "moveUp": "上へ移動",
     "noCustomFronts": "カスタムフロントはまだありません。",
     "selectAction": "選択",
+    "displayFields": "表示する項目",
+    "fieldGroups": "グループ",
+    "fieldDescriptions": "説明",
+    "fieldPronouns": "代名詞",
+    "fieldRoles": "役割",
     "title": "メンバー",
     "add": "+ 追加",
     "search": "検索…",
@@ -492,6 +500,7 @@
     "role": "役割/アーキタイプ",
     "rolePlaceholder": "ホスト、プロテクター、ゲートキーパー…",
     "color": "色",
+    "hue": "色相",
     "invalidHex": "無効な16進数カラー",
     "transparentColor": "透明",
     "removeImageMsg": "この画像を削除しますか？",
@@ -771,6 +780,7 @@
   },
   "systemMap": {
     "connections": "つながり",
+    "showOnMap": "マップに表示",
     "addMember": "+ メンバー",
     "emptyMap": "マップは空です。「+ メンバー」でメンバーを追加するか、「+ 関係を追加」でつなげましょう。",
     "depth": "つながりの距離",

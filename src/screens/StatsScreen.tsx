@@ -462,8 +462,12 @@ export const StatsScreen = ({theme: T, history, members, chatMessages, singlet =
             if (e.coFrontEnergy && (e.coFrontIds || []).includes(selectedStatMember)) { eSum += e.coFrontEnergy; eCount++; }
           });
           const sm = getMember(selectedStatMember);
-          const topCo = Object.entries(coMembers).sort((a, b) => b[1] - a[1]).slice(0, 5);
-          const topMd = Object.entries(moods).sort((a, b) => b[1] - a[1]).slice(0, 5);
+          const topCoAll = Object.entries(coMembers).sort((a, b) => b[1] - a[1]);
+          const coLimit = limitFor('coMembers');
+          const topCo = topCoAll.slice(0, coLimit);
+          const topMdAll = Object.entries(moods).sort((a, b) => b[1] - a[1]);
+          const mdLimit = limitFor('coMoods');
+          const topMd = topMdAll.slice(0, mdLimit);
           const avgE = eCount > 0 ? Math.round((eSum / eCount) * 10) / 10 : null;
 
           return (
@@ -485,6 +489,7 @@ export const StatsScreen = ({theme: T, history, members, chatMessages, singlet =
                       </View>
                     );
                   })}
+                  <ShowMoreRow boardKey="coMembers" total={topCoAll.length} limit={coLimit} />
                 </View>
               )}
               {topMd.length > 0 && (
@@ -496,6 +501,7 @@ export const StatsScreen = ({theme: T, history, members, chatMessages, singlet =
                       <Text style={{fontSize: fs(11), color: T.muted}}>{count}x</Text>
                     </View>
                   ))}
+                  <ShowMoreRow boardKey="coMoods" total={topMdAll.length} limit={mdLimit} />
                 </View>
               )}
             </View>

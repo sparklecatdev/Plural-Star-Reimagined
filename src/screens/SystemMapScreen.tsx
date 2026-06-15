@@ -6,12 +6,15 @@ import {useTranslation} from 'react-i18next';
 import {Member, Relationship, RelationshipTypeDef, allRelationshipTypes, relationshipDegrees, uid, sortMembersBySearch, DEFAULT_REL_COLOR, RELATIONSHIP_COLOR_CHOICES, PRESET_RELATIONSHIP_TYPES, isValidHex, normalizeHex} from '../utils';
 import {Fonts, PALETTE, UI} from '../theme';
 import {store, KEYS} from '../storage';
+import {ColorPicker} from '../components/ColorPicker';
 import {Avatar} from '../components/Avatar';
 
 interface Props {
   theme: any;
   members: Member[];
   onViewMember?: (id: string) => void;
+  onRelCountChange?: (n: number) => void;
+  focus?: {id: string; n: number} | null;
 }
 
 interface MapNode {
@@ -208,11 +211,8 @@ const TypeForm = ({T, initial, saveLabel, onSave}: {
           style={{backgroundColor: T.surface, color: T.text, borderWidth: 1, borderColor: T.border, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8, fontSize: fs(13), marginBottom: 8}} />
       )}
       <Text style={{fontSize: fs(10), letterSpacing: 1, textTransform: 'uppercase', color: T.dim, marginBottom: 6, fontWeight: '600'}}>{t('systemMap.typeColor')}</Text>
-      <View style={{flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8}}>
-        <View style={{width: 36, height: 36, borderRadius: 18, backgroundColor: color, borderWidth: 2, borderColor: 'rgba(255,255,255,0.15)'}} />
-        <TextInput value={hexInput} onChangeText={handleHexChange} placeholder="#C9A96E" placeholderTextColor={T.muted} maxLength={7} autoCapitalize="characters"
-          style={{flex: 1, backgroundColor: T.surface, color: T.text, borderWidth: 1, borderColor: hexError ? T.danger : T.border, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 9, fontSize: fs(14), fontFamily: 'monospace'}} />
-      </View>
+      <ColorPicker value={color} onChange={setColor} T={T} />
+      <View style={{height: 12}} />
       {hexError && <Text style={{fontSize: fs(11), color: T.danger, marginBottom: 8}}>{t('modal.invalidHex')}</Text>}
       <View style={{flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 10}}>
         {swatches.map(c => (
@@ -230,7 +230,7 @@ const TypeForm = ({T, initial, saveLabel, onSave}: {
   );
 };
 
-export const SystemMapScreen = ({theme: T, members, onViewMember}: Props) => {
+export const SystemMapScreen = ({theme: T, members, onViewMember, onRelCountChange, focus}: Props) => {
   const {t} = useTranslation();
   const fs = (s: number) => Math.round(s * (T.textScale || 1));
   const behavior = useKeyboardBehavior();
@@ -241,8 +241,10 @@ export const SystemMapScreen = ({theme: T, members, onViewMember}: Props) => {
   const memberById = useMemo(() => new Map(eligibleMembers.map(m => [m.id, m])), [eligibleMembers]);
 
   const [relationships, setRelationships] = useState<Relationship[]>([]);
+  useEffect(() => { onRelCountChange?.(relationships.length); }, [relationships.length, onRelCountChange]);
   const [customTypes, setCustomTypes] = useState<RelationshipTypeDef[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  useEffect(() => { if (focus) setSelectedId(focus.id); }, [focus]);
   const [showEditor, setShowEditor] = useState(false);
   const [editRel, setEditRel] = useState<Relationship | null>(null);
   const [fromId, setFromId] = useState('');
@@ -259,6 +261,8 @@ export const SystemMapScreen = ({theme: T, members, onViewMember}: Props) => {
 
   const types = useMemo(() => allRelationshipTypes(customTypes), [customTypes]);
   const typeById = useMemo(() => new Map(types.map(td => [td.id, td])), [types]);
+  const userTypes = useMemo(() => types.filter(td => !td.preset), [types]);
+  const presetTypes = useMemo(() => types.filter(td => td.preset), [types]);
 
   useEffect(() => {
     (async () => {
@@ -307,10 +311,10 @@ export const SystemMapScreen = ({theme: T, members, onViewMember}: Props) => {
     await store.set(KEYS.relationshipTypes, next);
   };
 
-  const typeLabel = useCallback((td: RelationshipTypeDef): string => td.preset ? t(`relType.${td.id}`) : td.name, [t]);
+  const typeLabel = useCallback((td: RelationshipTypeDef): string => (td.preset && !td.overridden) ? t(`relType.${td.id}`) : td.name, [t]);
   const typeInverseLabel = useCallback((td: RelationshipTypeDef): string => {
     if (!td.directional) return typeLabel(td);
-    return td.preset ? t(`relType.${td.id}Inverse`) : (td.inverseName || td.name);
+    return (td.preset && !td.overridden) ? t(`relType.${td.id}Inverse`) : (td.inverseName || td.name);
   }, [t, typeLabel]);
 
   const roleOfOther = (r: Relationship, memberId: string): string => {
@@ -507,7 +511,11 @@ export const SystemMapScreen = ({theme: T, members, onViewMember}: Props) => {
   };
 
   const updateType = async (id: string, d: {name: string; directional: boolean; inverseName?: string; color: string}) => {
-    await saveCustomTypes(customTypes.map(x => x.id === id ? {...x, name: d.name, directional: d.directional, inverseName: d.inverseName, color: d.color} : x));
+    if (customTypes.some(x => x.id === id)) {
+      await saveCustomTypes(customTypes.map(x => x.id === id ? {...x, name: d.name, directional: d.directional, inverseName: d.inverseName, color: d.color} : x));
+    } else if (PRESET_RELATIONSHIP_TYPES.some(p => p.id === id)) {
+      await saveCustomTypes([...customTypes, {id, name: d.name, directional: d.directional, inverseName: d.inverseName, color: d.color, preset: true}]);
+    }
   };
 
   const deleteCustomType = (td: RelationshipTypeDef) => {
@@ -652,11 +660,13 @@ export const SystemMapScreen = ({theme: T, members, onViewMember}: Props) => {
           </Animated.View>
         </View>
 
-        {(mapMembers.length === 0 || relationships.length === 0) && (
-          <View pointerEvents="none" style={{...StyleSheet.absoluteFill, alignItems: 'center', justifyContent: 'flex-end', paddingBottom: 32}}>
-            <Text style={{fontSize: fs(12), color: T.dim, textAlign: 'center', paddingHorizontal: 32}}>
-              {mapMembers.length === 0 ? t('systemMap.emptyMap') : t('systemMap.noRelationships')}
-            </Text>
+        {(mapMembers.length === 0 || relationships.length === 0) && !selectedId && (
+          <View pointerEvents="none" style={{position: 'absolute', left: 16, right: 16, bottom: 16, alignItems: 'center'}}>
+            <View style={{maxWidth: 360, backgroundColor: T.card, borderWidth: 1, borderColor: T.border, borderRadius: 12, paddingHorizontal: 16, paddingVertical: 10}}>
+              <Text style={{fontSize: fs(12), color: T.dim, textAlign: 'center'}}>
+                {mapMembers.length === 0 ? t('systemMap.emptyMap') : t('systemMap.noRelationships')}
+              </Text>
+            </View>
           </View>
         )}
 
@@ -674,15 +684,8 @@ export const SystemMapScreen = ({theme: T, members, onViewMember}: Props) => {
 
       {selectedMember && !showEditor && (
         <View style={{position: 'absolute', left: 12, right: 12, bottom: 12, backgroundColor: T.card, borderRadius: UI.radiusLg, borderWidth: 1, borderColor: T.border, padding: 14, maxHeight: 300}}>
-          <View style={{flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8}}>
-            <Avatar member={selectedMember} size={30} T={T} />
-            <View style={{flex: 1}}>
-              <Text style={{fontSize: fs(15), fontWeight: '600', color: selectedMember.color}} numberOfLines={1}>{selectedMember.name}</Text>
-              <Text style={{fontSize: fs(10), color: T.muted}}>
-                {(degrees[selectedMember.id] || 0) === 1 ? t('systemMap.relationshipOne') : t('systemMap.relationships', {count: degrees[selectedMember.id] || 0})}
-              </Text>
-            </View>
-            <View style={{flexDirection: 'row', gap: 4, marginRight: 4}}>
+          <View style={{flexDirection: 'row', alignItems: 'center', marginBottom: 10}}>
+            <View style={{flexDirection: 'row', gap: 4}}>
               {([1, 2, 3] as const).map(d => (
                 <TouchableOpacity key={d} onPress={() => setDepth(d)} activeOpacity={0.7}
                   accessibilityRole="button" accessibilityState={{selected: depth === d}} accessibilityLabel={`${t('systemMap.depth')} ${d}`}
@@ -692,9 +695,10 @@ export const SystemMapScreen = ({theme: T, members, onViewMember}: Props) => {
                 </TouchableOpacity>
               ))}
             </View>
+            <View style={{flex: 1}} />
             {onViewMember && (
               <TouchableOpacity onPress={() => onViewMember(selectedMember.id)} activeOpacity={0.7} accessibilityRole="button" accessibilityLabel={t('systemMap.viewProfile')}
-                style={{borderWidth: 1, borderColor: T.border, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6}}>
+                style={{borderWidth: 1, borderColor: T.border, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, marginRight: 4}}>
                 <Text style={{fontSize: fs(11), color: T.accent}}>{t('systemMap.viewProfile')}</Text>
               </TouchableOpacity>
             )}
@@ -704,6 +708,15 @@ export const SystemMapScreen = ({theme: T, members, onViewMember}: Props) => {
             <TouchableOpacity onPress={() => setSelectedId(null)} activeOpacity={0.7} accessibilityRole="button" accessibilityLabel={t('common.close')} style={{padding: 4}}>
               <Text style={{fontSize: fs(14), color: T.dim}}>✕</Text>
             </TouchableOpacity>
+          </View>
+          <View style={{flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8}}>
+            <Avatar member={selectedMember} size={30} T={T} />
+            <View style={{flex: 1}}>
+              <Text style={{fontSize: fs(15), fontWeight: '600', color: selectedMember.color}} numberOfLines={1}>{selectedMember.name}</Text>
+              <Text style={{fontSize: fs(10), color: T.muted}} numberOfLines={1}>
+                {(degrees[selectedMember.id] || 0) === 1 ? t('systemMap.relationshipOne') : t('systemMap.relationships', {count: degrees[selectedMember.id] || 0})}
+              </Text>
+            </View>
           </View>
           <ScrollView style={{maxHeight: 170}}>
             {selectedRels.length === 0 ? (
@@ -839,11 +852,11 @@ export const SystemMapScreen = ({theme: T, members, onViewMember}: Props) => {
               )}
 
               <Text style={{fontSize: fs(10), letterSpacing: 1, textTransform: 'uppercase', color: T.dim, fontWeight: '600', marginBottom: 8}}>{t('systemMap.customTypes')}</Text>
-              {customTypes.length === 0 ? (
+              {userTypes.length === 0 ? (
                 <Text style={{fontSize: fs(12), color: T.muted, marginBottom: 14}}>{t('systemMap.noCustomTypes')}</Text>
               ) : (
                 <View style={{backgroundColor: T.card, borderRadius: 10, borderWidth: 1, borderColor: T.border, overflow: 'hidden', marginBottom: 14}}>
-                  {customTypes.map(td => (
+                  {userTypes.map(td => (
                     <View key={td.id} style={{borderBottomWidth: 1, borderBottomColor: T.border}}>
                       <View style={{flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 12, paddingVertical: 10}}>
                         <View style={{width: 10, height: 10, borderRadius: 5, backgroundColor: td.color || DEFAULT_REL_COLOR}} />
@@ -877,15 +890,30 @@ export const SystemMapScreen = ({theme: T, members, onViewMember}: Props) => {
 
               <Text style={{fontSize: fs(10), letterSpacing: 1, textTransform: 'uppercase', color: T.dim, fontWeight: '600', marginBottom: 8}}>{t('systemMap.presetTypes')}</Text>
               <View style={{backgroundColor: T.card, borderRadius: 10, borderWidth: 1, borderColor: T.border, overflow: 'hidden'}}>
-                {PRESET_RELATIONSHIP_TYPES.map(td => (
-                  <View key={td.id} style={{flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 12, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: T.border}}>
-                    <View style={{width: 10, height: 10, borderRadius: 5, backgroundColor: td.color || DEFAULT_REL_COLOR}} />
-                    <View style={{flex: 1}}>
-                      <Text style={{fontSize: fs(13), color: T.text}} numberOfLines={1}>
-                        {td.directional ? `${typeLabel(td)} → ${typeInverseLabel(td)}` : typeLabel(td)}
-                      </Text>
-                      <Text style={{fontSize: fs(10), color: T.muted}}>{t('systemMap.inUse', {count: usageByType[td.id] || 0})}</Text>
+                {presetTypes.map(td => (
+                  <View key={td.id} style={{borderBottomWidth: 1, borderBottomColor: T.border}}>
+                    <View style={{flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 12, paddingVertical: 10}}>
+                      <View style={{width: 10, height: 10, borderRadius: 5, backgroundColor: td.color || DEFAULT_REL_COLOR}} />
+                      <View style={{flex: 1}}>
+                        <Text style={{fontSize: fs(13), color: T.text}} numberOfLines={1}>
+                          {td.directional ? `${typeLabel(td)} → ${typeInverseLabel(td)}` : typeLabel(td)}
+                        </Text>
+                        <Text style={{fontSize: fs(10), color: T.muted}}>{t('systemMap.inUse', {count: usageByType[td.id] || 0})}</Text>
+                      </View>
+                      <TouchableOpacity onPress={() => {setEditTypeId(editTypeId === td.id ? null : td.id); setShowAddType(false);}} activeOpacity={0.7}
+                        accessibilityRole="button" accessibilityState={{expanded: editTypeId === td.id}} accessibilityLabel={t('systemMap.editType')}
+                        style={{borderWidth: 1, borderColor: T.border, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5}}>
+                        <Text style={{fontSize: fs(11), color: T.accent}}>{t('common.edit')}</Text>
+                      </TouchableOpacity>
                     </View>
+                    {editTypeId === td.id && (
+                      <View style={{paddingHorizontal: 12, paddingBottom: 12}}>
+                        <TypeForm T={T} initial={{...td, name: typeLabel(td), inverseName: td.directional ? typeInverseLabel(td) : td.inverseName}} saveLabel={t('common.save')} onSave={async d => {
+                          await updateType(td.id, d);
+                          setEditTypeId(null);
+                        }} />
+                      </View>
+                    )}
                   </View>
                 ))}
               </View>

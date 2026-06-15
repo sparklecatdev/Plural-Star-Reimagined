@@ -130,9 +130,16 @@
     "customFront": "Front Tùy chỉnh",
     "customFronts": "Front Tùy chỉnh",
     "moveDown": "Di chuyển xuống",
+    "moveAbove": "trên {{name}}",
+    "moveBelow": "dưới {{name}}",
     "moveUp": "Di chuyển lên",
     "noCustomFronts": "Chưa có front tùy chỉnh nào.",
     "selectAction": "Chọn",
+    "displayFields": "Trường hiển thị",
+    "fieldGroups": "Nhóm",
+    "fieldDescriptions": "Mô tả",
+    "fieldPronouns": "Đại từ",
+    "fieldRoles": "Vai trò",
     "title": "Thành viên",
     "count": "{{count}} thành viên",
     "count_other": "{{count}} thành viên",
@@ -470,6 +477,7 @@
     "role": "Vai trò / Hình mẫu",
     "rolePlaceholder": "Host, Người bảo vệ, Gatekeeper…",
     "color": "Màu",
+    "hue": "Sắc độ",
     "invalidHex": "Mã màu hex không hợp lệ",
     "transparentColor": "Trong suốt",
     "removeImageMsg": "Gỡ ảnh này?",
@@ -717,6 +725,7 @@
     "pickMember": "Nhắc đến một thành viên"
   },
   "systemManager": {
+    "browse": "Duyệt",
     "deleteSelectedMsg": "Gỡ {{count}} mục đã chọn? Thành viên sẽ không bị xóa.",
     "desc": "Tạo, sửa, sắp xếp lại và xóa nhóm cùng hệ thống con. Nhấn ⇄ trên một mục, rồi nhấn điểm đến, để lồng nó vào.",
     "title": "Trình quản lý Hệ thống"
@@ -771,6 +780,7 @@
   },
   "systemMap": {
     "connections": "Kết nối",
+    "showOnMap": "Hiện trên bản đồ",
     "addMember": "+ Thành viên",
     "emptyMap": "Bản đồ đang trống. Nhấn + Thành viên để thêm thành viên, hoặc + Thêm Mối quan hệ để kết nối họ.",
     "depth": "Số bước kết nối",

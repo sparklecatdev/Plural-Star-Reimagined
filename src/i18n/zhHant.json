@@ -130,9 +130,16 @@
     "customFront": "自訂前台",
     "customFronts": "自訂前台",
     "moveDown": "下移",
+    "moveAbove": "在{{name}}上方",
+    "moveBelow": "在{{name}}下方",
     "moveUp": "上移",
     "noCustomFronts": "尚無自訂前台。",
     "selectAction": "選取",
+    "displayFields": "顯示欄位",
+    "fieldGroups": "群組",
+    "fieldDescriptions": "描述",
+    "fieldPronouns": "代詞",
+    "fieldRoles": "角色",
     "title": "成員",
     "count": "{{count}} 位成員",
     "count_other": "{{count}} 位成員",
@@ -470,6 +477,7 @@
     "role": "角色 / 原型",
     "rolePlaceholder": "宿主、守護者、守門人…",
     "color": "顏色",
+    "hue": "色相",
     "invalidHex": "十六進位顏色無效",
     "transparentColor": "透明",
     "removeImageMsg": "要移除此圖片嗎？",
@@ -717,6 +725,7 @@
     "pickMember": "提及一位成員"
   },
   "systemManager": {
+    "browse": "瀏覽",
     "deleteSelectedMsg": "移除所選的 {{count}} 個項目？成員不會被刪除。",
     "desc": "建立、編輯、重新排列和刪除群組與子系統。點按項目上的 ⇄，再點按目的地，即可巢狀放置。",
     "title": "系統管理員"
@@ -771,6 +780,7 @@
   },
   "systemMap": {
     "connections": "連結",
+    "showOnMap": "在地圖上顯示",
     "addMember": "+ 成員",
     "emptyMap": "地圖是空的。點按「+ 成員」新增成員，或「+ 新增關係」將他們連接起來。",
     "depth": "關係層數",

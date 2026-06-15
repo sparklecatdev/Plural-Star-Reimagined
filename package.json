@@ -1,14 +1,14 @@
 {
   "name": "PluralStar",
-  "version": "1.10.0",
+  "version": "1.10.2",
   "private": true,
   "scripts": {
     "android": "node scripts/run-android.js",
     "ios": "react-native run-ios",
     "ios:fresh": "node scripts/run-ios-fresh.js",
     "start": "react-native start",
-    "build-android-release": "cd android && ./gradlew bundleRelease",
-    "build-android-apk": "cd android && ./gradlew assembleRelease",
+    "build-android-release": "cd android && bash ./gradlew bundleRelease",
+    "build-android-apk": "cd android && bash ./gradlew assembleRelease",
     "postinstall": "patch-package"
   },
   "dependencies": {
@@ -26,6 +26,7 @@
     "react-native": "0.85.3",
     "react-native-blob-util": "^0.24.9",
     "react-native-image-picker": "^8.2.1",
+    "react-native-linear-gradient": "^2.8.3",
     "react-native-localize": "^3.4.1",
     "react-native-safe-area-context": "^5.7.0",
     "react-native-share": "^12.2.6"

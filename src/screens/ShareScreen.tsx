@@ -132,6 +132,7 @@ export const ShareScreen = ({theme: T, system, members, front, history, journal,
     setImportStatus('idle'); setImportMsg('');
     try {
       const [res] = await safePick({type: ['text/plain', 'text/markdown', 'application/json']});
+      if (!res) return;
       const ext = (res.name || '').split('.').pop()?.toLowerCase() || '';
       const titleBase = (res.name || 'Imported Entry').replace(/\.[^.]+$/, '');
       let body = '';
@@ -150,6 +151,7 @@ export const ShareScreen = ({theme: T, system, members, front, history, journal,
     setRestoreError(''); setRestorePreview(false); setRestorePath(null); setRestoreFile(null); setRestoreDone(false); setRestoreIsBundle(false);
     try {
       const [res] = await safePick({type: ['application/json', 'application/zip', 'text/plain']});
+      if (!res) return;
       const pickedPath = getPickedFilePath(res);
       const isZip = /\.zip$/i.test(res.name || '') || /\.zip$/i.test(pickedPath);
       if (isZip) {
@@ -178,7 +180,7 @@ export const ShareScreen = ({theme: T, system, members, front, history, journal,
       try {
         content = await ReactNativeBlobUtil.fs.readFile(pickedPath, 'utf8');
       } catch {
-        content = await ReactNativeBlobUtil.fs.readFile(res.uri || res.fileCopyUri || pickedPath, 'utf8');
+        content = await ReactNativeBlobUtil.fs.readFile(res.uri || pickedPath, 'utf8');
       }
       let parsed: any;
       try { parsed = JSON.parse(content); } catch {
@@ -279,6 +281,7 @@ export const ShareScreen = ({theme: T, system, members, front, history, journal,
             if (restoreSel.journalTemplates && data.journalTemplates) await store.set(KEYS.journalTemplates, data.journalTemplates);
             if (restoreSel.relationships && data.relationships) await store.set(KEYS.relationships, data.relationships);
             if (restoreSel.relationships && data.relationshipTypes) await store.set(KEYS.relationshipTypes, data.relationshipTypes);
+            if (restoreSel.relationships && data.systemMapMembers) await store.set(KEYS.systemMapMembers, data.systemMapMembers);
             if (restoreSel.medical && data.medical) await store.set(KEYS.medical, data.medical);
             setRestoreDone(true); setTimeout(() => onDataImported(), 800);
             return;
@@ -702,6 +705,7 @@ export const ShareScreen = ({theme: T, system, members, front, history, journal,
           if (restoreSel.journalTemplates && data.journalTemplates) await store.set(KEYS.journalTemplates, data.journalTemplates);
           if (restoreSel.relationships && data.relationships) await store.set(KEYS.relationships, data.relationships);
           if (restoreSel.relationships && data.relationshipTypes) await store.set(KEYS.relationshipTypes, data.relationshipTypes);
+            if (restoreSel.relationships && data.systemMapMembers) await store.set(KEYS.systemMapMembers, data.systemMapMembers);
           if (restoreSel.medical && data.medical) await store.set(KEYS.medical, data.medical);
           setRestoreDone(true); setTimeout(() => onDataImported(), 800);
         } catch (e: any) {
@@ -1034,6 +1038,7 @@ export const ShareScreen = ({theme: T, system, members, front, history, journal,
     setRestoreError(''); setExtPreview(null); setImportStatus('idle'); setImportMsg(''); setPsAvatarIndex(null); setPsZipFiles(null);
     try {
       const [res] = await safePick({type: ['application/json', 'application/zip', 'text/plain']});
+      if (!res) return;
       const path = getPickedFilePath(res);
       const isZip = /\.zip$/i.test(res.name || '') || /\.zip$/i.test(path);
       let parsed: any;
@@ -1350,6 +1355,7 @@ export const ShareScreen = ({theme: T, system, members, front, history, journal,
     setRestoreError(''); setExtPreview(null); setImportStatus('idle'); setImportMsg('');
     try {
       const [res] = await safePick({type: ['*/*']});
+      if (!res) return;
       const path = getPickedFilePath(res);
       let b64: string;
       try { b64 = await ReactNativeBlobUtil.fs.readFile(path, 'base64'); }
@@ -1760,6 +1766,7 @@ export const ShareScreen = ({theme: T, system, members, front, history, journal,
   const handleSPFileImport = async () => {
     try {
       const [res] = await safePick({type: ['application/json', 'text/plain']});
+      if (!res) return;
       const content = await ReactNativeBlobUtil.fs.readFile(getPickedFilePath(res), 'utf8');
       const data = JSON.parse(content);
       if (!data.members && !data.frontHistory && !data.users) {
@@ -2136,7 +2143,7 @@ export const ShareScreen = ({theme: T, system, members, front, history, journal,
           </View>
 
           <View style={{flexDirection: 'row', gap: 8, marginBottom: 6}}>
-            {[['↓ JSON', handleJSON, T.accentBg, T.accent, `${T.accent}40`], ['↓ HTML', handleHTML, T.infoBg, T.info, `${T.info}40`]].map(([label, fn, bg, color, border]: any) => (
+            {[['↓ ZIP', handleJSON, T.accentBg, T.accent, `${T.accent}40`], ['↓ HTML', handleHTML, T.infoBg, T.info, `${T.info}40`]].map(([label, fn, bg, color, border]: any) => (
               <TouchableOpacity key={label} onPress={fn} activeOpacity={0.7} accessibilityRole="button" accessibilityLabel={label} style={{flex: 1, alignItems: 'center', paddingVertical: 10, borderRadius: 8, borderWidth: 1, backgroundColor: bg, borderColor: border}}>
                 <Text style={{fontSize: fs(14), fontWeight: '500', color}}>{label}</Text>
               </TouchableOpacity>

@@ -130,9 +130,16 @@
     "customFront": "Özel Front",
     "customFronts": "Özel Frontlar",
     "moveDown": "Aşağı taşı",
+    "moveAbove": "{{name}} üstüne",
+    "moveBelow": "{{name}} altına",
     "moveUp": "Yukarı taşı",
     "noCustomFronts": "Henüz özel front yok.",
     "selectAction": "Seç",
+    "displayFields": "Görüntülenen Alanlar",
+    "fieldGroups": "Gruplar",
+    "fieldDescriptions": "Açıklamalar",
+    "fieldPronouns": "Zamirler",
+    "fieldRoles": "Roller",
     "title": "Üyeler",
     "count": "{{count}} üye",
     "count_other": "{{count}} üye",
@@ -470,6 +477,7 @@
     "role": "Rol / Arketip",
     "rolePlaceholder": "Host, Koruyucu, Gatekeeper…",
     "color": "Renk",
+    "hue": "Ton",
     "invalidHex": "Geçersiz hex rengi",
     "transparentColor": "Şeffaf",
     "removeImageMsg": "Bu görsel kaldırılsın mı?",
@@ -717,6 +725,7 @@
     "pickMember": "Bir üyeden bahset"
   },
   "systemManager": {
+    "browse": "Göz at",
     "deleteSelectedMsg": "Seçilen {{count}} öğe kaldırılsın mı? Üyeler silinmeyecek.",
     "desc": "Grupları ve alt sistemleri oluşturun, düzenleyin, yeniden sıralayın ve silin. İç içe yerleştirmek için bir öğede ⇄ simgesine, sonra bir hedefe dokunun.",
     "title": "Sistem Yöneticisi"
@@ -771,6 +780,7 @@
   },
   "systemMap": {
     "connections": "Bağlantılar",
+    "showOnMap": "Haritada Göster",
     "addMember": "+ Üye",
     "emptyMap": "Harita boş. Üye eklemek için + Üye'ye, bağlamak için + İlişki Ekle'ye dokunun.",
     "depth": "Bağlantı uzaklığı",

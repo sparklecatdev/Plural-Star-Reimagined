@@ -31,6 +31,7 @@
     "pickMember": "Ein Mitglied erwähnen"
   },
   "systemManager": {
+    "browse": "Durchsuchen",
     "deleteSelectedMsg": "{{count}} ausgewählte(s) Element(e) entfernen? Mitglieder werden nicht gelöscht.",
     "desc": "Erstelle, bearbeite, ordne und lösche Gruppen und Subsysteme. Tippe auf ⇄ bei einem Element und dann auf ein Ziel, um es zu verschachteln.",
     "title": "Systemverwaltung"
@@ -165,9 +166,16 @@
     "customFront": "Benutzerdefinierte Front",
     "customFronts": "Benutzerdefinierte Fronten",
     "moveDown": "Nach unten",
+    "moveAbove": "über {{name}}",
+    "moveBelow": "unter {{name}}",
     "moveUp": "Nach oben",
     "noCustomFronts": "Noch keine benutzerdefinierten Fronten.",
     "selectAction": "Auswählen",
+    "displayFields": "Felder anzeigen",
+    "fieldGroups": "Gruppen",
+    "fieldDescriptions": "Beschreibungen",
+    "fieldPronouns": "Pronomen",
+    "fieldRoles": "Rollen",
     "title": "Mitglieder",
     "add": "+ Hinzufügen",
     "search": "Suchen...",
@@ -457,6 +465,7 @@
     "role": "Rolle / Archetyp",
     "rolePlaceholder": "Host, Beschützer, Torwächter…",
     "color": "Farbe",
+    "hue": "Farbton",
     "invalidHex": "Ungültige Hex-Farbe",
     "transparentColor": "Transparent",
     "removeImageMsg": "Dieses Bild entfernen?",
@@ -771,6 +780,7 @@
   },
   "systemMap": {
     "connections": "Verbindungen",
+    "showOnMap": "Auf Karte zeigen",
     "addMember": "+ Mitglied",
     "emptyMap": "Die Karte ist leer. Tippe auf + Mitglied, um Mitglieder hinzuzufügen, oder + Beziehung hinzufügen, um sie zu verbinden.",
     "depth": "Verbindungen entfernt",

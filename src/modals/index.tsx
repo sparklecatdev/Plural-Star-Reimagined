@@ -4,9 +4,11 @@ import {Text, TextInput} from '../components/AppText';
 import {useTranslation} from 'react-i18next';
 import {pickImageFromGallery} from '../utils/imagePicker';
 import {Sheet} from '../components/Sheet';
-import {PALETTE, FONT_OPTIONS, Fonts} from '../theme';
-import type {FontChoice} from '../theme';
-import {Member, MemberGroup, JournalEntry, JournalTemplate, FrontState, FrontTier, FrontTierKey, SystemInfo, AppSettings, TextScale, TEXT_SCALE_OPTIONS, CustomFieldDef, CustomFieldValue, NoteboardEntry, uid, isValidHex, normalizeHex, DEFAULT_MOODS, EMPTY_TIER, TIER_LABELS, fmtTime, getInitials, translateMood, parseMoodList, toggleMoodInList, serializeMoodList, sortMembersBySearch} from '../utils';
+import {Avatar} from '../components/Avatar';
+import {ColorPicker} from '../components/ColorPicker';
+import {PALETTE, BUILTIN_PALETTES, deriveTheme, FONT_OPTIONS, Fonts} from '../theme';
+import type {CustomPalette, FontChoice} from '../theme';
+import {Member, MemberGroup, JournalEntry, JournalTemplate, FrontState, FrontTier, FrontTierKey, SystemInfo, AppSettings, TextScale, TEXT_SCALE_OPTIONS, CustomFieldDef, CustomFieldValue, NoteboardEntry, uid, isValidHex, normalizeHex, DEFAULT_MOODS, EMPTY_TIER, TIER_LABELS, fmtTime, getInitials, translateMood, parseMoodList, toggleMoodInList, serializeMoodList, sortMembersBySearch, Relationship, RelationshipTypeDef, allRelationshipTypes, DEFAULT_REL_COLOR} from '../utils';
 import type {ThemeMode} from '../utils';
 import {store, KEYS} from '../storage';
 import {SUPPORTED_LANGUAGES} from '../i18n/i18n';
@@ -182,7 +184,7 @@ export const SetFrontModal = ({visible, theme: T, members, groups, current, sett
     if (visible) {
       const c: FrontState | null = current;
       setPrimaryIds(new Set(c?.primary?.memberIds || [])); setCoFrontIds(new Set(c?.coFront?.memberIds || [])); setCoConsciousIds(new Set(c?.coConscious?.memberIds || []));
-      setPrimaryMood(c?.primary?.mood || ''); setPrimaryCustomMood(''); setPrimaryShowCustom(false); setPrimaryLocation(c?.primary?.location || lastKnownLocation || ''); setPrimaryNote(c?.primary?.note || '');
+      setPrimaryMood(c?.primary?.mood || ''); setPrimaryCustomMood(''); setPrimaryShowCustom(false); setPrimaryLocation(c?.primary?.location || (settings?.gpsEnabled ? lastKnownLocation : '') || ''); setPrimaryNote(c?.primary?.note || '');
       setCoFrontMood(c?.coFront?.mood || ''); setCoFrontCustomMood(''); setCoFrontShowCustom(false); setCoFrontNote(c?.coFront?.note || '');
       setCoConsciousMood(c?.coConscious?.mood || ''); setCoConsciousCustomMood(''); setCoConsciousShowCustom(false); setCoConsciousNote(c?.coConscious?.note || '');
       setPrimaryEnergy(c?.primary?.energyLevel); setCoFrontEnergy(c?.coFront?.energyLevel); setCoConsciousEnergy(c?.coConscious?.energyLevel);
@@ -329,7 +331,7 @@ export const SetStatusModal = ({visible, theme: T, statuses, selfId, current, se
       const c: FrontState | null = current;
       setStatusIds(new Set((c?.primary?.memberIds || []).filter((id: string) => id !== selfId)));
       setMood(c?.primary?.mood || ''); setCustomMood(''); setShowCustom(false);
-      setLocation(c?.primary?.location || lastKnownLocation || ''); setNote(c?.primary?.note || '');
+      setLocation(c?.primary?.location || (settings?.gpsEnabled ? lastKnownLocation : '') || ''); setNote(c?.primary?.note || '');
       setEnergy(c?.primary?.energyLevel);
     }
   }, [visible, current, selfId, lastKnownLocation]);
@@ -404,9 +406,9 @@ export const EditFrontDetailModal = ({visible, theme: T, front, tier, settings, 
   const isPrimary = tier === 'primary';
   const tierLabel = statusMode ? t('tabs.status') : t(`tier.${tier === 'primary' ? 'primaryFront' : tier === 'coFront' ? 'coFront' : 'coConscious'}`);
   const [mood, setMood] = useState(tierData.mood || ''); const [customMood, setCustomMood] = useState(''); const [showCustomMood, setShowCustomMood] = useState(false);
-  const [location, setLocation] = useState(tierData.location || lastKnownLocation || ''); const [note, setNote] = useState(tierData.note || '');
+  const [location, setLocation] = useState(tierData.location || (settings?.gpsEnabled ? lastKnownLocation : '') || ''); const [note, setNote] = useState(tierData.note || '');
   const allMoods = [...DEFAULT_MOODS, ...(settings?.customMoods || [])]; const allLocations = settings?.locations || [];
-  React.useEffect(() => { if (visible) { const td = front?.[tier] || EMPTY_TIER; setMood(td.mood || ''); setLocation(td.location || lastKnownLocation || ''); setNote(td.note || ''); setShowCustomMood(false); setCustomMood(''); } }, [visible, front, tier, lastKnownLocation]);
+  React.useEffect(() => { if (visible) { const td = front?.[tier] || EMPTY_TIER; setMood(td.mood || ''); setLocation(td.location || (settings?.gpsEnabled ? lastKnownLocation : '') || ''); setNote(td.note || ''); setShowCustomMood(false); setCustomMood(''); } }, [visible, front, tier, lastKnownLocation]);
 
   return (
     <Sheet visible={visible} title={t('tier.editTier', {tier: tierLabel})} theme={T} onClose={onClose}
@@ -436,20 +438,24 @@ export const EditFrontDetailModal = ({visible, theme: T, front, tier, settings, 
 };
 
 
-export const MemberModal = ({visible, theme: T, member, members, groups, settings, onSave, onDelete, onClose, readOnly = false, onMentionPress, isFronting = false, onRequestEdit, profileMode = false}: any) => {
+export const MemberModal = ({visible, theme: T, member, members, groups, settings, onSave, onDelete, onClose, readOnly = false, onMentionPress, isFronting = false, onRequestEdit, profileMode = false, onShowOnMap}: any) => {
   const {t} = useTranslation();
   const fs = (s: number) => Math.round(s * (T.textScale || 1));
   const isNew = !member;
   const [f, setF] = useState<Member>(member || {id: uid(), name: '', pronouns: '', role: '', color: PALETTE[0], description: '', tags: [], groupIds: []});
-  const [hexInput, setHexInput] = useState(member?.color || PALETTE[0]); const [hexError, setHexError] = useState(false); const [confirmDel, setConfirmDel] = useState(false);
+  const [confirmDel, setConfirmDel] = useState(false);
   const [tagInput, setTagInput] = useState('');
   const [showDescEditor, setShowDescEditor] = useState(false);
   const [showLink, setShowLink] = useState(false);
   const [linkInput, setLinkInput] = useState('');
   const [linking, setLinking] = useState(false);
+  const [hexInput, setHexInput] = useState(member?.color || PALETTE[0]);
+  const [hexError, setHexError] = useState(false);
 
-  type MemberTab = 'main' | 'fields' | 'noteboard';
+  type MemberTab = 'main' | 'fields' | 'connections' | 'noteboard';
   const [memberTab, setMemberTab] = useState<MemberTab>('main');
+  const [relList, setRelList] = useState<Relationship[]>([]);
+  const [relTypes, setRelTypes] = useState<RelationshipTypeDef[]>([]);
 
   const [fieldDefs, setFieldDefs] = useState<CustomFieldDef[]>([]);
   const [allNotes, setAllNotes] = useState<NoteboardEntry[]>([]);
@@ -463,12 +469,11 @@ export const MemberModal = ({visible, theme: T, member, members, groups, setting
     store.get<NoteboardEntry[]>(KEYS.noteboards, []).then(n => setAllNotes(n || []));
   }, []);
 
-  React.useEffect(() => { if (visible) { const fresh = member || {id: uid(), name: '', pronouns: '', role: '', color: PALETTE[0], description: '', tags: [], groupIds: []}; setF({...fresh, tags: fresh.tags || [], groupIds: fresh.groupIds || []}); setHexInput(fresh.color); setHexError(false); setConfirmDel(false); setTagInput(''); setShowDescEditor(false); setShowLink(false); setLinkInput(''); setLinking(false); setMemberTab('main'); setNoteText(''); setNoteAuthorId((members || []).find((m: Member) => !m.archived)?.id || ''); store.get<NoteboardEntry[]>(KEYS.noteboards, []).then(n => setAllNotes(n || [])); } }, [visible, member?.id]);
+  React.useEffect(() => { if (visible) { const fresh = member || {id: uid(), name: '', pronouns: '', role: '', color: PALETTE[0], description: '', tags: [], groupIds: []}; setF({...fresh, tags: fresh.tags || [], groupIds: fresh.groupIds || []}); setHexInput(fresh.color || PALETTE[0]); setHexError(false); setConfirmDel(false); setTagInput(''); setShowDescEditor(false); setShowLink(false); setLinkInput(''); setLinking(false); setMemberTab('main'); setNoteText(''); setNoteAuthorId((members || []).find((m: Member) => !m.archived)?.id || ''); store.get<NoteboardEntry[]>(KEYS.noteboards, []).then(n => setAllNotes(n || [])); } }, [visible, member?.id]);
   const set = (k: keyof Member, v: any) => setF(x => ({...x, [k]: v}));
-  const handleHexChange = (val: string) => { setHexInput(val); const n = normalizeHex(val); if (isValidHex(n)) {set('color', n); setHexError(false);} else setHexError(val.length > 1); };
-
   const addTag = () => { const raw = tagInput.trim().replace(/^#/, '').toLowerCase(); if (!raw) return; const cur = f.tags || []; if (!cur.includes(`#${raw}`)) set('tags', [...cur, `#${raw}`]); setTagInput(''); };
   const togGroup = (gid: string) => { const cur = f.groupIds || []; set('groupIds', cur.includes(gid) ? cur.filter(id => id !== gid) : [...cur, gid]); };
+  const handleHexChange = (val: string) => { setHexInput(val); const n = normalizeHex(val); if (isValidHex(n)) {set('color', n); setHexError(false);} else setHexError(val.length > 1); };
 
   const pickAvatar = async () => {
     try {
@@ -542,6 +547,13 @@ export const MemberModal = ({visible, theme: T, member, members, groups, setting
     }
   }, [visible, memberTab, f.id, isNew]);
 
+  React.useEffect(() => {
+    if (visible && memberTab === 'connections' && !isNew) {
+      store.get<Relationship[]>(KEYS.relationships, []).then(r => setRelList(r || []));
+      store.get<RelationshipTypeDef[]>(KEYS.relationshipTypes, []).then(tt => setRelTypes(tt || []));
+    }
+  }, [visible, memberTab, isNew]);
+
   const togglePin = (id: string) => saveNotes(allNotes.map(n => n.id === id ? {...n, pinned: !n.pinned} : n));
 
   const setFieldVal = (fieldId: string, newVal: string | number | boolean | null) => {
@@ -564,6 +576,12 @@ export const MemberModal = ({visible, theme: T, member, members, groups, setting
 
   const activeMembers = sortMembersBySearch<Member>((members || []).filter((m: Member) => !m.archived && !m.isCustomFront), '');
 
+  const relTypeMap = new Map(allRelationshipTypes(relTypes).map((td: RelationshipTypeDef) => [td.id, td] as [string, RelationshipTypeDef]));
+  const relTypeName = (td: RelationshipTypeDef) => (td.preset && !td.overridden) ? t(`relType.${td.id}`) : td.name;
+  const relTypeInverse = (td: RelationshipTypeDef) => !td.directional ? relTypeName(td) : ((td.preset && !td.overridden) ? t(`relType.${td.id}Inverse`) : (td.inverseName || td.name));
+  const connRole = (r: Relationship) => { const td = relTypeMap.get(r.typeId); if (!td) return '?'; return r.fromId === f.id ? relTypeInverse(td) : relTypeName(td); };
+  const myConnections = relList.filter((r: Relationship) => r.fromId === f.id || r.toId === f.id);
+
   return (
     <Sheet visible={visible} title={readOnly ? (f.name || t('modal.member')) : (isNew ? t('modal.addMember') : t('modal.editMember'))} theme={T} onClose={onClose}
       headerAction={readOnly && onRequestEdit ? (
@@ -581,17 +599,18 @@ export const MemberModal = ({visible, theme: T, member, members, groups, setting
       {!confirmDel && <Btn instant T={T} onPress={() => {if (f.name.trim()) {onSave(f); onClose();}}}>{t('common.save')}</Btn>}</>)}>
 
       {!isNew && !profileMode && (
-        <View style={{flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: T.border, marginBottom: 14}}>
-          {(['main', 'fields', 'noteboard'] as MemberTab[]).map(tab => (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{marginBottom: 14}}
+          contentContainerStyle={{borderBottomWidth: 1, borderBottomColor: T.border}}>
+          {(['main', 'fields', 'connections', 'noteboard'] as MemberTab[]).map(tab => (
             <TouchableOpacity key={tab} onPress={() => setMemberTab(tab)} activeOpacity={0.7}
               accessibilityRole="tab" accessibilityState={{selected: memberTab === tab}}
               style={{paddingVertical: 10, paddingHorizontal: 14, borderBottomWidth: 2, borderBottomColor: memberTab === tab ? T.accent : 'transparent'}}>
-              <Text style={{fontSize: fs(12), color: memberTab === tab ? T.accent : T.dim, fontWeight: memberTab === tab ? '600' : '400'}}>
-                {tab === 'main' ? (readOnly ? t('modal.profile') : t('modal.editMember')) : tab === 'fields' ? t('customFields.title') : t('noteboard.title')}
+              <Text numberOfLines={1} maxFontSizeMultiplier={1.3} style={{fontSize: fs(12), color: memberTab === tab ? T.accent : T.dim, fontWeight: memberTab === tab ? '600' : '400'}}>
+                {tab === 'main' ? (readOnly ? t('modal.profile') : t('modal.editMember')) : tab === 'fields' ? t('customFields.title') : tab === 'connections' ? t('systemMap.connections') : t('noteboard.title')}
               </Text>
             </TouchableOpacity>
           ))}
-        </View>
+        </ScrollView>
       )}
 
       {(memberTab === 'main' || isNew) && (<>
@@ -653,22 +672,30 @@ export const MemberModal = ({visible, theme: T, member, members, groups, setting
         {!profileMode && <Field label={t('modal.role')} value={f.role} onChange={(v: string) => set('role', v)} placeholder={t('modal.rolePlaceholder')} readOnly={readOnly} T={T} />}
 
         <Text style={{fontSize: fs(10), letterSpacing: 1, textTransform: 'uppercase', color: T.dim, marginBottom: 8, fontWeight: '600'}}>{profileMode ? t('profile.favoriteColor') : t('modal.color')}</Text>
-        <View style={{flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10}}>
-          <View style={{width: 36, height: 36, borderRadius: 18, backgroundColor: f.color, borderWidth: 2, borderColor: 'rgba(255,255,255,0.15)'}} />
-          <TextInput value={hexInput} onChangeText={handleHexChange} placeholder="#C9A96E" placeholderTextColor={T.muted} maxLength={7} autoCapitalize="characters"
-            editable={!readOnly}
-            style={{flex: 1, backgroundColor: T.surface, color: T.text, borderWidth: 1, borderColor: hexError ? T.danger : T.border, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 9, fontSize: fs(14), fontFamily: 'monospace'}} />
-        </View>
-        {hexError && !readOnly && <Text style={{fontSize: fs(11), color: T.danger, marginBottom: 8}}>{t('modal.invalidHex')}</Text>}
-        {!readOnly && <View style={{flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 14}}>
-          <TouchableOpacity onPress={() => set('avatarTransparent', !f.avatarTransparent)} activeOpacity={0.8}
-            accessibilityRole="switch" accessibilityState={{checked: !!f.avatarTransparent}} accessibilityLabel={t('modal.transparentColor')}
-            style={{width: 30, height: 30, borderRadius: 15, backgroundColor: 'transparent', borderWidth: 2, borderColor: f.avatarTransparent ? T.text : T.border, alignItems: 'center', justifyContent: 'center'}}>
-            <Text style={{fontSize: 15, color: f.avatarTransparent ? T.text : T.dim}} allowFontScaling={false} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">⊘</Text>
-          </TouchableOpacity>
-          {PALETTE.map((c: string) => (<TouchableOpacity key={c} onPress={() => {set('color', c); setHexInput(c); setHexError(false);}} activeOpacity={0.8} accessibilityRole="button" accessibilityState={{selected: f.color === c}} accessibilityLabel={`${t('memberProfile.color')} ${c}`} style={{width: 30, height: 30, borderRadius: 15, backgroundColor: c, borderWidth: 2, borderColor: f.color === c ? T.text : 'transparent'}} />))}
-        </View>}
-        {readOnly && <View style={{marginBottom: 14}} />}
+        {!readOnly ? (
+          <View style={{marginBottom: 14}}>
+            <View style={{flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10}}>
+              <View style={{width: 36, height: 36, borderRadius: 18, backgroundColor: f.color, borderWidth: 2, borderColor: 'rgba(255,255,255,0.15)'}} />
+              <TextInput value={hexInput} onChangeText={handleHexChange} placeholder="#C9A96E" placeholderTextColor={T.muted} maxLength={7} autoCapitalize="characters"
+                style={{flex: 1, backgroundColor: T.surface, color: T.text, borderWidth: 1, borderColor: hexError ? T.danger : T.border, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 9, fontSize: fs(14), fontFamily: 'monospace'}} />
+            </View>
+            {hexError && <Text style={{fontSize: fs(11), color: T.danger, marginBottom: 8}}>{t('modal.invalidHex')}</Text>}
+            <ColorPicker value={f.color} onChange={(v: string) => { set('color', v); setHexInput(v); setHexError(false); }} T={T} />
+            <View style={{flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12}}>
+              <TouchableOpacity onPress={() => set('avatarTransparent', !f.avatarTransparent)} activeOpacity={0.8}
+                accessibilityRole="switch" accessibilityState={{checked: !!f.avatarTransparent}} accessibilityLabel={t('modal.transparentColor')}
+                style={{width: 30, height: 30, borderRadius: 15, backgroundColor: 'transparent', borderWidth: 2, borderColor: f.avatarTransparent ? T.text : T.border, alignItems: 'center', justifyContent: 'center'}}>
+                <Text style={{fontSize: 15, color: f.avatarTransparent ? T.text : T.dim}} allowFontScaling={false} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">⊘</Text>
+              </TouchableOpacity>
+              {PALETTE.map((c: string) => (<TouchableOpacity key={c} onPress={() => {set('color', c); setHexInput(c); setHexError(false);}} activeOpacity={0.8} accessibilityRole="button" accessibilityState={{selected: f.color === c}} accessibilityLabel={`${t('memberProfile.color')} ${c}`} style={{width: 30, height: 30, borderRadius: 15, backgroundColor: c, borderWidth: 2, borderColor: f.color === c ? T.text : 'transparent'}} />))}
+            </View>
+          </View>
+        ) : (
+          <View style={{flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 14}}>
+            <View style={{width: 36, height: 36, borderRadius: 18, backgroundColor: f.color, borderWidth: 2, borderColor: 'rgba(255,255,255,0.15)'}} />
+            <Text style={{fontSize: fs(13), color: T.dim, fontFamily: 'monospace'}}>{f.color}</Text>
+          </View>
+        )}
 
         {(groups || []).length > 0 && (() => {
           const visibleGroups = readOnly
@@ -851,12 +878,14 @@ export const MemberModal = ({visible, theme: T, member, members, groups, setting
                 ) : fd.type === 'color' ? (
                   <View>
                     <Text style={{fontSize: fs(10), letterSpacing: 1, textTransform: 'uppercase', color: T.dim, marginBottom: 6, fontWeight: '600'}}>{fd.name}</Text>
-                    <View style={{flexDirection: 'row', alignItems: 'center', gap: 10}}>
-                      <View style={{width: 32, height: 32, borderRadius: 8, backgroundColor: String(val || '#333'), borderWidth: 1, borderColor: T.border}} />
-                      <TextInput value={String(val || '')} onChangeText={v => setFieldVal(fd.id, v)} placeholder="#000000" placeholderTextColor={T.muted}
-                        editable={!readOnly}
-                        style={{flex: 1, backgroundColor: T.surface, color: T.text, borderWidth: 1, borderColor: T.border, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, fontSize: fs(13), fontFamily: 'monospace'}} />
-                    </View>
+                    {readOnly ? (
+                      <View style={{flexDirection: 'row', alignItems: 'center', gap: 10}}>
+                        <View style={{width: 32, height: 32, borderRadius: 8, backgroundColor: String(val || '#333'), borderWidth: 1, borderColor: T.border}} />
+                        <Text style={{fontSize: fs(13), color: T.dim, fontFamily: 'monospace'}}>{String(val || '')}</Text>
+                      </View>
+                    ) : (
+                      <ColorPicker value={String(val || '#333333')} onChange={v => setFieldVal(fd.id, v)} T={T} />
+                    )}
                   </View>
                 ) : fd.type === 'image' ? (
                   <View>
@@ -948,6 +977,40 @@ export const MemberModal = ({visible, theme: T, member, members, groups, setting
             </View>
           );
           })()}
+        </View>
+      )}
+
+      {memberTab === 'connections' && !isNew && (
+        <View>
+          {onShowOnMap && (
+            <TouchableOpacity onPress={() => onShowOnMap(f.id)} activeOpacity={0.7} accessibilityRole="button" accessibilityLabel={t('systemMap.showOnMap')}
+              style={{alignSelf: 'flex-start', borderWidth: 1, borderColor: `${T.accent}40`, backgroundColor: T.accentBg, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, marginBottom: 14}}>
+              <Text style={{fontSize: fs(13), fontWeight: '600', color: T.accent}}>{t('systemMap.showOnMap')}</Text>
+            </TouchableOpacity>
+          )}
+          {myConnections.length === 0 ? (
+            <Text style={{fontSize: fs(12), color: T.dim, paddingVertical: 8}}>{t('systemMap.noneForMember')}</Text>
+          ) : myConnections.map((r: Relationship) => {
+            const otherId = r.fromId === f.id ? r.toId : r.fromId;
+            const other = (members || []).find((m: Member) => m.id === otherId);
+            if (!other) return null;
+            const td = relTypeMap.get(r.typeId);
+            const c = td?.color || DEFAULT_REL_COLOR;
+            return (
+              <TouchableOpacity key={r.id} onPress={() => onMentionPress && onMentionPress(otherId)} activeOpacity={0.7}
+                accessibilityRole="button" accessibilityLabel={`${connRole(r)}: ${other.name}`}
+                style={{flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: T.border}}>
+                <Avatar member={other} size={32} T={T} />
+                <View style={{flex: 1}}>
+                  <Text style={{fontSize: fs(14), color: T.text}} numberOfLines={1}>{other.name}</Text>
+                  {r.note ? <Text style={{fontSize: fs(11), color: T.muted}} numberOfLines={1}>{r.note}</Text> : null}
+                </View>
+                <View style={{backgroundColor: `${c}20`, borderWidth: 1, borderColor: `${c}60`, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3}}>
+                  <Text style={{fontSize: fs(10), color: c}}>{connRole(r)}</Text>
+                </View>
+              </TouchableOpacity>
+            );
+          })}
         </View>
       )}
 
@@ -1683,11 +1746,8 @@ export const CustomFrontModal = ({visible, theme: T, customFront, onSave, onDele
       <RichTextEditor visible={showDescEditor} title={t('modal.descriptionBio')} initialContent={f.description || ''} theme={T}
         onSave={(html: string) => {set('description', html); setShowDescEditor(false);}} onClose={() => setShowDescEditor(false)} />
       <Text style={{fontSize: fs(10), letterSpacing: 1, textTransform: 'uppercase', color: T.dim, marginBottom: 8, fontWeight: '600'}}>{t('modal.color')}</Text>
-      <View style={{flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10}}>
-        <View style={{width: 36, height: 36, borderRadius: 9, backgroundColor: f.color, borderWidth: 2, borderColor: 'rgba(255,255,255,0.15)'}} />
-        <TextInput value={hexInput} onChangeText={handleHexChange} placeholder="#C9A96E" placeholderTextColor={T.muted} maxLength={7} autoCapitalize="characters"
-          style={{flex: 1, backgroundColor: T.surface, color: T.text, borderWidth: 1, borderColor: hexError ? T.danger : T.border, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 9, fontSize: fs(14), fontFamily: 'monospace'}} />
-      </View>
+      <ColorPicker value={f.color} onChange={(v: string) => set('color', v)} T={T} />
+      <View style={{height: 12}} />
       {hexError && <Text style={{fontSize: fs(11), color: T.danger, marginBottom: 8}}>{t('modal.invalidHex')}</Text>}
       <View style={{flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 8}}>
         <TouchableOpacity onPress={() => set('avatarTransparent', !f.avatarTransparent)} activeOpacity={0.8}

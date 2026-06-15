@@ -31,6 +31,7 @@
     "pickMember": "Mencionar a un miembro"
   },
   "systemManager": {
+    "browse": "Explorar",
     "deleteSelectedMsg": "¿Eliminar {{count}} elemento(s) seleccionado(s)? Los miembros no se eliminarán.",
     "desc": "Crea, edita, reorganiza y elimina grupos y subsistemas. Toca ⇄ en un elemento y luego un destino para anidarlo.",
     "title": "Gestor del sistema"
@@ -165,9 +166,16 @@
     "customFront": "Frente personalizado",
     "customFronts": "Frentes personalizados",
     "moveDown": "Mover abajo",
+    "moveAbove": "encima de {{name}}",
+    "moveBelow": "debajo de {{name}}",
     "moveUp": "Mover arriba",
     "noCustomFronts": "Aún no hay frentes personalizados.",
     "selectAction": "Seleccionar",
+    "displayFields": "Mostrar campos",
+    "fieldGroups": "Grupos",
+    "fieldDescriptions": "Descripciones",
+    "fieldPronouns": "Pronombres",
+    "fieldRoles": "Roles",
     "title": "Miembros",
     "add": "+ Añadir",
     "search": "Buscar...",
@@ -492,6 +500,7 @@
     "role": "Rol / Arquetipo",
     "rolePlaceholder": "Host, Protector, Guardián…",
     "color": "Color",
+    "hue": "Tono",
     "invalidHex": "Color hex inválido",
     "transparentColor": "Transparente",
     "removeImageMsg": "¿Quitar esta imagen?",
@@ -771,6 +780,7 @@
   },
   "systemMap": {
     "connections": "Conexiones",
+    "showOnMap": "Mostrar en el mapa",
     "addMember": "+ Miembro",
     "emptyMap": "El mapa está vacío. Toca + Miembro para añadir miembros, o + Añadir relación para conectarlos.",
     "depth": "Conexiones de distancia",

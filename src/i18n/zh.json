@@ -31,6 +31,7 @@
     "pickMember": "提及成员"
   },
   "systemManager": {
+    "browse": "浏览",
     "deleteSelectedMsg": "移除所选的 {{count}} 个项目？成员不会被删除。",
     "desc": "创建、编辑、重新排列和删除组与子系统。点按项目上的 ⇄，然后选择目标位置以嵌套。",
     "title": "系统管理器"
@@ -165,9 +166,16 @@
     "customFront": "自定义前台",
     "customFronts": "自定义前台",
     "moveDown": "下移",
+    "moveAbove": "在{{name}}上方",
+    "moveBelow": "在{{name}}下方",
     "moveUp": "上移",
     "noCustomFronts": "暂无自定义前台。",
     "selectAction": "选择",
+    "displayFields": "显示字段",
+    "fieldGroups": "群组",
+    "fieldDescriptions": "描述",
+    "fieldPronouns": "代词",
+    "fieldRoles": "角色",
     "title": "成员",
     "add": "+ 添加",
     "search": "搜索…",
@@ -492,6 +500,7 @@
     "role": "角色/原型",
     "rolePlaceholder": "主持者、保护者、守门人…",
     "color": "颜色",
+    "hue": "色相",
     "invalidHex": "无效的十六进制颜色",
     "transparentColor": "透明",
     "removeImageMsg": "要移除此图片吗？",
@@ -771,6 +780,7 @@
   },
   "systemMap": {
     "connections": "连接",
+    "showOnMap": "在地图上显示",
     "addMember": "+ 成员",
     "emptyMap": "地图是空的。点按「+ 成员」添加成员，或「+ 添加关系」将他们连接起来。",
     "depth": "关系层数",

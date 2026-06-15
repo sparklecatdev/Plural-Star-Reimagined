@@ -381,10 +381,10 @@ export const HistoryScreen = ({theme: T, history, journal, getMember, members, s
                 backgroundColor: subTab === tab ? T.surface : 'transparent',
                 borderColor: 'transparent',
               }]}>
-              <AccentText T={T} style={{
-                fontSize: fs(12),
+                fontSize: fs(13),
                 fontWeight: subTab === tab ? '700' : '500',
                 color: subTab === tab ? T.accent : T.dim,
+                textAlign: 'center',
               }}>
                 {tab === 'front'
                   ? (singlet ? t('history.statusHistory') : t('history.frontHistory'))

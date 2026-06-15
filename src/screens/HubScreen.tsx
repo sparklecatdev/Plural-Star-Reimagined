@@ -26,6 +26,8 @@ interface Props {
   renderArchiveScreen: () => React.ReactNode;
   renderPollsScreen: () => React.ReactNode;
   renderSystemMapScreen: () => React.ReactNode;
+  systemMapRelCount?: number;
+  mapFocus?: {id: string; n: number} | null;
   renderMedicalScreen: () => React.ReactNode;
   resetKey?: number;
   editHistoryIndex?: number | null;
@@ -370,7 +372,7 @@ const RetroHistoryScreen = ({T, members, history, front, onSaveHistory, onSetFro
 const DISCORD_URL = 'https://discord.gg/FFQw33cu8m';
 const BMC_URL = 'https://www.buymeacoffee.com/PluralStar';
 
-export const HubScreen = ({theme: T, singlet = false, selfId, members, history, front, onSaveHistory, onSetFront, renderShareScreen, renderStatsScreen, renderChatScreen, renderCustomFieldsScreen, renderSystemManagerScreen, renderArchiveScreen, renderPollsScreen, renderSystemMapScreen, renderMedicalScreen, resetKey, editHistoryIndex, onClearEditHistory}: Props) => {
+export const HubScreen = ({theme: T, singlet = false, selfId, members, history, front, onSaveHistory, onSetFront, renderShareScreen, renderStatsScreen, renderChatScreen, renderCustomFieldsScreen, renderSystemManagerScreen, renderArchiveScreen, renderPollsScreen, renderSystemMapScreen, systemMapRelCount = 0, mapFocus, renderMedicalScreen, resetKey, editHistoryIndex, onClearEditHistory}: Props) => {
   const {t} = useTranslation();
   const fs = (s: number) => Math.round(s * (T.textScale || 1));
   const [activeTile, setActiveTile] = useState<HubTile | null>(null);
@@ -382,6 +384,10 @@ export const HubScreen = ({theme: T, singlet = false, selfId, members, history, 
       setActiveTile('retroHistory');
     }
   }, [editHistoryIndex]);
+
+  useEffect(() => {
+    if (mapFocus) setActiveTile('systemMap');
+  }, [mapFocus]);
 
   const handleRetroBack = () => {
     setActiveTile(null);
@@ -511,6 +517,7 @@ export const HubScreen = ({theme: T, singlet = false, selfId, members, history, 
             <Text style={{fontSize: fs(18), color: T.dim}}>←</Text>
           </TouchableOpacity>
           <Text accessibilityRole="header" style={{fontFamily: Fonts.display, fontSize: fs(22), fontWeight: '600', fontStyle: 'italic', color: T.text, flex: 1, marginRight: 8}} numberOfLines={1} maxFontSizeMultiplier={1.2}>{t('systemMap.title')}</Text>
+          <Text style={{fontSize: fs(11), color: T.dim}} numberOfLines={1} maxFontSizeMultiplier={1.2}>{systemMapRelCount === 1 ? t('systemMap.relationshipOne') : t('systemMap.relationships', {count: systemMapRelCount})}</Text>
         </View>
         {renderSystemMapScreen()}
       </View>

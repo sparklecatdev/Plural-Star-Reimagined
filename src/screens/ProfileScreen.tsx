@@ -50,7 +50,7 @@ export const ProfileScreen = ({theme: T, member, statuses, front, onEditProfile,
             <TouchableOpacity key={tab} onPress={() => setSubTab(tab)} activeOpacity={0.7}
               accessibilityRole="tab" accessibilityState={{selected: subTab === tab}}
               style={[s.subtab, subTab === tab && {backgroundColor: T.accentBg, borderColor: `${T.accent}45`}]}>
-              <AccentText T={T} style={{fontSize: fs(13), fontWeight: subTab === tab ? '600' : '500', color: subTab === tab ? T.accent : T.dim}}>
+              <AccentText T={T} numberOfLines={2} maxFontSizeMultiplier={1.3} style={{fontSize: fs(13), textAlign: 'center', fontWeight: subTab === tab ? '600' : '500', color: subTab === tab ? T.accent : T.dim}}>
                 {tab === 'profile' ? t('tabs.profile') : t('profile.statuses')}
               </AccentText>
             </TouchableOpacity>

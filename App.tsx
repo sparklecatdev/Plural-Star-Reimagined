@@ -88,6 +88,8 @@ function MainAppContent() {
   const [firstRun, setFirstRun] = useState(false);
   const [locked, setLocked] = useState(false);
   const [tab, setTab] = useState<Tab>('front');
+  const [systemMapRelCount, setSystemMapRelCount] = useState(0);
+  const [mapFocus, setMapFocus] = useState<{id: string; n: number} | null>(null);
   const [mountedTabs, setMountedTabs] = useState<Tab[]>(['front']);
   useEffect(() => {
     setMountedTabs(prev => prev.includes(tab) ? prev : [...prev, tab]);
@@ -130,6 +132,12 @@ function MainAppContent() {
     setEditMember(m);
     setViewOnlyMember(true);
     setShowMember(true);
+  };
+
+  const showMemberOnMap = (id: string) => {
+    setShowMember(false); setEditMember(null); setViewOnlyMember(false);
+    setMapFocus({id, n: Date.now()});
+    setTab('hub');
   };
 
   const C: ThemeColors = useMemo(() => {
@@ -753,7 +761,7 @@ function MainAppContent() {
   );
 
   const renderSystemMapScreen = () => (
-    <SystemMapScreen theme={C} members={members} onViewMember={openMemberById} />
+    <SystemMapScreen theme={C} members={members} onViewMember={openMemberById} onRelCountChange={setSystemMapRelCount} focus={mapFocus} />
   );
 
   const renderMedicalScreen = () => (
@@ -786,7 +794,7 @@ function MainAppContent() {
             onAddStatus={() => {setEditCustomFront(null); setShowCustomFront(true);}}
             onEditStatus={m => {setEditCustomFront(m); setShowCustomFront(true);}} />;
         }
-        return <MembersScreen theme={C} members={members} front={front} groups={groups} initialSortMode={appSettings.memberSortMode}
+        return <MembersScreen theme={C} members={members} front={front} groups={groups} initialSortMode={appSettings.memberSortMode} memberListFields={appSettings.memberListFields} onSaveListFields={async (next: any) => {const sNext = {...appSettings, memberListFields: next}; setAppSettings(sNext); await store.set(KEYS.settings, sNext);}}
           onAdd={() => {setEditMember(null); setViewOnlyMember(false); setAddCustomFront(false); setShowMember(true);}}
           onAddCustomFront={() => {setEditCustomFront(null); setShowCustomFront(true);}}
           onEdit={m => { if (m.isCustomFront) {setEditCustomFront(m); setShowCustomFront(true);} else {setEditMember(m); setViewOnlyMember(false); setShowMember(true);} }}
@@ -811,7 +819,7 @@ function MainAppContent() {
           onBulkAddGroups={bulkAddGroups}
         />;
       case 'hub':
-        return <HubScreen theme={C} singlet={isSinglet} selfId={selfMember?.id} members={members} history={history} front={front} onSaveHistory={saveHistory} onSetFront={handleHubSetFront} renderShareScreen={renderShareScreen} renderStatsScreen={renderStatsScreen} renderChatScreen={renderChatScreen} renderCustomFieldsScreen={renderCustomFieldsScreen} renderSystemManagerScreen={() => <SystemManagerScreen theme={C} members={members} groups={groups} onSaveGroups={saveGroups} />} renderArchiveScreen={renderArchiveScreen} renderPollsScreen={renderPollsScreen} renderSystemMapScreen={renderSystemMapScreen} renderMedicalScreen={renderMedicalScreen} resetKey={hubResetKey} editHistoryIndex={editHistoryIndex} onClearEditHistory={() => setEditHistoryIndex(null)} />;
+        return <HubScreen theme={C} singlet={isSinglet} selfId={selfMember?.id} members={members} history={history} front={front} onSaveHistory={saveHistory} onSetFront={handleHubSetFront} renderShareScreen={renderShareScreen} renderStatsScreen={renderStatsScreen} renderChatScreen={renderChatScreen} renderCustomFieldsScreen={renderCustomFieldsScreen} renderSystemManagerScreen={() => <SystemManagerScreen theme={C} members={members} groups={groups} onSaveGroups={saveGroups} onViewMember={openMemberById} />} renderArchiveScreen={renderArchiveScreen} renderPollsScreen={renderPollsScreen} renderSystemMapScreen={renderSystemMapScreen} systemMapRelCount={systemMapRelCount} mapFocus={mapFocus} renderMedicalScreen={renderMedicalScreen} resetKey={hubResetKey} editHistoryIndex={editHistoryIndex} onClearEditHistory={() => setEditHistoryIndex(null)} />;
       case 'journal':
         return <JournalScreen theme={C} journal={journal} templates={journalTemplates} members={members} systemJournalPassword={system.journalPassword} onAdd={() => {setEditJournal(null); setShowJournal(true);}} onEdit={e => {setEditJournal(e); setShowJournal(true);}} onDelete={deleteEntry} onTogglePin={e => saveEntry({...e, pinned: !e.pinned})} onSaveTemplates={saveJournalTemplates} onMentionPress={openMemberById} />;
       case 'history':
@@ -888,6 +896,7 @@ function MainAppContent() {
         onRequestEdit={isSinglet && viewOnlyMember ? () => setViewOnlyMember(false) : undefined}
         isFronting={!!editMember && allFrontMemberIds(front).includes(editMember.id)}
         onMentionPress={openMemberById}
+        onShowOnMap={showMemberOnMap}
         onSave={async (m: Member) => {await saveMember(addCustomFront && !editMember ? {...m, isCustomFront: true} : m); setShowMember(false); setEditMember(null); setViewOnlyMember(false); setAddCustomFront(false);}}
         onDelete={async (id: string) => {await deleteMember(id); setShowMember(false); setEditMember(null); setViewOnlyMember(false);}}
         onClose={() => {setShowMember(false); setEditMember(null); setViewOnlyMember(false);}} />

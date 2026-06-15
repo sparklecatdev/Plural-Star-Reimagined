@@ -130,9 +130,16 @@
     "customFront": "ฟรอนต์กำหนดเอง",
     "customFronts": "ฟรอนต์กำหนดเอง",
     "moveDown": "เลื่อนลง",
+    "moveAbove": "เหนือ {{name}}",
+    "moveBelow": "ใต้ {{name}}",
     "moveUp": "เลื่อนขึ้น",
     "noCustomFronts": "ยังไม่มีฟรอนต์กำหนดเอง",
     "selectAction": "เลือก",
+    "displayFields": "ฟิลด์ที่แสดง",
+    "fieldGroups": "กลุ่ม",
+    "fieldDescriptions": "คำอธิบาย",
+    "fieldPronouns": "สรรพนาม",
+    "fieldRoles": "บทบาท",
     "title": "สมาชิก",
     "count": "{{count}} สมาชิก",
     "count_other": "{{count}} สมาชิก",
@@ -470,6 +477,7 @@
     "role": "บทบาท / อาร์คีไทป์",
     "rolePlaceholder": "โฮสต์ ผู้พิทักษ์ เกตคีปเปอร์…",
     "color": "สี",
+    "hue": "เฉดสี",
     "invalidHex": "รหัสสี hex ไม่ถูกต้อง",
     "transparentColor": "โปร่งใส",
     "removeImageMsg": "นำรูปภาพนี้ออก?",
@@ -717,6 +725,7 @@
     "pickMember": "กล่าวถึงสมาชิก"
   },
   "systemManager": {
+    "browse": "เรียกดู",
     "deleteSelectedMsg": "นำ {{count}} รายการที่เลือกออก? สมาชิกจะไม่ถูกลบ",
     "desc": "สร้าง แก้ไข จัดเรียง และลบกลุ่มกับระบบย่อย แตะ ⇄ บนรายการ แล้วแตะปลายทาง เพื่อซ้อนเข้าไป",
     "title": "ตัวจัดการระบบ"
@@ -771,6 +780,7 @@
   },
   "systemMap": {
     "connections": "การเชื่อมต่อ",
+    "showOnMap": "แสดงบนแผนที่",
     "addMember": "+ สมาชิก",
     "emptyMap": "แผนที่ว่างเปล่า แตะ + สมาชิก เพื่อเพิ่มสมาชิก หรือ + เพิ่มความสัมพันธ์ เพื่อเชื่อมโยงพวกเขา",
     "depth": "ระยะการเชื่อมต่อ",
