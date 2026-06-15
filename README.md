@@ -1,21 +1,21 @@
-<h1 align="center">Plural Star</h1>
+<h1 align="center">Plural Star Reimagined</h1>
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/TheHanyou/Plural-Star/main/docs/icon.png" width="120" alt="Plural Star icon" />
 </p>
 
 <p align="center">
-  <strong>Front tracking, system journal & history for plural systems.</strong><br>
+  <strong>A maintained fork of Plural Star for plural systems.</strong><br>
   Private. Offline-first. No accounts. No servers.
 </p>
 
 <p align="center">
-  <a href="https://play.google.com/store/apps/details?id=com.pluralspace.app">
-    <img src="https://img.shields.io/badge/Google%20Play-Get%20the%20App-DAA520?style=for-the-badge&logo=googleplay&logoColor=white" alt="Get it on Google Play" />
+  <a href="https://github.com/sparklecatdev/Plural-Star-Reimagined/releases/latest">
+    <img src="https://img.shields.io/badge/GitHub%20Releases-Download-DAA520?style=for-the-badge&logo=github&logoColor=white" alt="Download from GitHub Releases" />
   </a>
   &nbsp;
-  <a href="https://apps.apple.com/in/app/plural-star/id6763964266">
-    <img src="https://img.shields.io/badge/App%20Store-Download-DAA520?style=for-the-badge&logo=appstore&logoColor=white" alt="Download on the App Store" />
+  <a href="https://github.com/sparklecatdev/Plural-Star-Reimagined">
+    <img src="https://img.shields.io/badge/Fork-View%20Source-DAA520?style=for-the-badge&logo=github&logoColor=white" alt="View the fork source" />
   </a>
 </p>
 
@@ -37,7 +37,7 @@
 
 > **Renamed from Plural Space.** The app, repo, and subreddit were renamed to Plural Star for community clarity — another app was also using the Plural Space name. Your existing installation, data, backups, and Buy-Me-a-Coffee links all continue to work; on-device data and old Plural Space `.json` exports are fully compatible with Plural Star.
 
-Plural Star is a private, offline-first system management app built for plural individuals — those with DID, OSDD, or any form of plurality.
+Plural Star Reimagined is a fork of [TheHanyou/Plural-Star](https://github.com/TheHanyou/Plural-Star), a private, offline-first system management app built for plural individuals — those with DID, OSDD, or any form of plurality.
 
 Made in part with AI assistance, and is one of the main reasons we went Open Source. So that those wishing to, or those with concerns, could examine the code.
 
@@ -130,10 +130,10 @@ Full privacy policy: [https://thehanyou.github.io/Plural-Star/](https://thehanyo
 ## Installation
 
 **Android**
-Download Plural Star from [Google Play](https://play.google.com/store/apps/details?id=com.pluralspace.app).
+Download the latest Android build from this fork's [GitHub Releases](https://github.com/sparklecatdev/Plural-Star-Reimagined/releases/latest).
 
 **iOS**
-Download Plural Star from the [App Store](https://apps.apple.com/in/app/plural-star/id6763964266).
+Download the latest iOS release assets from this fork's [GitHub Releases](https://github.com/sparklecatdev/Plural-Star-Reimagined/releases/latest).
 
 ---
 
@@ -141,8 +141,8 @@ Download Plural Star from the [App Store](https://apps.apple.com/in/app/plural-s
 
 ```bash
 # Requirements: Node 22+, JDK 17, Android SDK
-git clone https://github.com/TheHanyou/Plural-Star.git
-cd Plural-Star
+git clone https://github.com/sparklecatdev/Plural-Star-Reimagined.git
+cd Plural-Star-Reimagined
 npm install --legacy-peer-deps
 cd android && gradlew.bat assembleRelease
 ```
@@ -163,7 +163,7 @@ This software is free and open source. You are free to use, modify, and distribu
 
 ## Support
 
-Plural Star is free, always. If it's been useful to you, a contribution helps cover Play Store fees and development time.
+Plural Star Reimagined is a fork. If you want to support the original project and its creator, please support The Hanyou System using the links below, not this fork maintainer.
 
 <a href="https://www.buymeacoffee.com/PluralStar">
   <img src="https://img.buymeacoffee.com/button-api/?text=Support+PS&amp;emoji=%E2%98%95&amp;slug=PluralStar&amp;button_colour=151929&amp;font_colour=ffffff&amp;font_family=Cookie&amp;outline_colour=ffffff&amp;coffee_colour=FFDD00" alt="Support Plural Star on Buy Me a Coffee" />
