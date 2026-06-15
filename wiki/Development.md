@@ -10,6 +10,8 @@
 ## Install
 
 ```bash
+git clone https://github.com/sparklecatdev/Plural-Star-Reimagined.git
+cd Plural-Star-Reimagined
 npm install --legacy-peer-deps
 ```
 
