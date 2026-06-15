@@ -377,7 +377,6 @@ export const SystemManagerScreen = ({theme: T, members, groups, onSaveGroups, on
           <ColorPicker value={newColor} onChange={setNewColor} T={T} />
         </View>
       )}
-      </View>
     </ScrollView>
     </View>
     </KeyboardAvoidingView>

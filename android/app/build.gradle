@@ -11,6 +11,8 @@ def keystorePropsFile = rootProject.file("keystore.properties")
 if (keystorePropsFile.exists()) {
     keystoreProps.load(new FileInputStream(keystorePropsFile))
 }
+def releaseKeystoreFile = file('../../plural-space.keystore')
+def hasReleaseKeystore = releaseKeystoreFile.exists()
 
 android {
     namespace "com.pluralspace.app"
@@ -36,7 +38,7 @@ android {
             keyPassword 'android'
         }
         release {
-            storeFile file('../../plural-space.keystore')
+            storeFile releaseKeystoreFile
             storePassword keystoreProps['PLURALSPACE_STORE_PASSWORD'] ?: (project.findProperty('PLURALSPACE_STORE_PASSWORD') ?: '')
             keyAlias 'pluralspace'
             keyPassword keystoreProps['PLURALSPACE_KEY_PASSWORD'] ?: (project.findProperty('PLURALSPACE_KEY_PASSWORD') ?: '')
@@ -48,7 +50,9 @@ android {
             signingConfig signingConfigs.debug
         }
         release {
-            signingConfig signingConfigs.release
+            if (hasReleaseKeystore) {
+                signingConfig signingConfigs.release
+            }
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
