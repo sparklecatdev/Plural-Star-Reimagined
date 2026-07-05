@@ -70,7 +70,7 @@ export const ProfileScreen = ({theme: T, member, statuses, front, onEditProfile,
             <View style={[s.profileCard, {backgroundColor: T.bg, borderColor: T.border}]}>
             <View style={{alignItems: 'center', marginBottom: 14}}>
               {member?.avatar ? (
-                <Image source={{uri: member.avatar}} style={{width: 88, height: 88, borderRadius: 20, borderWidth: 2, borderColor: member.color || T.accent}} resizeMode="cover" />
+                <Image source={{uri: member.avatar}} accessibilityRole="image" accessibilityLabel={member.name} style={{width: 88, height: 88, borderRadius: 20, borderWidth: 2, borderColor: member.color || T.accent}} resizeMode="cover" />
               ) : (
                 <View style={{width: 88, height: 88, borderRadius: 20, backgroundColor: member?.color || T.accent, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: 'rgba(255,255,255,0.15)'}}>
                   <Text style={{fontSize: fs(30), fontWeight: '700', color: 'rgba(0,0,0,0.75)'}}>{getInitials(member?.name || '?')}</Text>

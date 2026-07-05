@@ -22,6 +22,8 @@ export const KEYS = {
   relationships: 'ps:relationships',
   relationshipTypes: 'ps:relationshipTypes',
   systemMapMembers: 'ps:systemMapMembers',
+  systemMapPositions: 'ps:systemMapPositions',
+  whiteboard: 'ps:whiteboard',
   deviceCodes: 'ps:deviceCodes',
   medical: 'ps:medical',
 };
@@ -30,6 +32,7 @@ const CRITICAL_KEYS = new Set([
   KEYS.system, KEYS.members, KEYS.front, KEYS.history,
   KEYS.journal, KEYS.groups, KEYS.chatChannels, KEYS.relationships,
   KEYS.deviceCodes, KEYS.medical,
+  'ps:networkIdentity', 'ps:networkFriends', 'ps:networkSettings',
 ]);
 
 const STORAGE_DEBUG = __DEV__;
@@ -103,6 +106,40 @@ export const listRecoverableBackups = async (): Promise<RecoverableEntry[]> => {
     console.error('[STORAGE] listRecoverableBackups error:', e);
     return [];
   }
+};
+
+export const storageLooksWiped = async (): Promise<boolean> => {
+  let psKeys: string[] = [];
+  let readFailed = false;
+  try {
+    const all = await AsyncStorage.getAllKeys();
+    psKeys = all.filter(k => k.startsWith('ps:'));
+  } catch (e) {
+    readFailed = true;
+    console.error('[STORAGE] getAllKeys THREW during boot probe:', e);
+  }
+  if (!readFailed && psKeys.length > 0) return false;
+  try {
+    const backups = await listRecoverableBackups();
+    return backups.length > 0;
+  } catch {
+    return false;
+  }
+};
+
+export const restoreAllBackups = async (): Promise<number> => {
+  let restored = 0;
+  try {
+    const backups = await listRecoverableBackups();
+    for (const b of backups) {
+      try {
+        if (await restoreFromBackup(b.key)) restored++;
+      } catch {}
+    }
+  } catch (e) {
+    console.error('[STORAGE] restoreAllBackups error:', e);
+  }
+  return restored;
 };
 
 export const restoreFromBackup = async (key: string): Promise<boolean> => {

@@ -14,8 +14,16 @@ struct PluralSpaceActivityAttributes: ActivityAttributes {
     var note: String?
     var startTime: Date
     var statusLine: String
+    var friendsText: String?
   }
 
   var systemName: String
+}
+
+@available(iOS 16.1, *)
+struct PluralStarFriendsActivityAttributes: ActivityAttributes {
+  public struct ContentState: Codable, Hashable {
+    var lines: String
+  }
 }
 #endif

@@ -312,33 +312,27 @@ export const HistoryScreen = ({theme: T, history, journal, getMember, members, s
     return out;
   }, [history, selectedMemberId]);
 
-  const memberHistoryEvents = selectedMemberId
-    ? [
-        ...mergedSessions.map(m => ({
-          type: 'front',
-          time: m.startTime,
-          entry: {...m.last, startTime: m.startTime, endTime: m.endTime},
+  const allMemberEvents = useMemo(() => {
+    if (!selectedMemberId) return [] as any[];
+    const memberHistoryEvents = [
+      ...mergedSessions.map(m => ({
+        type: 'front',
+        time: m.startTime,
+        entry: {...m.last, startTime: m.startTime, endTime: m.endTime},
+      })),
+      ...history
+        .filter(e => memberInEntry(selectedMemberId, e) && e.changeType && e.changeType !== 'front')
+        .map(e => ({
+          type: e.changeType as string,
+          time: e.changeTime ?? e.startTime,
+          entry: e,
         })),
-        ...history
-          .filter(e => memberInEntry(selectedMemberId, e) && e.changeType && e.changeType !== 'front')
-          .map(e => ({
-            type: e.changeType as string,
-            time: e.changeTime ?? e.startTime,
-            entry: e,
-          })),
-      ]
-    : [];
-
-  const memberJournalEvents = selectedMemberId
-    ? journal
-        .filter(e => (e.authorIds || []).includes(selectedMemberId))
-        .map(e => ({type: 'journal' as const, time: e.timestamp, journalEntry: e}))
-    : [];
-
-  const allMemberEvents = [
-    ...memberHistoryEvents,
-    ...memberJournalEvents,
-  ].sort((a, b) => b.time - a.time);
+    ];
+    const memberJournalEvents = journal
+      .filter(e => (e.authorIds || []).includes(selectedMemberId))
+      .map(e => ({type: 'journal' as const, time: e.timestamp, journalEntry: e}));
+    return [...memberHistoryEvents, ...memberJournalEvents].sort((a, b) => b.time - a.time);
+  }, [selectedMemberId, mergedSessions, history, journal]);
 
   const EVENT_ICONS: Record<string, string> = {
     front:    '◈',
@@ -467,11 +461,12 @@ export const HistoryScreen = ({theme: T, history, journal, getMember, members, s
                   const end = m.endTime ?? (m.count > 1 ? Date.now() : (effEnd(m.last) ?? Date.now()));
                   return sum + Math.max(0, end - m.startTime);
                 }, 0);
+                const entryEvents = allMemberEvents.filter((e: any) => e.entry);
                 const moodCounts: Record<string, number> = {};
-                memberHistoryEvents.forEach(e => {if (e.entry.mood) moodCounts[e.entry.mood] = (moodCounts[e.entry.mood] || 0) + 1;});
+                entryEvents.forEach((e: any) => {if (e.entry.mood) moodCounts[e.entry.mood] = (moodCounts[e.entry.mood] || 0) + 1;});
                 const topMood = Object.entries(moodCounts).sort((a, b) => b[1] - a[1])[0];
                 const locCounts: Record<string, number> = {};
-                memberHistoryEvents.forEach(e => {if (e.entry.location) locCounts[e.entry.location] = (locCounts[e.entry.location] || 0) + 1;});
+                entryEvents.forEach((e: any) => {if (e.entry.location) locCounts[e.entry.location] = (locCounts[e.entry.location] || 0) + 1;});
                 const topLoc = Object.entries(locCounts).sort((a, b) => b[1] - a[1])[0];
                 return (
                   <View style={{flexDirection: 'row', gap: 8, margin: UI.screenPadding, marginBottom: 8}}>
@@ -499,15 +494,19 @@ export const HistoryScreen = ({theme: T, history, journal, getMember, members, s
                 );
               })()}
 
-              <ScrollView style={{flex: 1}} contentContainerStyle={{padding: UI.screenPadding, paddingTop: 8, paddingBottom: 32}}>
-                {allMemberEvents.length === 0 ? (
+              <FlashList
+                data={allMemberEvents}
+                keyExtractor={(event: any, i: number) => `${event.type}-${event.time}-${i}`}
+                getItemType={(event: any) => event.type === 'journal' ? 'journal' : 'entry'}
+                contentContainerStyle={{padding: UI.screenPadding, paddingTop: 8, paddingBottom: 32}}
+                ListEmptyComponent={
                   <View style={[s.emptyState, {backgroundColor: T.surface, borderColor: 'transparent', paddingVertical: 32}]}>
                     <Text style={{fontSize: fs(13), color: T.dim, textAlign: 'center'}}>
                       {t('history.noActivity', {name: selectedMember?.name})}
                     </Text>
                   </View>
-                ) : (
-                  allMemberEvents.map((event, i) => {
+                }
+                renderItem={({item: event, index: i}: {item: any; index: number}) => {
                     const icon = EVENT_ICONS[event.type] || '◈';
                     const label = 'entry' in event ? getEventLabel(event.type, event.entry) : getEventLabel(event.type, {} as any);
                     const color = event.type === 'front'
@@ -592,9 +591,8 @@ export const HistoryScreen = ({theme: T, history, journal, getMember, members, s
                         </View>
                       </View>
                     );
-                  })
-                )}
-              </ScrollView>
+                  }}
+              />
             </>
           )}
         </View>

@@ -5,5 +5,6 @@ import WidgetKit
 struct PluralSpaceLiveActivityBundle: WidgetBundle {
   var body: some Widget {
     PluralSpaceLiveActivityWidget()
+    PluralStarFriendsActivityWidget()
   }
 }

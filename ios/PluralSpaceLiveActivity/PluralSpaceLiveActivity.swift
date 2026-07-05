@@ -117,6 +117,17 @@ private struct LockScreenView: View {
           .foregroundStyle(.secondary)
           .lineLimit(2)
       }
+
+      if let friendsText = context.state.friendsText, !friendsText.isEmpty {
+        VStack(alignment: .leading, spacing: 3) {
+          Text("FRIENDS")
+            .font(.caption2.weight(.semibold))
+            .foregroundStyle(.secondary)
+          Text(friendsText)
+            .font(.caption)
+            .lineLimit(5)
+        }
+      }
     }
     .padding(.horizontal, 16)
     .padding(.vertical, 14)
@@ -147,6 +158,48 @@ private struct LockScreenView: View {
     .padding(.horizontal, 10)
     .padding(.vertical, 6)
     .background(Color.white.opacity(0.08), in: Capsule())
+  }
+}
+
+@available(iOS 16.1, *)
+struct PluralStarFriendsActivityWidget: Widget {
+  var body: some WidgetConfiguration {
+    ActivityConfiguration(for: PluralStarFriendsActivityAttributes.self) { context in
+      VStack(alignment: .leading, spacing: 6) {
+        Text("FRIENDS")
+          .font(.caption2.weight(.semibold))
+          .foregroundStyle(.secondary)
+        Text(context.state.lines)
+          .font(.caption)
+          .lineLimit(6)
+      }
+      .padding(.horizontal, 16)
+      .padding(.vertical, 14)
+      .activityBackgroundTint(Color.black.opacity(0.92))
+      .activitySystemActionForegroundColor(Color(hex: "#DAA520"))
+    } dynamicIsland: { context in
+      DynamicIsland {
+        DynamicIslandExpandedRegion(.leading) {
+          Label("Friends", systemImage: "person.2.wave.2.fill")
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(Color(hex: "#DAA520"))
+        }
+        DynamicIslandExpandedRegion(.bottom) {
+          Text(context.state.lines)
+            .font(.caption)
+            .lineLimit(6)
+        }
+      } compactLeading: {
+        Image(systemName: "person.2.wave.2.fill")
+          .foregroundStyle(Color(hex: "#DAA520"))
+      } compactTrailing: {
+        EmptyView()
+      } minimal: {
+        Image(systemName: "person.2.wave.2.fill")
+          .foregroundStyle(Color(hex: "#DAA520"))
+      }
+      .keylineTint(Color(hex: "#DAA520"))
+    }
   }
 }
 

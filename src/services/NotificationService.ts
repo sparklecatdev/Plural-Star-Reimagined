@@ -10,6 +10,9 @@ import notifee, {
 } from '@notifee/react-native';
 import {Platform} from 'react-native';
 import {FrontState, Member, Medication, MedicalAppointment, fmtDur, fmtTime} from '../utils';
+import {endFrontLiveActivity, updateFrontLiveActivity} from './LiveActivityService';
+import {NetworkManager} from '../network/NetworkManager';
+import {MAX_NOTIF_FRIENDS} from '../network/types';
 import i18n from '../i18n/i18n';
 
 export const NOTIF_CHANNEL_ID = 'plural-space-front';
@@ -132,33 +135,65 @@ const frontAndroidConfig = (bigText: string) => ({
   },
 });
 
+let fgsBound = false;
+
+const buildFriendLines = (): string[] => {
+  const st = NetworkManager.getState();
+  if (!st.enabled) return [];
+  const lines: string[] = [];
+  for (const f of st.friends) {
+    if (lines.length >= MAX_NOTIF_FRIENDS) break;
+    if (!f.showInNotification || f.status !== 'accepted') continue;
+    const s = f.lastStatus;
+    if (!s || !s.fronters) continue;
+    const dur = s.startTime ? fmtDur(s.startTime) : '';
+    lines.push(`◈ ${f.displayName}: ${s.fronters}${dur ? `  ·  ${dur}` : ''}`);
+  }
+  return lines;
+};
+
 export const showFrontNotification = async (
   front: FrontState | null,
   members: Member[],
   systemName = 'Plural Star',
 ) => {
   try {
-    if (!supportsLocalNotifications) return;
-
-    if (!front) {
-      await clearFrontNotification();
+    if (Platform.OS === 'ios') {
+      const friendLines = buildFriendLines();
+      await updateFrontLiveActivity(front, members, systemName, friendLines.join('\n') || undefined);
       return;
     }
+    if (!supportsLocalNotifications) return;
 
-    const content = buildFrontContent(front, members);
-    if (!content) {
+    const netOn = NetworkManager.getState().enabled;
+    const content = front ? buildFrontContent(front, members) : null;
+    const friendLines = buildFriendLines();
+
+    if (!content && !netOn) {
       await clearFrontNotification();
       return;
     }
 
     await setupNotificationChannel();
 
+    if (!netOn && fgsBound) {
+      await notifee.stopForegroundService();
+      fgsBound = false;
+    }
+
+    const onlineLabel = i18n.t('network.status.online', {defaultValue: 'Online'});
+    const title = content ? content.title : systemName;
+    const body = content ? content.body : friendLines.length > 0 ? friendLines[0].replace(/^◈ /, '') : onlineLabel;
+    const ownBig = content ? content.bigText : '';
+    const bigText = [ownBig, ...friendLines].filter(Boolean).join('\n\n') || onlineLabel;
+
     await notifee.displayNotification({
       id: NOTIF_ID,
-      title: content.title,
-      body: content.body,
-      android: frontAndroidConfig(content.bigText),
+      title,
+      body,
+      android: {...frontAndroidConfig(bigText), asForegroundService: netOn},
     });
+    if (netOn) fgsBound = true;
   } catch (e) {
     console.error('[PluralSpace] Notification error:', e);
   }
@@ -186,7 +221,7 @@ export const scheduleFrontNotificationRefresh = async (
         id: NOTIF_ID,
         title: content.title,
         body: content.body,
-        android: frontAndroidConfig(content.bigText),
+        android: {...frontAndroidConfig(content.bigText), asForegroundService: NetworkManager.getState().enabled},
       },
       trigger,
     );
@@ -206,10 +241,15 @@ export const cancelFrontNotificationRefresh = async () => {
 
 export const clearFrontNotification = async () => {
   try {
+    if (Platform.OS === 'ios') {
+      await endFrontLiveActivity();
+      return;
+    }
     if (!supportsLocalNotifications) return;
     try { await notifee.cancelTriggerNotification(NOTIF_ID); } catch {}
     await notifee.cancelNotification(NOTIF_ID);
     try { await notifee.stopForegroundService(); } catch {}
+    fgsBound = false;
   } catch (e) {
     console.error('[PluralSpace] Clear notification error:', e);
   }

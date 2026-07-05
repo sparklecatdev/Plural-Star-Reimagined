@@ -19,6 +19,7 @@ export interface MemberGroup {
   kind?: GroupNodeKind;
   parentId?: string | null;
   sortOrder?: number;
+  sourceId?: string;
 }
 
 export const groupKind = (g: MemberGroup): GroupNodeKind => g.kind || 'group';
@@ -28,6 +29,27 @@ export const childrenOf = (nodes: MemberGroup[], parentId: string | null): Membe
   nodes
     .filter(n => groupParent(n) === parentId)
     .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0) || a.name.localeCompare(b.name));
+
+export const groupDisplayOrder = (nodes: MemberGroup[]): Map<string, number> => {
+  const order = new Map<string, number>();
+  const walk = (parentId: string | null) => {
+    for (const g of childrenOf(nodes, parentId)) {
+      if (order.has(g.id)) continue;
+      order.set(g.id, order.size);
+      walk(g.id);
+    }
+  };
+  walk(null);
+  for (const g of nodes) {
+    if (!order.has(g.id)) order.set(g.id, order.size);
+  }
+  return order;
+};
+
+export const sortGroupsForDisplay = (list: MemberGroup[], all: MemberGroup[]): MemberGroup[] => {
+  const order = groupDisplayOrder(all);
+  return [...list].sort((a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0));
+};
 
 export const descendantsOf = (nodes: MemberGroup[], id: string): MemberGroup[] => {
   const out: MemberGroup[] = [];
@@ -80,11 +102,12 @@ export interface CustomFieldValue {
 
 export interface NoteboardEntry {
   id: string;
-  memberId: string;
-  authorId: string;
+  memberId: string;   // recipient (whose mailbox this lands in)
+  authorId: string;   // sender
   content: string;
   timestamp: number;
   pinned?: boolean;
+  read?: boolean;     // marked true once the recipient's mailbox has been opened
 }
 
 export interface PollOption {
@@ -116,6 +139,10 @@ export interface Member {
   tags?: string[];
   groupIds?: string[];
   archived?: boolean;
+  // Soft-delete tombstone: hidden from all member lists (roster, archive, pickers) but
+  // kept in storage so front history & stats can still resolve the member's name/color
+  // instead of showing the raw ID.
+  deleted?: boolean;
   avatar?: string;
   avatarTransparent?: boolean;
   banner?: string;
@@ -124,6 +151,7 @@ export interface Member {
   createdAt?: number;
   sourceId?: string;
   isCustomFront?: boolean;
+  mailboxPassword?: string;
 }
 
 export const DEFAULT_CUSTOM_FRONT_NAMES = ['Chatty', 'Non-Verbal', 'IWC', 'DNI', 'Blurry', 'Blendy', 'Rapid Switching', 'Foggy', 'Grounded', 'Dissociated', 'Anxious', 'Depressed', 'Cheerful', 'Happy', 'Sad', 'Crisis', 'Melancholy', 'Stimming', 'Stressed', 'Working', 'Traveling', 'Sleeping', 'Hyperfocus'];
@@ -671,7 +699,7 @@ export const sortMembers = (members: Member[], mode: MemberSortMode = 'alphabeti
     case 'age': return sorted.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
     case 'color': return sorted.sort((a, b) => a.color.localeCompare(b.color));
     case 'role': return sorted.sort((a, b) => (a.role || '').localeCompare(b.role || ''));
-    case 'manual': return sorted.sort((a, b) => (a.sortOrder ?? 9999) - (b.sortOrder ?? 9999));
+    case 'manual': return sorted.sort((a, b) => (a.sortOrder ?? Number.MAX_SAFE_INTEGER) - (b.sortOrder ?? Number.MAX_SAFE_INTEGER));
     default: return sorted;
   }
 };

@@ -5,6 +5,8 @@ import {fmtDur} from '../utils';
 type LiveActivityModule = {
   startOrUpdate(payload: Record<string, unknown>): Promise<unknown>;
   endActivity(): Promise<unknown>;
+  getFriendsPushToken?(): Promise<string | null>;
+  endFriendsActivity?(): Promise<unknown>;
 };
 
 const nativeModule: LiveActivityModule | null =
@@ -15,10 +17,27 @@ const resolveNames = (ids: string[], members: Member[]): string =>
 
 export const liveActivitiesSupported = Platform.OS === 'ios' && !!nativeModule;
 
+export const getFriendsPushToken = async (): Promise<string | null> => {
+  if (!nativeModule || typeof nativeModule.getFriendsPushToken !== 'function') return null;
+  try {
+    return (await nativeModule.getFriendsPushToken()) || null;
+  } catch {
+    return null;
+  }
+};
+
+export const endFriendsActivity = async (): Promise<void> => {
+  if (!nativeModule || typeof nativeModule.endFriendsActivity !== 'function') return;
+  try {
+    await nativeModule.endFriendsActivity();
+  } catch {}
+};
+
 export const updateFrontLiveActivity = async (
   front: FrontState | null,
   members: Member[],
   systemName: string,
+  friendsText?: string,
 ) => {
   if (!nativeModule) return;
   if (!front) {
@@ -42,6 +61,7 @@ export const updateFrontLiveActivity = async (
     note: front.primary.note || undefined,
     startTime: front.startTime,
     statusLine: fmtDur(front.startTime),
+    friendsText: friendsText || undefined,
   });
 };
 

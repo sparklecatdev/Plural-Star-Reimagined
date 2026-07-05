@@ -60,14 +60,17 @@ Manage your groups and subsystems from one dedicated screen — create, rename, 
 **✦ Custom Fields**  
 Define your own per-member fields beyond the built-in ones. Support for text, number, toggle, date, month/year, month, year, and markdown types. Create fields once in the Hub; fill them out per-member in the member edit modal. Fields are reorderable, renameable, and fully exportable. Compatible with Simply Plural custom field imports.
 
-**📋 Per-Member Noteboards**  
-Each member has their own noteboard — a shared space inside the member profile where any headmate can leave notes for or about them. Notes record author, timestamp, and content; can be pinned to the top; and display chronologically in the member's profile sub-tab. Useful for leaving messages between alters, shared observations, or ongoing context that doesn't fit anywhere else.
+**✉ Mailbox**  
+System-wide mail between headmates in its own Hub tile: per-member inboxes with unread badges and notification alerts, compose with From/To pickers, quick replies, pinning, and delete confirmation. Useful for leaving messages between alters, shared observations, or ongoing context that doesn't fit anywhere else — and mail syncs across your linked devices.
 
 **📊 System Polls**  
 Create polls the whole system can vote on — decisions, preferences, member opinions. Polls live in the Hub with options (each with its own vote tallies), voter tracking (who voted for what), and optional closure. Every active member can cast one vote per poll; votes can be changed until the poll is closed.
 
 **🕸 System Map**  
 Chart the relationships between your headmates on an interactive force-directed graph. Start with an empty canvas and place members deliberately — or let them join automatically as you create relationships. Four basic connection types ship built in — Red Rival, Green Friend, Yellow Ally, Pink Love — and the Connections manager lets you create unlimited custom types with their own names, colors, and optional directionality with inverse labels. Threads rest grey until you select a member; their web then lights up in connection colors, with a 1·2·3 reach selector to extend the glow to friends-of-friends and one ring beyond. Pan, pinch-zoom, tap any node for their relationship list, and jump straight to their profile. Built to scale to polyfragmented systems with grid-accelerated layout and automatic detail levels.
+
+**🛰 Friends & Syncing**  
+Connect with other systems and your own devices over the Plural Star network — fully end-to-end encrypted, with the relay seeing nothing but sealed blobs. Add friends with short shareable codes (mutual by design: both sides must enter each other's code within 30 minutes) and see their current front — fronters, mood, location — update live with online status from the Network tile. Link your own devices with a directed first copy — you choose which device sends and which receives — then everything stays in sync both ways automatically: members, history, journal, chat, polls, settings, even profile pictures and banners. Pin up to five friends into the persistent notification and watch their fronts change without opening the app; on iOS, pinned friends appear on the Live Island. Networking is fully opt-in and off by default.
 
 **◷ History & Insights**  
 Front History gives you a complete timestamped log of every switch, organized by day, with co-front and co-conscious tiers displayed inline. Member History shows everything about a specific headmate — every front session across all tiers, mood changes, location changes, note updates, energy levels, and journal entries they authored — alongside a summary of total time fronted, sessions, top mood, and top location. Add retroactive history entries manually with full three-tier support, mood, location, and energy, searchable Custom Front pickers for Front and Co-Front, start/end time selection, and a "Current" option for ongoing sessions — the app detects overlaps with existing entries and lets you choose how to handle them.
@@ -140,11 +143,44 @@ Download the latest iOS release assets from this fork's [GitHub Releases](https:
 ## Build from Source
 
 ```bash
-# Requirements: Node 22+, JDK 17, Android SDK
+git clone https://github.com/sparklecatdev/Plural-Star-Reimagined.git
+cd Plural-Star-Reimagined
+# Requirements:
+# - Node 22+
+# - JDK 17
+# - Android SDK for Android builds
+# - Xcode, Ruby 3.4+, and CocoaPods for iOS builds
 git clone https://github.com/sparklecatdev/Plural-Star-Reimagined.git
 cd Plural-Star-Reimagined
 npm install --legacy-peer-deps
-cd android && gradlew.bat assembleRelease
+```
+
+**Android release APK**
+
+```bash
+cd android
+bash ./gradlew assembleRelease
+```
+
+**iOS simulator/dev build**
+
+```bash
+bundle install
+cd ios
+bundle exec pod install
+cd ..
+npm run ios
+```
+
+**iOS release build from the command line**
+
+```bash
+xcodebuild \
+  -workspace ios/PluralSpace.xcworkspace \
+  -scheme PluralSpace \
+  -configuration Release \
+  -sdk iphoneos \
+  build
 ```
 
 ## Wiki

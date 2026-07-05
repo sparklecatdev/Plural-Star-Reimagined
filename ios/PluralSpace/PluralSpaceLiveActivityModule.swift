@@ -112,8 +112,91 @@ class PluralSpaceLiveActivity: NSObject {
       location: payload["location"] as? String,
       note: payload["note"] as? String,
       startTime: Date(timeIntervalSince1970: startTimeSeconds / 1000),
-      statusLine: statusLine
+      statusLine: statusLine,
+      friendsText: payload["friendsText"] as? String
     )
   }
 #endif
+
+  @objc(getFriendsPushToken:rejecter:)
+  func getFriendsPushToken(
+    _ resolve: @escaping RCTPromiseResolveBlock,
+    rejecter reject: @escaping RCTPromiseRejectBlock
+  ) {
+#if canImport(ActivityKit)
+    guard #available(iOS 16.2, *) else {
+      resolve(NSNull())
+      return
+    }
+    Task {
+      var activity = Activity<PluralStarFriendsActivityAttributes>.activities.first
+      if activity == nil {
+        do {
+          activity = try Activity.request(
+            attributes: PluralStarFriendsActivityAttributes(),
+            content: ActivityContent(
+              state: PluralStarFriendsActivityAttributes.ContentState(lines: " "),
+              staleDate: nil
+            ),
+            pushType: .token
+          )
+        } catch {
+          resolve(NSNull())
+          return
+        }
+      }
+      guard let act = activity else {
+        resolve(NSNull())
+        return
+      }
+      if let token = act.pushToken {
+        resolve(token.map { String(format: "%02x", $0) }.joined())
+        return
+      }
+      let hex = await withTaskGroup(of: String?.self) { group -> String? in
+        group.addTask {
+          for await data in act.pushTokenUpdates {
+            return data.map { String(format: "%02x", $0) }.joined()
+          }
+          return nil
+        }
+        group.addTask {
+          try? await Task.sleep(nanoseconds: 5_000_000_000)
+          return nil
+        }
+        let first = await group.next() ?? nil
+        group.cancelAll()
+        return first
+      }
+      if let hex {
+        resolve(hex)
+      } else {
+        resolve(NSNull())
+      }
+    }
+#else
+    resolve(NSNull())
+#endif
+  }
+
+  @objc(endFriendsActivity:rejecter:)
+  func endFriendsActivity(
+    _ resolve: @escaping RCTPromiseResolveBlock,
+    rejecter reject: @escaping RCTPromiseRejectBlock
+  ) {
+#if canImport(ActivityKit)
+    guard #available(iOS 16.2, *) else {
+      resolve(NSNull())
+      return
+    }
+    Task {
+      for activity in Activity<PluralStarFriendsActivityAttributes>.activities {
+        await activity.end(nil, dismissalPolicy: .immediate)
+      }
+      resolve(true)
+    }
+#else
+    resolve(NSNull())
+#endif
+  }
 }

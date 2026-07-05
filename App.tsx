@@ -1,5 +1,5 @@
 import React, {useState, useEffect, useCallback, useMemo, useRef} from 'react';
-import {View, Image, TouchableOpacity, StyleSheet, StatusBar, Platform, PermissionsAndroid, Alert, useColorScheme} from 'react-native';
+import {View, Image, TouchableOpacity, StyleSheet, StatusBar, Platform, PermissionsAndroid, Alert, AppState, useColorScheme} from 'react-native';
 import {Text, TextInput, setAppTextDyslexicEnabled, setAppTextFont} from './src/components/AppText';
 import {fontFamilyForChoice} from './src/theme';
 import {SafeAreaProvider, useSafeAreaInsets} from 'react-native-safe-area-context';
@@ -13,7 +13,7 @@ import type {SupportedLanguage} from './src/i18n/i18n';
 import {T, BUILTIN_PALETTES, deriveTheme} from './src/theme';
 import type {CustomPalette, ThemeColors} from './src/theme';
 import {AccentText} from './src/components/AccentText';
-import {store, KEYS} from './src/storage';
+import {store, KEYS, storageLooksWiped, restoreAllBackups} from './src/storage';
 import {SystemInfo, Member, MemberGroup, FrontState, FrontTier, FrontTierKey, HistoryEntry, JournalEntry, JournalTemplate, ShareSettings, AppSettings, ChatChannel, ChatMessage, NoteboardEntry, DeviceCodes, MedicalData, DEFAULT_MEDICAL, DEFAULT_CHANNELS, findOpenFrontInHistory, migrateFrontState, frontToHistoryEntry, uid, makeDefaultCustomFronts, isFrontEmpty, allFrontMemberIds, singletStatuses, generateFriendCode, generateSyncCode, emergencyNotificationLine, DEFAULT_THEME_MODE, paletteIdForThemeMode, normalizeAppearanceSettings} from './src/utils';
 import {migrateInlineAvatars, migrateInlineChatMedia, clearAllMedia, migrateStaleMediaPaths, rebaseChatMessageMedia} from './src/utils/mediaUtils';
 import {showFrontNotification, clearFrontNotification, scheduleFrontCheckReminder, cancelFrontCheckReminder, showNoteboardNotification, clearNoteboardNotification, scheduleFrontNotificationRefresh, cancelFrontNotificationRefresh, setEmergencyNotificationInfo, rescheduleMedicationReminders, rescheduleAppointmentReminders} from './src/services/NotificationService';
@@ -33,8 +33,12 @@ import {CustomFieldsScreen} from './src/screens/CustomFieldsScreen';
 import {PollsScreen} from './src/screens/PollsScreen';
 import {SystemMapScreen} from './src/screens/SystemMapScreen';
 import {MedicalScreen} from './src/screens/MedicalScreen';
+import {MailboxScreen} from './src/screens/MailboxScreen';
+import {WhiteboardScreen} from './src/screens/WhiteboardScreen';
 import {StatusScreen} from './src/screens/StatusScreen';
 import {ProfileScreen} from './src/screens/ProfileScreen';
+import {NetworkScreen} from './src/screens/NetworkScreen';
+import {NetworkManager} from './src/network/NetworkManager';
 import {SetFrontModal, SetStatusModal, EditFrontDetailModal, MemberModal, JournalModal, SystemModal, CustomFrontModal} from './src/modals';
 
 type Tab = 'front' | 'members' | 'hub' | 'journal' | 'history';
@@ -97,6 +101,7 @@ function MainAppContent() {
 
   const [loaded, setLoaded] = useState(false);
   const [firstRun, setFirstRun] = useState(false);
+  const storageSuspectRef = useRef(false);
   const [locked, setLocked] = useState(false);
   const [tab, setTab] = useState<Tab>('front');
   const [systemMapRelCount, setSystemMapRelCount] = useState(0);
@@ -186,6 +191,18 @@ function MainAppContent() {
   }, []);
 
   const loadAll = useCallback(async () => {
+    let storageSuspect = false;
+    try {
+      if (await storageLooksWiped()) {
+        console.warn('[STARTUP] AsyncStorage blank but backups exist — restoring before load');
+        const n = await restoreAllBackups();
+        console.warn(`[STARTUP] restored ${n} keys from file backups`);
+        if (n === 0) storageSuspect = true;
+      }
+    } catch {
+      storageSuspect = true;
+    }
+    storageSuspectRef.current = storageSuspect;
     try {
       const [sys, mem, fr, hist, jour, jourTemplates, share, settings, savedLang, grps, savedPalettes, savedChannels] = await Promise.all([
         store.get<SystemInfo>(KEYS.system),
@@ -208,7 +225,7 @@ function MainAppContent() {
         const {members: migratedMembers, changed: avatarsChanged} = await migrateInlineAvatars(loadedMembers);
         if (avatarsChanged) {
           loadedMembers = migratedMembers;
-          await store.set(KEYS.members, loadedMembers);
+          if (!storageSuspect) await store.set(KEYS.members, loadedMembers);
         }
       } catch (e) {
         console.error('[PS] avatar migration error:', e);
@@ -218,30 +235,51 @@ function MainAppContent() {
         if (pathsChanged) {
           loadedMembers = rebasedMembers;
           loadedSystem = rebasedSystem;
-          await store.set(KEYS.members, loadedMembers);
-          if (rebasedSystem) await store.set(KEYS.system, rebasedSystem);
+          if (!storageSuspect) {
+            await store.set(KEYS.members, loadedMembers);
+            if (rebasedSystem) await store.set(KEYS.system, rebasedSystem);
+          }
           console.log('[STARTUP] rebased stale Documents:// media paths');
         }
       } catch (e) {
         console.error('[PS] media path rebase error:', e);
       }
       let loadedSettingsObj: AppSettings = {...DEFAULT_SETTINGS, ...(settings || {})};
-      if (!loadedSettingsObj.customFrontsSeeded) {
-        loadedMembers = [...loadedMembers, ...makeDefaultCustomFronts()];
+      if (!loadedSettingsObj.customFrontsSeeded && !storageSuspect) {
+        const existingCustomNames = new Set(loadedMembers.filter(m => m.isCustomFront).map(m => (m.name || '').toLowerCase()));
+        const seeds = makeDefaultCustomFronts().filter(cf => !existingCustomNames.has(cf.name.toLowerCase()));
+        loadedMembers = [...loadedMembers, ...seeds];
         loadedSettingsObj = {...loadedSettingsObj, customFrontsSeeded: true};
-        await store.set(KEYS.members, loadedMembers);
+        if (seeds.length > 0) await store.set(KEYS.members, loadedMembers);
         await store.set(KEYS.settings, normalizeAppearanceSettings(loadedSettingsObj, systemScheme));
       }
       if (!loadedSystem) {
-        console.warn('[STARTUP] No system info loaded — entering first-run state. If this is unexpected, check for AsyncStorage failures above.');
-        setFirstRun(true);
+        const realMemberCount = (loadedMembers || []).filter(m => !m.isCustomFront).length;
+        const hasUserData = realMemberCount > 0 || (hist && hist.length > 0) || (jour && jour.length > 0) || (grps && grps.length > 0);
+        if (hasUserData) {
+          // The system record was lost (e.g. AsyncStorage didn't flush before a
+          // power-off — a known iOS issue) but the user's members/history survived.
+          // Reconstruct a minimal system and persist it instead of dropping into
+          // first-run Setup, which would strand their data and look like a full wipe.
+          console.warn(`[STARTUP] System missing but ${realMemberCount} members + data present — reconstructing system, NOT entering first-run.`);
+          const recovered: SystemInfo = {name: '', description: ''};
+          loadedSystem = recovered;
+          if (!storageSuspect) await store.set(KEYS.system, recovered);
+          setSystem(recovered);
+        } else if (storageSuspect) {
+          console.warn('[STARTUP] Blank load with suspect storage — staying OUT of first-run; will retry on foreground.');
+          setSystem({name: '', description: ''});
+        } else {
+          console.warn('[STARTUP] No system info loaded — entering first-run state. If this is unexpected, check for AsyncStorage failures above.');
+          setFirstRun(true);
+        }
       } else {
         setSystem(loadedSystem);
       }
       setMembers(loadedMembers);
       const migratedFront = migrateFrontState(fr) || findOpenFrontInHistory(hist || []);
       setFront(migratedFront);
-      if ((fr && !fr.primary && migratedFront) || (!fr && migratedFront)) {
+      if (((fr && !fr.primary && migratedFront) || (!fr && migratedFront)) && !storageSuspect) {
         await store.set(KEYS.front, migratedFront);
       }
       setHistory(hist || []);
@@ -256,7 +294,7 @@ function MainAppContent() {
       let channels = savedChannels || [];
       if (channels.length === 0) {
         channels = DEFAULT_CHANNELS.map(c => ({id: uid(), name: c.name, createdAt: Date.now()}));
-        await store.set(KEYS.chatChannels, channels);
+        if (!storageSuspect) await store.set(KEYS.chatChannels, channels);
       }
       setChatChannels(channels);
       await loadChatMessages(channels);
@@ -276,7 +314,8 @@ function MainAppContent() {
 
       try {
         const savedCodes = await store.get<DeviceCodes>(KEYS.deviceCodes);
-        if (!savedCodes || !savedCodes.friendCode || !savedCodes.syncCode) {
+        // Suspect loads must not rotate identity codes off a blank read.
+        if ((!savedCodes || !savedCodes.friendCode || !savedCodes.syncCode) && !storageSuspect) {
           const fresh: DeviceCodes = {friendCode: generateFriendCode(), syncCode: generateSyncCode(), createdAt: Date.now()};
           await store.set(KEYS.deviceCodes, fresh);
         }
@@ -287,8 +326,16 @@ function MainAppContent() {
       if (savedLang) changeLanguage(savedLang as SupportedLanguage);
     } catch (e) {
       console.error('[PS] startup load error:', e);
-      setSystem({name: '', description: ''});
-      setMembers([]);
+      storageSuspectRef.current = true;
+      // A transient load error must NOT look like a wipe. Try a focused recovery of
+      // the user's members/system (store.get self-heals from the file backup) before
+      // deciding to show first-run Setup. Only enter first-run if nothing is recoverable.
+      let recoveredMembers: Member[] = [];
+      let recoveredSystem: SystemInfo | null = null;
+      try { recoveredMembers = (await store.get<Member[]>(KEYS.members, [])) || []; } catch {}
+      try { recoveredSystem = await store.get<SystemInfo>(KEYS.system); } catch {}
+      const realCount = recoveredMembers.filter(m => !m.isCustomFront).length;
+      setMembers(recoveredMembers);
       setFront(null);
       setHistory([]);
       setJournal([]);
@@ -299,7 +346,16 @@ function MainAppContent() {
       setPalettes([]);
       setChatChannels(DEFAULT_CHANNELS.map(c => ({id: uid(), name: c.name, createdAt: Date.now()})));
       setAllChatMessages([]);
-      setFirstRun(true);
+      if (recoveredSystem) {
+        setSystem(recoveredSystem);
+      } else if (realCount > 0) {
+        const r: SystemInfo = {name: '', description: ''};
+        setSystem(r);
+        console.warn(`[STARTUP] load error but ${realCount} members recovered — reconstructed system instead of first-run.`);
+      } else {
+        setSystem({name: '', description: ''});
+        console.warn('[STARTUP] load error with nothing recovered — staying OUT of first-run; will retry on foreground.');
+      }
     } finally {
       setLoaded(true);
     }
@@ -358,9 +414,41 @@ function MainAppContent() {
     } catch (e) { console.error('[PS] File permission error:', e); }
   };
 
-  const supportsPersistentNotifications = Platform.OS === 'android';
+  const supportsPersistentNotifications = Platform.OS === 'android' || Platform.OS === 'ios';
 
   useEffect(() => { loadAll(); }, [loadAll]);
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', s => {
+      if (s === 'active' && storageSuspectRef.current) {
+        console.warn('[STARTUP] foreground after suspect load — retrying loadAll');
+        loadAll();
+      }
+    });
+    return () => sub.remove();
+  }, [loadAll]);
+  useEffect(() => { NetworkManager.init().catch(e => console.error('[NETWORK] init failed:', e)); }, []);
+  useEffect(() => { if (loaded) NetworkManager.updateMyFront(front, members).catch(() => {}); }, [loaded, front, members]);
+  // Poke the sync engine when any synced data changes (it debounces + rate-limits).
+  useEffect(() => { NetworkManager.notifyDataChanged(); }, [system, members, history, journal, journalTemplates, groups, palettes, chatChannels, medical, appSettings]);
+  // Apply incoming device-sync writes by reloading app state.
+  useEffect(() => NetworkManager.onSyncApplied(() => { loadAll(); }), [loadAll]);
+  // Prompt to resolve a device-sync conflict (which device's data wins).
+  useEffect(() => NetworkManager.onSyncConflict(c => {
+    Alert.alert(
+      t('network.syncConflictTitle'),
+      t('network.syncConflictMsg', {device: c.deviceName, defaultValue: `Your data differs from ${c.deviceName}. Which device should win?`}),
+      [
+        {text: t('network.keepThisDevice'), onPress: () => { NetworkManager.resolveConflict(c.peerId, 'mine'); }},
+        {text: t('network.keepOtherDevice'), onPress: () => { NetworkManager.resolveConflict(c.peerId, 'theirs'); }},
+      ],
+    );
+  }), [t]);
+  useEffect(() => NetworkManager.onSyncRoleMismatch(c => {
+    Alert.alert(
+      t('network.syncRoleMismatchTitle', {defaultValue: 'Sync setup mismatch'}),
+      t('network.syncRoleMismatchMsg', {device: c.deviceName, defaultValue: `You and ${c.deviceName} both chose the same direction, so the initial copy was skipped. New changes will still sync. To copy everything, remove the link and pair again — choose "send" on one device and "receive" on the other.`}),
+    );
+  }), [t]);
   useEffect(() => { if (loaded && !firstRun) requestPermissions(); }, [loaded, firstRun]);
 
   useEffect(() => {
@@ -374,6 +462,20 @@ function MainAppContent() {
     if (appSettings.notificationsEnabled) { showFrontNotification(front, members, system.name).catch(e => console.error('[PS] notif error:', e)); }
     else { clearFrontNotification().catch(e => console.error('[PS] clear notif error:', e)); }
   }, [front, members, appSettings.notificationsEnabled, supportsPersistentNotifications, system.name]);
+
+  useEffect(() => {
+    let last: string | null = null;
+    let debounce: ReturnType<typeof setTimeout> | null = null;
+    const unsub = NetworkManager.subscribe(s => {
+      const sig = `${s.enabled}|${s.friends.filter(f => f.showInNotification && f.status === 'accepted').map(f => `${f.peerId}:${f.statusUpdatedAt || 0}`).join(',')}`;
+      if (last !== null && sig !== last && appSettings.notificationsEnabled) {
+        if (debounce) clearTimeout(debounce);
+        debounce = setTimeout(() => { showFrontNotification(front, members, system.name).catch(() => {}); }, 2000);
+      }
+      last = sig;
+    });
+    return () => { if (debounce) clearTimeout(debounce); unsub(); };
+  }, [front, members, appSettings.notificationsEnabled, system.name]);
 
   useEffect(() => {
     if (!supportsPersistentNotifications || !front || !appSettings.notificationsEnabled) return;
@@ -435,7 +537,7 @@ function MainAppContent() {
           const member = members.find(m => m.id === memberId);
           if (!member) continue;
           const lastSeenTs = lastSeen[memberId] || 0;
-          const unread = allNotes.filter(n => n.memberId === memberId && n.timestamp > lastSeenTs);
+          const unread = allNotes.filter(n => n.memberId === memberId && !n.read && n.timestamp > lastSeenTs);
           if (unread.length > 0) {
             entries.push({memberName: member.name, unreadCount: unread.length});
           }
@@ -626,8 +728,8 @@ function MainAppContent() {
         e.endTime === null && e.startTime === front.startTime && (!e.changeType || e.changeType === 'front') ? {...e, endTime: now} : e);
     }
 
+    let finalFront = nf;
     if (nf) {
-      const frontEntry = frontToHistoryEntry(nf, null, 'front');
       if (continuing) {
         const extras: HistoryEntry[] = [];
         const moodChanged = (nf.primary.mood || undefined) !== (front!.primary.mood || undefined);
@@ -643,16 +745,33 @@ function MainAppContent() {
           entry.changeTime = now + 1;
           extras.push(entry);
         }
-        newHistory = newHistory.map(e =>
-          e.endTime === null && e.startTime === front!.startTime && (!e.changeType || e.changeType === 'front') ? frontEntry : e);
-        newHistory = [...extras, ...newHistory];
+        const tierTracked = (a: FrontTier, b: FrontTier) =>
+          (a.mood || undefined) !== (b.mood || undefined) || (a.energyLevel ?? undefined) !== (b.energyLevel ?? undefined);
+        const segment = tierTracked(nf.primary, front!.primary) || tierTracked(nf.coFront, front!.coFront)
+          || tierTracked(nf.coConscious, front!.coConscious) || locChanged;
+        if (segment) {
+          // Tracked state changed mid-session: close the open entry as it was
+          // and start a new segment, so history keeps the timeline instead of
+          // overwriting it.
+          finalFront = {...nf, startTime: now};
+          const segEntry = frontToHistoryEntry(finalFront, null, 'front');
+          newHistory = newHistory.map(e =>
+            e.endTime === null && e.startTime === front!.startTime && (!e.changeType || e.changeType === 'front') ? {...e, endTime: now} : e);
+          newHistory = [segEntry, ...extras, ...newHistory];
+        } else {
+          const frontEntry = frontToHistoryEntry(nf, null, 'front');
+          newHistory = newHistory.map(e =>
+            e.endTime === null && e.startTime === front!.startTime && (!e.changeType || e.changeType === 'front') ? frontEntry : e);
+          newHistory = [...extras, ...newHistory];
+        }
       } else {
+        const frontEntry = frontToHistoryEntry(nf, null, 'front');
         newHistory = [frontEntry, ...newHistory];
       }
     }
 
-    setFront(nf);
-    await store.set(KEYS.front, nf);
+    setFront(finalFront);
+    await store.set(KEYS.front, finalFront);
     await saveHistory(newHistory);
     await syncFrontToPluralKit(nf);
 
@@ -704,33 +823,65 @@ function MainAppContent() {
     const tierData = front[tier];
     const resolvedLocation = tier === 'primary' ? await maybeGPS(location) : tierData.location;
     const updatedTier = {...tierData, mood, location: resolvedLocation, note: note ?? tierData.note};
-    const updated = {...front, [tier]: updatedTier};
+    const moodChanged = (mood || undefined) !== (tierData.mood || undefined);
+    const locChanged = tier === 'primary' && (resolvedLocation || undefined) !== (tierData.location || undefined);
+    const noteChanged = note !== undefined && (note || undefined) !== (tierData.note || undefined);
+    const segment = moodChanged || locChanged;
+    const updated = segment ? {...front, [tier]: updatedTier, startTime: now} : {...front, [tier]: updatedTier};
     setFront(updated); await store.set(KEYS.front, updated);
     if (tier === 'primary') {
       if (resolvedLocation) await updateLastLocation(resolvedLocation);
       else await clearLastLocation();
     }
     const extras: HistoryEntry[] = [];
-    const moodChanged = (mood || undefined) !== (tierData.mood || undefined);
-    const locChanged = tier === 'primary' && (resolvedLocation || undefined) !== (tierData.location || undefined);
-    const noteChanged = note !== undefined && (note || undefined) !== (tierData.note || undefined);
     if (moodChanged || locChanged) { const entry = frontToHistoryEntry(updated, null, moodChanged ? 'mood' : 'location', tier); entry.changeTime = now; extras.push(entry); }
     if (noteChanged) { const entry = frontToHistoryEntry(updated, null, 'note', tier); entry.changeTime = now + 1; extras.push(entry); }
-    if (extras.length > 0) await saveHistory([...extras, ...history]);
+    let newHistory = [...history];
+    if (segment) {
+      const segEntry = frontToHistoryEntry(updated, null, 'front');
+      newHistory = newHistory.map(e =>
+        e.endTime === null && e.startTime === front.startTime && (!e.changeType || e.changeType === 'front') ? {...e, endTime: now} : e);
+      newHistory = [segEntry, ...extras, ...newHistory];
+      await saveHistory(newHistory);
+    } else if (extras.length > 0) {
+      await saveHistory([...extras, ...newHistory]);
+    }
+  };
+
+  const quickAddToFront = async (id: string, tierKey: FrontTierKey) => {
+    const strip = (tier: FrontTier): FrontTier => ({...tier, memberIds: tier.memberIds.filter(x => x !== id)});
+    const tiers: Record<FrontTierKey, FrontTier> = {
+      primary: front ? strip(front.primary) : {memberIds: [], note: ''},
+      coFront: front ? strip(front.coFront) : {memberIds: [], note: ''},
+      coConscious: front ? strip(front.coConscious) : {memberIds: [], note: ''},
+    };
+    tiers[tierKey] = {...tiers[tierKey], memberIds: [...tiers[tierKey].memberIds, id]};
+    await updateFront(tiers.primary, tiers.coFront, tiers.coConscious);
+  };
+
+  const removeFromFront = async (id: string) => {
+    if (!front) return;
+    await updateFront(
+      {...front.primary, memberIds: front.primary.memberIds.filter(x => x !== id)},
+      {...front.coFront, memberIds: front.coFront.memberIds.filter(x => x !== id)},
+      {...front.coConscious, memberIds: front.coConscious.memberIds.filter(x => x !== id)},
+    );
   };
 
   const saveMember = async (m: Member) => {
     const u = members.find(x => x.id === m.id) ? members.map(x => (x.id === m.id ? m : x)) : [...members, m];
     await saveMembers(u);
   };
-  const deleteMember = async (id: string) => saveMembers(members.filter(m => m.id !== id));
+  // Soft-delete: keep a hidden tombstone (archived + deleted) so front history & stats
+  // still resolve the member's name instead of showing the raw ID ("scary symbols").
+  const deleteMember = async (id: string) => saveMembers(members.map(m => m.id === id ? {...m, archived: true, deleted: true} : m));
   const bulkSetArchived = async (ids: string[], archived: boolean) => {
     const idSet = new Set(ids);
     await saveMembers(members.map(m => idSet.has(m.id) ? {...m, archived} : m));
   };
   const bulkDeleteMembers = async (ids: string[]) => {
     const idSet = new Set(ids);
-    await saveMembers(members.filter(m => !idSet.has(m.id)));
+    await saveMembers(members.map(m => idSet.has(m.id) ? {...m, archived: true, deleted: true} : m));
   };
   const bulkAddGroups = async (ids: string[], groupIds: string[]) => {
     const idSet = new Set(ids);
@@ -773,7 +924,7 @@ function MainAppContent() {
     return (
       <View style={[styles.loading, {backgroundColor: T.bg}]}>
         <StatusBar barStyle="light-content" backgroundColor={T.bg} translucent={false} />
-        <Image source={require('./src/assets/splash-logo.png')} style={styles.splashLogo} resizeMode="contain" />
+        <Image source={require('./src/assets/splash-logo.png')} accessibilityElementsHidden importantForAccessibility="no" style={styles.splashLogo} resizeMode="contain" />
         <Text style={[styles.splashName, {color: T.accent}]}>Plural Star</Text>
       </View>
     );
@@ -851,6 +1002,22 @@ function MainAppContent() {
     <MedicalScreen theme={C} medical={medical} onSave={saveMedical} />
   );
 
+  const renderNetworkScreen = () => (
+    <NetworkScreen theme={C} members={members} groups={groups} journal={journal} />
+  );
+
+  const renderMailboxScreen = (onBack: () => void) => (
+    <MailboxScreen theme={C} members={members} onBack={onBack}
+      onSetMailboxPassword={(memberId, password) => {
+        const m = members.find(x => x.id === memberId);
+        if (m) saveMember({...m, mailboxPassword: password});
+      }} />
+  );
+
+  const renderWhiteboardScreen = (onBack: () => void) => (
+    <WhiteboardScreen theme={C} onBack={onBack} />
+  );
+
   const renderArchiveScreen = () => (
     <MembersScreen theme={C} members={members} front={front} groups={groups} archiveOnly
       onAdd={() => {}}
@@ -878,6 +1045,7 @@ function MainAppContent() {
             onEditStatus={m => {setEditCustomFront(m); setShowCustomFront(true);}} />;
         }
         return <MembersScreen theme={C} members={members} front={front} groups={groups} initialSortMode={appSettings.memberSortMode} memberListFields={appSettings.memberListFields} onSaveListFields={async (next: any) => {const sNext = {...appSettings, memberListFields: next}; setAppSettings(sNext); await store.set(KEYS.settings, sNext);}}
+          onQuickAddToFront={quickAddToFront} onRemoveFromFront={removeFromFront}
           onAdd={() => {setEditMember(null); setViewOnlyMember(false); setAddCustomFront(false); setShowMember(true);}}
           onAddCustomFront={() => {setEditCustomFront(null); setShowCustomFront(true);}}
           onEdit={m => { if (m.isCustomFront) {setEditCustomFront(m); setShowCustomFront(true);} else {setEditMember(m); setViewOnlyMember(false); setShowMember(true);} }}
@@ -885,9 +1053,12 @@ function MainAppContent() {
           onSaveGroups={saveGroups} onSaveSortMode={async (mode) => {const next = normalizeAppearanceSettings({...appSettings, memberSortMode: mode}, systemScheme); setAppSettings(next); await store.set(KEYS.settings, next);}} onReorderMember={async (id, direction) => {
           const active = members.filter(m => !m.archived);
           const archived = members.filter(m => m.archived);
-          const needsInit = active.some(m => m.sortOrder === undefined);
-          const seeded = needsInit ? active.map((m, i) => ({...m, sortOrder: i})) : [...active];
-          const ordered = [...seeded].sort((a, b) => (a.sortOrder ?? 9999) - (b.sortOrder ?? 9999));
+          // Order exactly the way the Members list shows manual sort: by sortOrder,
+          // with members that have none (e.g. freshly imported) falling to the end in
+          // a stable order. Then reindex so those get real positions — previously this
+          // re-seeded from the raw members-array index, which didn't match the on-screen
+          // order, so ▲/▼ moved the wrong neighbours for imported members.
+          const ordered = [...active].sort((a, b) => (a.sortOrder ?? Number.MAX_SAFE_INTEGER) - (b.sortOrder ?? Number.MAX_SAFE_INTEGER));
           const idx = ordered.findIndex(m => m.id === id);
           if (idx === -1) return;
           const swapWith = direction === 'up' ? idx - 1 : idx + 1;
@@ -902,7 +1073,7 @@ function MainAppContent() {
           onBulkAddGroups={bulkAddGroups}
         />;
       case 'hub':
-        return <HubScreen theme={C} singlet={isSinglet} selfId={selfMember?.id} members={members} history={history} front={front} onSaveHistory={saveHistory} onSetFront={handleHubSetFront} renderShareScreen={renderShareScreen} renderStatsScreen={renderStatsScreen} renderChatScreen={renderChatScreen} renderCustomFieldsScreen={renderCustomFieldsScreen} renderSystemManagerScreen={() => <SystemManagerScreen theme={C} members={members} groups={groups} onSaveGroups={saveGroups} onViewMember={openMemberById} />} renderArchiveScreen={renderArchiveScreen} renderPollsScreen={renderPollsScreen} renderSystemMapScreen={renderSystemMapScreen} systemMapRelCount={systemMapRelCount} mapFocus={mapFocus} renderMedicalScreen={renderMedicalScreen} resetKey={hubResetKey} editHistoryIndex={editHistoryIndex} onClearEditHistory={() => setEditHistoryIndex(null)} />;
+        return <HubScreen theme={C} singlet={isSinglet} selfId={selfMember?.id} members={members} history={history} front={front} onSaveHistory={saveHistory} onSetFront={handleHubSetFront} renderShareScreen={renderShareScreen} renderStatsScreen={renderStatsScreen} renderChatScreen={renderChatScreen} renderCustomFieldsScreen={renderCustomFieldsScreen} renderSystemManagerScreen={() => <SystemManagerScreen theme={C} members={members} groups={groups} onSaveGroups={saveGroups} onViewMember={openMemberById} />} renderArchiveScreen={renderArchiveScreen} renderPollsScreen={renderPollsScreen} renderSystemMapScreen={renderSystemMapScreen} systemMapRelCount={systemMapRelCount} mapFocus={mapFocus} renderMedicalScreen={renderMedicalScreen} renderMailboxScreen={renderMailboxScreen} renderWhiteboardScreen={renderWhiteboardScreen} renderNetworkScreen={renderNetworkScreen} resetKey={hubResetKey} editHistoryIndex={editHistoryIndex} onClearEditHistory={() => setEditHistoryIndex(null)} />;
       case 'journal':
         return <JournalScreen theme={C} journal={journal} templates={journalTemplates} members={members} systemJournalPassword={system.journalPassword} onAdd={() => {setEditJournal(null); setShowJournal(true);}} onEdit={e => {setEditJournal(e); setShowJournal(true);}} onDelete={deleteEntry} onTogglePin={e => saveEntry({...e, pinned: !e.pinned})} onSaveTemplates={saveJournalTemplates} onMentionPress={openMemberById} />;
       case 'history':
