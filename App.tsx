@@ -1,22 +1,24 @@
 import React, {useState, useEffect, useCallback, useMemo, useRef} from 'react';
-import {View, Image, TouchableOpacity, StyleSheet, StatusBar, Platform, PermissionsAndroid, Alert, AppState, useColorScheme} from 'react-native';
-import {Text, TextInput, setAppTextDyslexicEnabled, setAppTextFont} from './src/components/AppText';
+import {View, StyleSheet, StatusBar, Alert, AppState, BackHandler, Platform} from 'react-native';
+import {setAppTextFont} from './src/components/AppText';
 import {fontFamilyForChoice} from './src/theme';
-import {SafeAreaProvider, useSafeAreaInsets} from 'react-native-safe-area-context';
+import {SafeAreaProvider, SafeAreaView} from 'react-native-safe-area-context';
+import {KeyboardProvider} from 'react-native-keyboard-controller';
 import {useTranslation} from 'react-i18next';
-import notifee from '@notifee/react-native';
 
 import './src/i18n/i18n';
-import i18n, {changeLanguage} from './src/i18n/i18n';
+import {changeLanguage} from './src/i18n/i18n';
 import type {SupportedLanguage} from './src/i18n/i18n';
+import {setTerminologyOverrides, setTierNameOverrides} from './src/i18n/terminology';
+import {ImageCropHost} from './src/components/ImageCropModal';
 
-import {T, BUILTIN_PALETTES, deriveTheme} from './src/theme';
+import {BUILTIN_PALETTES, deriveTheme} from './src/theme';
 import type {CustomPalette, ThemeColors} from './src/theme';
-import {AccentText} from './src/components/AccentText';
-import {store, KEYS, storageLooksWiped, restoreAllBackups} from './src/storage';
-import {SystemInfo, Member, MemberGroup, FrontState, FrontTier, FrontTierKey, HistoryEntry, JournalEntry, JournalTemplate, ShareSettings, AppSettings, ChatChannel, ChatMessage, NoteboardEntry, DeviceCodes, MedicalData, DEFAULT_MEDICAL, DEFAULT_CHANNELS, findOpenFrontInHistory, migrateFrontState, frontToHistoryEntry, uid, makeDefaultCustomFronts, isFrontEmpty, allFrontMemberIds, singletStatuses, generateFriendCode, generateSyncCode, emergencyNotificationLine, DEFAULT_THEME_MODE, paletteIdForThemeMode, normalizeAppearanceSettings} from './src/utils';
-import {migrateInlineAvatars, migrateInlineChatMedia, clearAllMedia, migrateStaleMediaPaths, rebaseChatMessageMedia} from './src/utils/mediaUtils';
-import {showFrontNotification, clearFrontNotification, scheduleFrontCheckReminder, cancelFrontCheckReminder, showNoteboardNotification, clearNoteboardNotification, scheduleFrontNotificationRefresh, cancelFrontNotificationRefresh, setEmergencyNotificationInfo, rescheduleMedicationReminders, rescheduleAppointmentReminders} from './src/services/NotificationService';
+import {store, KEYS, storageLooksWiped, restoreAllBackups, storageReadFailures, anyPsKeysExist} from './src/storage';
+import {SystemInfo, Member, MemberGroup, FrontState, FrontTier, FrontTierKey, HistoryEntry, JournalEntry, JournalTemplate, ShareSettings, AppSettings, ChatChannel, ChatCategory, DeviceCodes, MedicalData, DEFAULT_MEDICAL, PlannerData, DEFAULT_PLANNER, DEFAULT_CHANNELS, findOpenFrontInHistory, migrateFrontState, uid, makeDefaultCustomFronts, allFrontMemberIds, singletStatuses, generateFriendCode, generateSyncCode} from './src/utils';
+import {migrateInlineAvatars, clearAllMedia, migrateStaleMediaPaths, downsizeExistingAvatars, restoreMissingMediaFiles} from './src/utils/mediaUtils';
+import {clearFrontNotification, setEmergencyNotificationInfo, rescheduleMedicationReminders, rescheduleAppointmentReminders, reschedulePlannerNotifications} from './src/services/NotificationService';
+import {waitForProtectedData} from './src/services/LiveActivityService';
 
 import {SetupScreen} from './src/screens/SetupScreen';
 import {LockScreen} from './src/screens/LockScreen';
@@ -32,76 +34,37 @@ import {ChatScreen} from './src/screens/ChatScreen';
 import {CustomFieldsScreen} from './src/screens/CustomFieldsScreen';
 import {PollsScreen} from './src/screens/PollsScreen';
 import {SystemMapScreen} from './src/screens/SystemMapScreen';
-import {MedicalScreen} from './src/screens/MedicalScreen';
 import {MailboxScreen} from './src/screens/MailboxScreen';
 import {WhiteboardScreen} from './src/screens/WhiteboardScreen';
+import {ColorsScreen} from './src/screens/ColorsScreen';
 import {StatusScreen} from './src/screens/StatusScreen';
 import {ProfileScreen} from './src/screens/ProfileScreen';
 import {NetworkScreen} from './src/screens/NetworkScreen';
 import {NetworkManager} from './src/network/NetworkManager';
-import {SetFrontModal, SetStatusModal, EditFrontDetailModal, MemberModal, JournalModal, SystemModal, CustomFrontModal} from './src/modals';
-
-type Tab = 'front' | 'members' | 'hub' | 'journal' | 'history';
-
-const TAB_IDS: Tab[] = ['front', 'members', 'hub', 'journal', 'history'];
-const TAB_ICONS: Record<Tab, string> = {
-  front: '◈', members: '◇', hub: '⬡', journal: '◉', history: '◷',
-};
-
-const DEFAULT_SETTINGS: AppSettings = {locations: [], customMoods: [], themeMode: DEFAULT_THEME_MODE, lightMode: false, gpsEnabled: false, filesEnabled: true, language: 'en', notificationsEnabled: true, noteboardNotifications: true, activePaletteId: '__dark__', textScale: 1.0, useDyslexicFont: false, pkFrontSyncEnabled: false};
-
-const PK_MEMBER_REF_RE = /^(?:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|[a-z]{5})$/i;
-const EXTERNAL_API_USER_AGENT = 'PluralStar/1.10.2 (the1hanyou@gmail.com)';
-const PK_FRONT_SYNC_COOLDOWN_MS = 5000;
-
-const pluralKitMemberRefForSource = (value?: string): string | null => {
-  const trimmed = value?.trim();
-  if (!trimmed) return null;
-  const candidate = trimmed.startsWith('pk:') ? trimmed.slice(3) : trimmed;
-  return PK_MEMBER_REF_RE.test(candidate) ? candidate : null;
-};
-
-const setDyslexicEnabled = (on: boolean) => {
-  setAppTextDyslexicEnabled(on);
-};
-
-const getGPSLocation = (): Promise<string | null> =>
-  new Promise(async resolve => {
-    try {
-      if (Platform.OS === 'android') {
-        const granted = await PermissionsAndroid.request(
-          PermissionsAndroid.PERMISSIONS.ACCESS_COARSE_LOCATION,
-          {title: i18n.t('notification.locationPermTitle'), message: i18n.t('notification.locationPermMsg'), buttonPositive: i18n.t('notification.allow'), buttonNegative: i18n.t('notification.deny')},
-        );
-        if (granted !== PermissionsAndroid.RESULTS.GRANTED) {resolve(null); return;}
-      }
-      ((globalThis as any).navigator)?.geolocation?.getCurrentPosition(
-        async (pos: any) => {
-          try {
-            const {latitude, longitude} = pos.coords;
-            const res = await fetch(
-              `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json&zoom=10`,
-              {headers: {'User-Agent': EXTERNAL_API_USER_AGENT}},
-            );
-            const data = await res.json();
-            const a = data.address || {};
-            const name = a.neighbourhood || a.suburb || a.village || a.town || a.city || a.county || a.state || null;
-            resolve(name);
-          } catch { resolve(null); }
-        },
-        () => resolve(null),
-        {timeout: 8000, maximumAge: 120000},
-      );
-    } catch { resolve(null); }
-  });
+import {CloudServices, bootCloudServices} from './src/cloud/cloudPlatform';
+import {installDestructiveGuard} from './src/cloud/destructiveGuard';
+import {SetFrontModal, SetStatusModal, EditFrontDetailModal, MemberModal, JournalModal, SystemModal, SystemProfileModal, CustomFrontModal} from './src/modals';
+import {AppErrorBoundary} from './src/components/AppErrorBoundary';
+import {SplashView} from './src/components/SplashView';
+import {AppHeader} from './src/components/AppHeader';
+import {TabBar, Tab, TAB_IDS} from './src/components/TabBar';
+import {useFrontNotifications} from './src/hooks/useFrontNotifications';
+import {useNoteboardNotifications} from './src/hooks/useNoteboardNotifications';
+import {useAppStore, DEFAULT_SETTINGS} from './src/store/appStore';
+import {saveSystem, saveMembers, saveHistory, saveJournal, saveJournalTemplates, saveShareSettings, saveGroups, savePalettes, saveChatChannels, saveMedical, selectPalette, updateFront, updateFrontDetails, quickAddToFront, removeFromFront, saveMember, deleteMember, restoreDeletedMember, pruneFrontOfRemovedMembers, bulkSetArchived, bulkDeleteMembers, bulkAddGroups, bulkAddTags, bulkRemoveFromGroup, bulkSetFacet, saveEntry, deleteEntry, addJournalEntry, saveAppSettings, ensureSelfMember, saveMemberListFields, saveMemberSortMode, reorderMember} from './src/store/actions';
+import {requestPermissions} from './src/utils/permissions';
+import {logError} from './src/utils/log';
+import {mergeHistoryEntries} from './src/import/convert';
 
 function MainAppContent() {
   const {t} = useTranslation();
-  const systemScheme = useColorScheme() === 'light' ? 'light' : 'dark';
 
-  const [loaded, setLoaded] = useState(false);
+  const loaded = useAppStore(s => s.loaded);
+  const setLoaded = useAppStore(s => s.setLoaded);
   const [firstRun, setFirstRun] = useState(false);
   const storageSuspectRef = useRef(false);
+  const suspectRetriesRef = useRef(0);
+  const loadAllRef = useRef<(() => Promise<void>) | null>(null);
   const [locked, setLocked] = useState(false);
   const [tab, setTab] = useState<Tab>('front');
   const [systemMapRelCount, setSystemMapRelCount] = useState(0);
@@ -112,19 +75,52 @@ function MainAppContent() {
   }, [tab]);
   const [hubResetKey, setHubResetKey] = useState(0);
   const [editHistoryIndex, setEditHistoryIndex] = useState<number | null>(null);
-  const [system, setSystem] = useState<SystemInfo>({name: '', description: ''});
-  const [members, setMembers] = useState<Member[]>([]);
-  const [front, setFront] = useState<FrontState | null>(null);
-  const [history, setHistory] = useState<HistoryEntry[]>([]);
-  const [journal, setJournal] = useState<JournalEntry[]>([]);
-  const [journalTemplates, setJournalTemplates] = useState<JournalTemplate[]>([]);
-  const [shareSettings, setShareSettings] = useState<ShareSettings>({showFront: true, showMembers: true, showDescriptions: false});
-  const [appSettings, setAppSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
-  const [groups, setGroups] = useState<MemberGroup[]>([]);
-  const [palettes, setPalettes] = useState<CustomPalette[]>([]);
-  const [chatChannels, setChatChannels] = useState<ChatChannel[]>([]);
-  const [allChatMessages, setAllChatMessages] = useState<ChatMessage[]>([]);
-  const [medical, setMedical] = useState<MedicalData>(DEFAULT_MEDICAL);
+  const backStateRef = useRef({tab, locked, loaded});
+  backStateRef.current = {tab, locked, loaded};
+  useEffect(() => {
+    if (Platform.OS !== 'android') return;
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      const s = backStateRef.current;
+      if (!s.loaded || s.locked) return false;
+      if (s.tab !== 'front') {
+        setTab('front');
+        return true;
+      }
+      return false;
+    });
+    return () => sub.remove();
+  }, []);
+  const system = useAppStore(s => s.system);
+  const setSystem = useAppStore(s => s.setSystem);
+  const members = useAppStore(s => s.members);
+  const setMembers = useAppStore(s => s.setMembers);
+  const front = useAppStore(s => s.front);
+  const setFront = useAppStore(s => s.setFront);
+  const history = useAppStore(s => s.history);
+  const setHistory = useAppStore(s => s.setHistory);
+  const journal = useAppStore(s => s.journal);
+  const setJournal = useAppStore(s => s.setJournal);
+  const journalTemplates = useAppStore(s => s.journalTemplates);
+  const setJournalTemplates = useAppStore(s => s.setJournalTemplates);
+  const shareSettings = useAppStore(s => s.shareSettings);
+  const setShareSettings = useAppStore(s => s.setShareSettings);
+  const appSettings = useAppStore(s => s.appSettings);
+  const setAppSettings = useAppStore(s => s.setAppSettings);
+  const groups = useAppStore(s => s.groups);
+  const setGroups = useAppStore(s => s.setGroups);
+  const palettes = useAppStore(s => s.palettes);
+  const setPalettes = useAppStore(s => s.setPalettes);
+  const activePaletteId = useAppStore(s => s.activePaletteId);
+  const setActivePaletteId = useAppStore(s => s.setActivePaletteId);
+  const chatChannels = useAppStore(s => s.chatChannels);
+  const setChatChannels = useAppStore(s => s.setChatChannels);
+  const setChatCategories = useAppStore(s => s.setChatCategories);
+  const setAllChatMessages = useAppStore(s => s.setAllChatMessages);
+  const medical = useAppStore(s => s.medical);
+  const setMedical = useAppStore(s => s.setMedical);
+  const setPlanner = useAppStore(s => s.setPlanner);
+  useEffect(() => { setTerminologyOverrides(appSettings.terminology); }, [appSettings.terminology]);
+  useEffect(() => { setTierNameOverrides(appSettings.tierNames); }, [appSettings.tierNames]);
 
   const [showSetFront, setShowSetFront] = useState(false);
   const [showEditFrontDetail, setShowEditFrontDetail] = useState(false);
@@ -133,19 +129,14 @@ function MainAppContent() {
   const [editMember, setEditMember] = useState<Member | null>(null);
   const [viewOnlyMember, setViewOnlyMember] = useState(false);
   const [addCustomFront, setAddCustomFront] = useState(false);
+  const [addFacet, setAddFacet] = useState(false);
   const [showCustomFront, setShowCustomFront] = useState(false);
   const [editCustomFront, setEditCustomFront] = useState<Member | null>(null);
   const [showJournal, setShowJournal] = useState(false);
   const [editJournal, setEditJournal] = useState<JournalEntry | null>(null);
   const [showSystem, setShowSystem] = useState(false);
+  const [showSystemProfile, setShowSystemProfile] = useState(false);
   const [, setDyslexicTick] = useState(0);
-  const insets = useSafeAreaInsets();
-  const fs = (s: number) => Math.round(s * (appSettings.textScale || 1));
-  const pkSyncTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const pkPendingMemberRefsRef = useRef<string[] | null>(null);
-  const pkLastSyncedKeyRef = useRef('');
-  const pkLastSyncAtRef = useRef(0);
-  const pkSyncInFlightRef = useRef(false);
 
   const openMemberById = (id: string) => {
     const m = members.find(mb => mb.id === id);
@@ -162,38 +153,22 @@ function MainAppContent() {
   };
 
   const C: ThemeColors = useMemo(() => {
-    const resolvedPaletteId = paletteIdForThemeMode(appSettings.themeMode || DEFAULT_THEME_MODE, systemScheme);
     const allPals = [...BUILTIN_PALETTES, ...palettes];
-    const pal = allPals.find(p => p.id === resolvedPaletteId) || BUILTIN_PALETTES[0];
+    const pal = allPals.find(p => p.id === activePaletteId) || BUILTIN_PALETTES[0];
     const theme = deriveTheme(pal.bg, pal.accent, pal.text, pal.mid);
     theme.textScale = appSettings.textScale || 1;
     return theme;
-  }, [appSettings.textScale, appSettings.themeMode, palettes, systemScheme]);
-
-  const loadChatMessages = useCallback(async (channels: ChatChannel[]) => {
-    const allMsgs: ChatMessage[] = [];
-    for (const ch of channels) {
-      if (ch.archived) continue;
-      try {
-        const msgs = await store.get<ChatMessage[]>(`ps:chat:${ch.id}`, []);
-        if (msgs) {
-          const {messages: migrated, changed} = await migrateInlineChatMedia(msgs);
-          const {messages: rebased, changed: rebasedChanged} = rebaseChatMessageMedia(changed ? migrated : msgs);
-          const finalMsgs = rebasedChanged ? rebased : (changed ? migrated : msgs);
-          if (changed || rebasedChanged) await store.set(`ps:chat:${ch.id}`, finalMsgs);
-          allMsgs.push(...finalMsgs);
-        }
-      } catch (e) {
-        console.error('[PS] chat load error:', ch.id, e);
-      }
-    }
-    setAllChatMessages(allMsgs);
-  }, []);
+  }, [activePaletteId, palettes, appSettings.textScale]);
 
   const loadAll = useCallback(async () => {
+    const hadAnyPsKeys = await anyPsKeysExist();
     let storageSuspect = false;
+    if (!(await waitForProtectedData())) {
+      console.warn('[STARTUP] Protected data still locked (pre-unlock background launch) — marking storage suspect.');
+      storageSuspect = true;
+    }
     try {
-      if (await storageLooksWiped()) {
+      if (!storageSuspect && await storageLooksWiped()) {
         console.warn('[STARTUP] AsyncStorage blank but backups exist — restoring before load');
         const n = await restoreAllBackups();
         console.warn(`[STARTUP] restored ${n} keys from file backups`);
@@ -203,8 +178,9 @@ function MainAppContent() {
       storageSuspect = true;
     }
     storageSuspectRef.current = storageSuspect;
+    const readFailuresBefore = storageReadFailures();
     try {
-      const [sys, mem, fr, hist, jour, jourTemplates, share, settings, savedLang, grps, savedPalettes, savedChannels] = await Promise.all([
+      const [sys, mem, fr, hist, jour, jourTemplates, share, settings, savedLang, grps, savedPalettes, savedChannels, savedChatCats] = await Promise.all([
         store.get<SystemInfo>(KEYS.system),
         store.get<Member[]>(KEYS.members, []),
         store.get<any>(KEYS.front),
@@ -217,15 +193,27 @@ function MainAppContent() {
         store.get<MemberGroup[]>(KEYS.groups, []),
         store.get<CustomPalette[]>(KEYS.palettes, []),
         store.get<ChatChannel[]>(KEYS.chatChannels, []),
+        store.get<ChatCategory[]>(KEYS.chatCategories, []),
       ]);
-      console.log(`[STARTUP] loadAll begin — sys:${!!sys} members:${(mem||[]).length} groups:${(grps||[]).length} journal:${(jour||[]).length} history:${(hist||[]).length} channels:${(savedChannels||[]).length}`);
+      if (!storageSuspect && !sys && (mem || []).length === 0 && (hist || []).length === 0 && AppState.currentState !== 'active') {
+        console.warn('[STARTUP] Blank load while app is not active — background/prewarm launch, storage may still be locked. Marking suspect; will retry on foreground.');
+        storageSuspect = true;
+        storageSuspectRef.current = true;
+      }
+      if (!storageSuspect && storageReadFailures() > readFailuresBefore) {
+        console.warn('[STARTUP] AsyncStorage read(s) FAILED during this load — marking suspect; will retry on foreground.');
+        storageSuspect = true;
+        storageSuspectRef.current = true;
+      }
       let loadedSystem = sys;
       let loadedMembers = mem || [];
       try {
-        const {members: migratedMembers, changed: avatarsChanged} = await migrateInlineAvatars(loadedMembers);
-        if (avatarsChanged) {
-          loadedMembers = migratedMembers;
-          if (!storageSuspect) await store.set(KEYS.members, loadedMembers);
+        if (!storageSuspect) {
+          const {members: migratedMembers, changed: avatarsChanged} = await migrateInlineAvatars(loadedMembers);
+          if (avatarsChanged) {
+            loadedMembers = migratedMembers;
+            await store.set(KEYS.members, loadedMembers);
+          }
         }
       } catch (e) {
         console.error('[PS] avatar migration error:', e);
@@ -239,10 +227,22 @@ function MainAppContent() {
             await store.set(KEYS.members, loadedMembers);
             if (rebasedSystem) await store.set(KEYS.system, rebasedSystem);
           }
-          console.log('[STARTUP] rebased stale Documents:// media paths');
         }
       } catch (e) {
         console.error('[PS] media path rebase error:', e);
+      }
+      try {
+        const alreadyDownsized = await store.get<boolean>('ps.avatarsDownsizedV1', false);
+        if (!alreadyDownsized && !storageSuspect) {
+          const {members: downsizedMembers, changed: downsizedChanged} = await downsizeExistingAvatars(loadedMembers);
+          if (downsizedChanged) {
+            loadedMembers = downsizedMembers;
+            await store.set(KEYS.members, loadedMembers);
+          }
+          await store.set('ps.avatarsDownsizedV1', true);
+        }
+      } catch (e) {
+        console.error('[PS] avatar downsize migration error:', e);
       }
       let loadedSettingsObj: AppSettings = {...DEFAULT_SETTINGS, ...(settings || {})};
       if (!loadedSettingsObj.customFrontsSeeded && !storageSuspect) {
@@ -251,16 +251,12 @@ function MainAppContent() {
         loadedMembers = [...loadedMembers, ...seeds];
         loadedSettingsObj = {...loadedSettingsObj, customFrontsSeeded: true};
         if (seeds.length > 0) await store.set(KEYS.members, loadedMembers);
-        await store.set(KEYS.settings, normalizeAppearanceSettings(loadedSettingsObj, systemScheme));
+        await store.set(KEYS.settings, loadedSettingsObj);
       }
       if (!loadedSystem) {
         const realMemberCount = (loadedMembers || []).filter(m => !m.isCustomFront).length;
         const hasUserData = realMemberCount > 0 || (hist && hist.length > 0) || (jour && jour.length > 0) || (grps && grps.length > 0);
         if (hasUserData) {
-          // The system record was lost (e.g. AsyncStorage didn't flush before a
-          // power-off — a known iOS issue) but the user's members/history survived.
-          // Reconstruct a minimal system and persist it instead of dropping into
-          // first-run Setup, which would strand their data and look like a full wipe.
           console.warn(`[STARTUP] System missing but ${realMemberCount} members + data present — reconstructing system, NOT entering first-run.`);
           const recovered: SystemInfo = {name: '', description: ''};
           loadedSystem = recovered;
@@ -269,24 +265,54 @@ function MainAppContent() {
         } else if (storageSuspect) {
           console.warn('[STARTUP] Blank load with suspect storage — staying OUT of first-run; will retry on foreground.');
           setSystem({name: '', description: ''});
+        } else if (hadAnyPsKeys) {
+          console.warn('[STARTUP] Blank load BUT ps: keys existed BEFORE this load — this is not a fresh install. Staying OUT of first-run; will retry on foreground.');
+          storageSuspect = true;
+          storageSuspectRef.current = true;
+          setSystem({name: '', description: ''});
         } else {
-          console.warn('[STARTUP] No system info loaded — entering first-run state. If this is unexpected, check for AsyncStorage failures above.');
+          console.warn('[STARTUP] No system info loaded and no ps: keys present — entering first-run state.');
           setFirstRun(true);
         }
       } else {
         setSystem(loadedSystem);
       }
       setMembers(loadedMembers);
-      const migratedFront = migrateFrontState(fr) || findOpenFrontInHistory(hist || []);
+      if (!storageSuspect) {
+        restoreMissingMediaFiles(loadedMembers).then(async r => {
+          if (!r.changed) return;
+          const healedById = new Map(r.members.map((m: Member) => [m.id, m]));
+          const cur = useAppStore.getState().members;
+          const adopt = (curV: string | undefined, healedV: string | undefined) =>
+            healedV && healedV !== curV && (!curV || curV.startsWith('file://')) ? healedV : curV;
+          const merged = cur.map(m => {
+            const h = healedById.get(m.id);
+            if (!h) return m;
+            const avatar = adopt(m.avatar, h.avatar);
+            const banner = adopt(m.banner, h.banner);
+            return avatar !== m.avatar || banner !== m.banner ? {...m, avatar, banner} : m;
+          });
+          useAppStore.getState().setMembers(merged);
+          await store.set(KEYS.members, merged);
+        }).catch(e => logError('media-restore', e));
+      }
+      const rawHist = hist || [];
+      const dedupedHist = mergeHistoryEntries([], rawHist);
+      if (dedupedHist.length !== rawHist.length && !storageSuspect) {
+        console.warn(`[STARTUP] collapsed ${rawHist.length - dedupedHist.length} duplicate history entries`);
+        await store.set(KEYS.history, dedupedHist);
+      }
+      const migratedFront = migrateFrontState(fr) || findOpenFrontInHistory(dedupedHist);
       setFront(migratedFront);
       if (((fr && !fr.primary && migratedFront) || (!fr && migratedFront)) && !storageSuspect) {
         await store.set(KEYS.front, migratedFront);
       }
-      setHistory(hist || []);
+      if (!storageSuspect) await pruneFrontOfRemovedMembers();
+      setHistory(dedupedHist);
       setJournal(jour || []);
       setJournalTemplates(jourTemplates || []);
       setShareSettings(share || {showFront: true, showMembers: true, showDescriptions: false});
-      const mergedSettings = normalizeAppearanceSettings(loadedSettingsObj, systemScheme);
+      const mergedSettings = loadedSettingsObj;
       setAppSettings(mergedSettings);
       setGroups(grps || []);
       setPalettes(savedPalettes || []);
@@ -297,24 +323,37 @@ function MainAppContent() {
         if (!storageSuspect) await store.set(KEYS.chatChannels, channels);
       }
       setChatChannels(channels);
-      await loadChatMessages(channels);
+      setChatCategories(savedChatCats || []);
+
+      const paletteId = mergedSettings.activePaletteId || '__dark__';
+      if (mergedSettings.lightMode && !mergedSettings.activePaletteId) {
+        setActivePaletteId('__light__');
+      } else {
+        setActivePaletteId(paletteId);
+      }
 
       try {
         const savedMedical = await store.get<MedicalData>(KEYS.medical);
         const med: MedicalData = {...DEFAULT_MEDICAL, ...(savedMedical || {})};
         setMedical(med);
-        setEmergencyNotificationInfo(emergencyNotificationLine(med.emergency));
-        if (Platform.OS === 'android') {
-          await rescheduleMedicationReminders(med.medications || []);
-          await rescheduleAppointmentReminders(med.appointments || []);
-        }
+        setEmergencyNotificationInfo(null);
+        await rescheduleMedicationReminders(med.medications || []);
+        await rescheduleAppointmentReminders(med.appointments || []);
       } catch (e) {
         console.error('[PS] medical init error:', e);
       }
 
       try {
+        const savedPlanner = await store.get<PlannerData>(KEYS.planner);
+        const plan: PlannerData = {...DEFAULT_PLANNER, ...(savedPlanner || {})};
+        setPlanner(plan);
+        await reschedulePlannerNotifications(plan);
+      } catch (e) {
+        console.error('[PS] planner init error:', e);
+      }
+
+      try {
         const savedCodes = await store.get<DeviceCodes>(KEYS.deviceCodes);
-        // Suspect loads must not rotate identity codes off a blank read.
         if ((!savedCodes || !savedCodes.friendCode || !savedCodes.syncCode) && !storageSuspect) {
           const fresh: DeviceCodes = {friendCode: generateFriendCode(), syncCode: generateSyncCode(), createdAt: Date.now()};
           await store.set(KEYS.deviceCodes, fresh);
@@ -327,9 +366,6 @@ function MainAppContent() {
     } catch (e) {
       console.error('[PS] startup load error:', e);
       storageSuspectRef.current = true;
-      // A transient load error must NOT look like a wipe. Try a focused recovery of
-      // the user's members/system (store.get self-heals from the file backup) before
-      // deciding to show first-run Setup. Only enter first-run if nothing is recoverable.
       let recoveredMembers: Member[] = [];
       let recoveredSystem: SystemInfo | null = null;
       try { recoveredMembers = (await store.get<Member[]>(KEYS.members, [])) || []; } catch {}
@@ -345,6 +381,7 @@ function MainAppContent() {
       setGroups([]);
       setPalettes([]);
       setChatChannels(DEFAULT_CHANNELS.map(c => ({id: uid(), name: c.name, createdAt: Date.now()})));
+      setChatCategories([]);
       setAllChatMessages([]);
       if (recoveredSystem) {
         setSystem(recoveredSystem);
@@ -358,81 +395,51 @@ function MainAppContent() {
       }
     } finally {
       setLoaded(true);
+      if (storageSuspectRef.current) {
+        if (suspectRetriesRef.current < 3) {
+          const attempt = ++suspectRetriesRef.current;
+          const delay = attempt * 800;
+          console.warn(`[STARTUP] suspect load — auto-retry ${attempt}/3 in ${delay}ms`);
+          setTimeout(() => { loadAllRef.current?.(); }, delay);
+        } else {
+          console.warn('[STARTUP] suspect load — auto-retry budget exhausted; waiting for foreground.');
+        }
+      } else {
+        suspectRetriesRef.current = 0;
+      }
     }
-  }, [loadChatMessages, systemScheme]);
+  }, []);
+  loadAllRef.current = loadAll;
 
-  const requestPermissions = async () => {
-    if (Platform.OS !== 'android') return;
-    try {
-      await notifee.requestPermission();
-    } catch (e) { console.error('[PS] notification permission error:', e); }
-    try {
-      if (Platform.Version >= 33) {
-        const result = await PermissionsAndroid.request(
-          'android.permission.POST_NOTIFICATIONS' as any,
-          {
-            title: t('notification.notifPermTitle'),
-            message: t('notification.notifPermMsg'),
-            buttonPositive: t('notification.allow'),
-            buttonNegative: t('notification.notNow'),
-          },
-        );
-        if (result !== PermissionsAndroid.RESULTS.GRANTED) {
-          console.warn('[PS] POST_NOTIFICATIONS denied:', result);
-        }
-      }
-    } catch (e) { console.error('[PS] POST_NOTIFICATIONS request error:', e); }
-    try {
-      if (appSettings.gpsEnabled) {
-        await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.ACCESS_COARSE_LOCATION,
-          {title: t('notification.locationPermTitle'), message: t('notification.locationPermMsg'), buttonPositive: t('notification.allow'), buttonNegative: t('notification.notNow')});
-      }
-    } catch (e) { console.error('[PS] location permission error:', e); }
-  };
-
-  const requestGPSPermission = async () => {
-    if (Platform.OS !== 'android') return;
-    try {
-      const result = await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.ACCESS_COARSE_LOCATION,
-        {title: t('notification.locationPermTitle'), message: t('notification.locationPermMsg'), buttonPositive: t('notification.allow'), buttonNegative: t('notification.notNow')});
-      if (result !== PermissionsAndroid.RESULTS.GRANTED) {
-        console.warn('[PS] GPS permission denied:', result);
-      }
-    } catch (e) { console.error('[PS] GPS permission error:', e); }
-  };
-
-  const requestFilesPermission = async () => {
-    if (Platform.OS !== 'android') return;
-    try {
-      if (Platform.Version < 33) {
-        const result = await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.READ_EXTERNAL_STORAGE,
-          {title: 'File Access', message: 'Allow Plural Star to import and export files.', buttonPositive: 'Allow', buttonNegative: 'Not now'});
-        if (result !== PermissionsAndroid.RESULTS.GRANTED) {
-          console.warn('[PS] File permission denied:', result);
-        }
-      }
-    } catch (e) { console.error('[PS] File permission error:', e); }
-  };
-
-  const supportsPersistentNotifications = Platform.OS === 'android' || Platform.OS === 'ios';
-
-  useEffect(() => { loadAll(); }, [loadAll]);
+  useEffect(() => { loadAll(); }, []);
   useEffect(() => {
     const sub = AppState.addEventListener('change', s => {
       if (s === 'active' && storageSuspectRef.current) {
         console.warn('[STARTUP] foreground after suspect load — retrying loadAll');
         loadAll();
       }
+      if (s === 'active') {
+        NetworkManager.retryInitIfLocked();
+        NetworkManager.requestFriendFronts();
+        NetworkManager.flushPendingFronts();
+        CloudServices.wake();
+      }
     });
     return () => sub.remove();
   }, [loadAll]);
-  useEffect(() => { NetworkManager.init().catch(e => console.error('[NETWORK] init failed:', e)); }, []);
-  useEffect(() => { if (loaded) NetworkManager.updateMyFront(front, members).catch(() => {}); }, [loaded, front, members]);
-  // Poke the sync engine when any synced data changes (it debounces + rate-limits).
-  useEffect(() => { NetworkManager.notifyDataChanged(); }, [system, members, history, journal, journalTemplates, groups, palettes, chatChannels, medical, appSettings]);
-  // Apply incoming device-sync writes by reloading app state.
+  useEffect(() => {
+    NetworkManager.init()
+      .catch(e => console.error('[NETWORK] init failed:', e))
+      .finally(() => {
+        bootCloudServices();
+        installDestructiveGuard();
+      });
+  }, []);
+  useEffect(() => {
+    NetworkManager.notifyDataChanged();
+    CloudServices.schedulePush();
+  }, [system, members, history, journal, journalTemplates, groups, palettes, chatChannels, medical, appSettings]);
   useEffect(() => NetworkManager.onSyncApplied(() => { loadAll(); }), [loadAll]);
-  // Prompt to resolve a device-sync conflict (which device's data wins).
   useEffect(() => NetworkManager.onSyncConflict(c => {
     Alert.alert(
       t('network.syncConflictTitle'),
@@ -449,7 +456,23 @@ function MainAppContent() {
       t('network.syncRoleMismatchMsg', {device: c.deviceName, defaultValue: `You and ${c.deviceName} both chose the same direction, so the initial copy was skipped. New changes will still sync. To copy everything, remove the link and pair again — choose "send" on one device and "receive" on the other.`}),
     );
   }), [t]);
-  useEffect(() => { if (loaded && !firstRun) requestPermissions(); }, [loaded, firstRun]);
+  const permsRequestedRef = useRef(false);
+  useEffect(() => {
+    if (!loaded || firstRun || permsRequestedRef.current) return;
+    if (AppState.currentState === 'active') {
+      permsRequestedRef.current = true;
+      requestPermissions();
+      return;
+    }
+    const sub = AppState.addEventListener('change', s => {
+      if (s === 'active' && !permsRequestedRef.current) {
+        permsRequestedRef.current = true;
+        requestPermissions();
+        sub.remove();
+      }
+    });
+    return () => sub.remove();
+  }, [loaded, firstRun]);
 
   useEffect(() => {
     const choice = appSettings.fontChoice ?? (appSettings.useDyslexicFont === true ? 'opendyslexic' : 'default');
@@ -457,483 +480,54 @@ function MainAppContent() {
     setDyslexicTick(t => t + 1);
   }, [appSettings.fontChoice, appSettings.useDyslexicFont]);
 
-  useEffect(() => {
-    if (!supportsPersistentNotifications) return;
-    if (appSettings.notificationsEnabled) { showFrontNotification(front, members, system.name).catch(e => console.error('[PS] notif error:', e)); }
-    else { clearFrontNotification().catch(e => console.error('[PS] clear notif error:', e)); }
-  }, [front, members, appSettings.notificationsEnabled, supportsPersistentNotifications, system.name]);
+  useFrontNotifications(front, members, system.name, appSettings);
+  useNoteboardNotifications(front, members, appSettings);
 
-  useEffect(() => {
-    let last: string | null = null;
-    let debounce: ReturnType<typeof setTimeout> | null = null;
-    const unsub = NetworkManager.subscribe(s => {
-      const sig = `${s.enabled}|${s.friends.filter(f => f.showInNotification && f.status === 'accepted').map(f => `${f.peerId}:${f.statusUpdatedAt || 0}`).join(',')}`;
-      if (last !== null && sig !== last && appSettings.notificationsEnabled) {
-        if (debounce) clearTimeout(debounce);
-        debounce = setTimeout(() => { showFrontNotification(front, members, system.name).catch(() => {}); }, 2000);
-      }
-      last = sig;
-    });
-    return () => { if (debounce) clearTimeout(debounce); unsub(); };
-  }, [front, members, appSettings.notificationsEnabled, system.name]);
 
-  useEffect(() => {
-    if (!supportsPersistentNotifications || !front || !appSettings.notificationsEnabled) return;
-    const interval = setInterval(() => { showFrontNotification(front, members, system.name).catch(e => console.error('[PS] notif refresh error:', e)); }, 5 * 60 * 1000);
-    return () => clearInterval(interval);
-  }, [front, members, appSettings.notificationsEnabled, supportsPersistentNotifications, system.name]);
-
-  useEffect(() => {
-    const interval = appSettings.frontCheckInterval || 0;
-    if (!appSettings.notificationsEnabled || interval <= 0) {
-      cancelFrontCheckReminder().catch(e => console.error('[PS] front-check cancel error:', e));
-    } else {
-      scheduleFrontCheckReminder(interval, appSettings.accountMode === 'singlet').catch(e => console.error('[PS] front-check schedule error:', e));
-    }
-  }, [appSettings.frontCheckInterval, appSettings.notificationsEnabled, appSettings.accountMode]);
-
-  useEffect(() => {
-    const mins = appSettings.notificationRefreshMinutes || 0;
-    if (!front || !appSettings.notificationsEnabled || mins <= 0) {
-      cancelFrontNotificationRefresh().catch(e => console.error('[PS] notif refresh cancel error:', e));
-    } else {
-      scheduleFrontNotificationRefresh(front, members, mins).catch(e => console.error('[PS] notif refresh schedule error:', e));
-    }
-  }, [front, members, appSettings.notificationRefreshMinutes, appSettings.notificationsEnabled]);
-
-  const prevFrontIdsRef = useRef<Set<string>>(new Set());
-  useEffect(() => {
-    if (!appSettings.notificationsEnabled || !appSettings.noteboardNotifications || appSettings.accountMode === 'singlet') {
-      prevFrontIdsRef.current = new Set();
-      clearNoteboardNotification().catch(() => {});
-      return;
-    }
-    const collectFrontIds = (f: FrontState | null): Set<string> => {
-      const ids = new Set<string>();
-      if (!f) return ids;
-      const tiers: (keyof FrontState)[] = ['primary', 'coFront', 'coConscious'];
-      for (const tk of tiers) {
-        const tier = (f as any)[tk];
-        const tierIds: string[] = tier?.memberIds || [];
-        tierIds.forEach(id => ids.add(id));
-      }
-      return ids;
-    };
-    const currentIds = collectFrontIds(front);
-    const newlyFronting: string[] = [];
-    currentIds.forEach(id => { if (!prevFrontIdsRef.current.has(id)) newlyFronting.push(id); });
-    prevFrontIdsRef.current = currentIds;
-    if (currentIds.size === 0) {
-      clearNoteboardNotification().catch(() => {});
-      return;
-    }
-    if (newlyFronting.length === 0) return;
-    (async () => {
-      try {
-        const allNotes = await store.get<NoteboardEntry[]>(KEYS.noteboards, []) || [];
-        const lastSeen = await store.get<Record<string, number>>(KEYS.lastNoteboardSeen, {}) || {};
-        const entries: {memberName: string; unreadCount: number}[] = [];
-        for (const memberId of newlyFronting) {
-          const member = members.find(m => m.id === memberId);
-          if (!member) continue;
-          const lastSeenTs = lastSeen[memberId] || 0;
-          const unread = allNotes.filter(n => n.memberId === memberId && !n.read && n.timestamp > lastSeenTs);
-          if (unread.length > 0) {
-            entries.push({memberName: member.name, unreadCount: unread.length});
-          }
-        }
-        if (entries.length > 0) {
-          await showNoteboardNotification(entries);
-        }
-      } catch (e) { console.error('[PS] noteboard unread check error:', e); }
-    })();
-  }, [front, members, appSettings.notificationsEnabled, appSettings.noteboardNotifications, appSettings.accountMode]);
-
-  const saveSystem = async (d: SystemInfo) => {setSystem(d); await store.set(KEYS.system, d);};
-  const saveMembers = async (d: Member[]) => {
-    if (!loaded && d.length === 0) {
-      console.warn('[PS] Blocked pre-load save of empty members');
-      return;
-    }
-    setMembers(d);
-    await store.set(KEYS.members, d);
-    const archivedIds = new Set(d.filter(m => m.archived).map(m => m.id));
-    if (archivedIds.size > 0 && front) {
-      const pruneTier = (tier: any) => tier ? {...tier, memberIds: (tier.memberIds || []).filter((id: string) => !archivedIds.has(id))} : tier;
-      const next: any = {...front, primary: pruneTier(front.primary), coFront: pruneTier(front.coFront), coConscious: pruneTier(front.coConscious)};
-      const count = (f: any) => (f?.primary?.memberIds?.length || 0) + (f?.coFront?.memberIds?.length || 0) + (f?.coConscious?.memberIds?.length || 0);
-      if (count(next) !== count(front)) {
-        const cleaned = isFrontEmpty(next) ? null : next;
-        setFront(cleaned);
-        await store.set(KEYS.front, cleaned);
-      }
-    }
-  };
-  const saveHistory = async (d: HistoryEntry[]) => {
-    if (!loaded && d.length === 0) return;
-    setHistory(d); await store.set(KEYS.history, d);
-  };
-  const saveJournal = async (d: JournalEntry[]) => {
-    if (!loaded && d.length === 0) return;
-    setJournal(d); await store.set(KEYS.journal, d);
-  };
-  const saveJournalTemplates = async (d: JournalTemplate[]) => {
-    if (!loaded && d.length === 0) return;
-    setJournalTemplates(d); await store.set(KEYS.journalTemplates, d);
-  };
-  const saveShareSettings = async (d: ShareSettings) => {setShareSettings(d); await store.set(KEYS.share, d);};
-  const saveGroups = async (d: MemberGroup[]) => {
-    if (!loaded && d.length === 0) return;
-    setGroups(d); await store.set(KEYS.groups, d);
-  };
-  const savePalettes = async (d: CustomPalette[]) => {setPalettes(d); await store.set(KEYS.palettes, d);};
-  const saveChatChannels = async (d: ChatChannel[]) => {setChatChannels(d); await store.set(KEYS.chatChannels, d); await loadChatMessages(d);};
-
-  const saveMedical = async (d: MedicalData) => {
-    setMedical(d);
-    await store.set(KEYS.medical, d);
-    setEmergencyNotificationInfo(emergencyNotificationLine(d.emergency));
-    if (Platform.OS === 'android') {
-      await rescheduleMedicationReminders(d.medications || []);
-      await rescheduleAppointmentReminders(d.appointments || []);
-    }
-    if (supportsPersistentNotifications && appSettings.notificationsEnabled) {
-      showFrontNotification(front, members, system.name).catch(e => console.error('[PS] notif error:', e));
-    }
-  };
-
-  const saveAppSettings = async (d: AppSettings) => {
-    const next = normalizeAppearanceSettings(d, systemScheme);
-    const gpsJustEnabled = next.gpsEnabled && !appSettings.gpsEnabled;
-    const filesJustEnabled = next.filesEnabled && !appSettings.filesEnabled;
-    setAppSettings(next);
-    await store.set(KEYS.settings, next);
-    await store.set(KEYS.lightMode, next.lightMode);
-    if (next.language) { changeLanguage(next.language); await store.set(KEYS.language, next.language); }
-    if (gpsJustEnabled) { await requestGPSPermission(); }
-    if (filesJustEnabled) { await requestFilesPermission(); }
-  };
-
-  const [lastKnownLocation, setLastKnownLocation] = useState<string | undefined>(undefined);
-  const getMember = (id: string) => members.find(m => m.id === id);
-
-  const updateLastLocation = async (loc: string | undefined) => {
-    if (loc) { setLastKnownLocation(loc); await store.set('ps:lastLocation', loc); }
-  };
-
-  const clearLastLocation = async () => {
-    setLastKnownLocation(undefined);
-    await store.remove('ps:lastLocation');
-  };
-
+  const lastKnownLocation = useAppStore(s => s.lastKnownLocation);
+  const setLastKnownLocation = useAppStore(s => s.setLastKnownLocation);
   useEffect(() => { store.get<string>('ps:lastLocation').then(loc => { if (loc) setLastKnownLocation(loc); }); }, []);
 
-  const maybeGPS = async (manualLocation?: string): Promise<string | undefined> => {
-    const loc = manualLocation?.trim() || undefined;
-    if (loc) return loc;
-    if (appSettings.gpsEnabled) { const gps = await getGPSLocation(); return gps || undefined; }
-    return undefined;
-  };
-
-  const flushPluralKitFrontSync = async () => {
-    if (pkSyncInFlightRef.current) return;
-    if (!appSettings.pkFrontSyncEnabled) return;
-    const token = appSettings.pkToken?.trim();
-    const memberRefs = pkPendingMemberRefsRef.current;
-    if (!token || !memberRefs) return;
-    const payloadKey = memberRefs.join('|');
-    pkPendingMemberRefsRef.current = null;
-    pkSyncInFlightRef.current = true;
-    pkLastSyncAtRef.current = Date.now();
-    try {
-      const res = await fetch('https://api.pluralkit.me/v2/systems/@me/switches', {
-        method: 'POST',
-        headers: {
-          Authorization: token,
-          'Content-Type': 'application/json',
-          'User-Agent': EXTERNAL_API_USER_AGENT,
-        },
-        body: JSON.stringify({members: memberRefs}),
-      });
-      if (!res.ok) {
-        const text = await res.text().catch(() => '');
-        console.error('[PS] PluralKit front sync failed:', res.status, text);
-      } else {
-        pkLastSyncedKeyRef.current = payloadKey;
-      }
-    } catch (e) {
-      console.error('[PS] PluralKit front sync error:', e);
-    } finally {
-      pkSyncInFlightRef.current = false;
-      if (pkPendingMemberRefsRef.current) {
-        const delay = Math.max(0, PK_FRONT_SYNC_COOLDOWN_MS - (Date.now() - pkLastSyncAtRef.current));
-        pkSyncTimeoutRef.current = setTimeout(() => {
-          pkSyncTimeoutRef.current = null;
-          void flushPluralKitFrontSync();
-        }, delay);
-      }
-    }
-  };
-
-  const syncFrontToPluralKit = async (nextFront: FrontState | null) => {
-    if (!appSettings.pkFrontSyncEnabled) return;
-    const token = appSettings.pkToken?.trim();
-    if (!token) return;
-    const memberRefs = (nextFront?.primary.memberIds || [])
-      .map(id => pluralKitMemberRefForSource(members.find(m => m.id === id)?.sourceId))
-      .filter((value): value is string => !!value);
-    const payloadKey = memberRefs.join('|');
-    if (payloadKey === pkLastSyncedKeyRef.current) return;
-    pkPendingMemberRefsRef.current = memberRefs;
-    if (pkSyncTimeoutRef.current) clearTimeout(pkSyncTimeoutRef.current);
-    const delay = pkSyncInFlightRef.current ? PK_FRONT_SYNC_COOLDOWN_MS : Math.max(0, PK_FRONT_SYNC_COOLDOWN_MS - (Date.now() - pkLastSyncAtRef.current));
-    if (delay === 0 && !pkSyncInFlightRef.current) {
-      await flushPluralKitFrontSync();
-      return;
-    }
-    pkSyncTimeoutRef.current = setTimeout(() => {
-      pkSyncTimeoutRef.current = null;
-      void flushPluralKitFrontSync();
-    }, delay);
-  };
-
-  useEffect(() => () => {
-    if (pkSyncTimeoutRef.current) clearTimeout(pkSyncTimeoutRef.current);
-  }, []);
-
-  const updateFront = async (primary: FrontTier, coFront: FrontTier, coConscious: FrontTier) => {
-    const now = Date.now();
-    const cleanTier = (tier: FrontTier): FrontTier =>
-      tier.memberIds.length === 0
-        ? {memberIds: [], mood: undefined, note: '', location: undefined, energyLevel: undefined}
-        : tier;
-    const cleanPrimary = cleanTier(primary);
-    const cleanCoFront = cleanTier(coFront);
-    const cleanCoConscious = cleanTier(coConscious);
-    const isEmpty = cleanPrimary.memberIds.length === 0 && cleanCoFront.memberIds.length === 0 && cleanCoConscious.memberIds.length === 0;
-
-    const sameMembers = (a: string[] = [], b: string[] = []) =>
-      a.length === b.length && [...a].sort().join('|') === [...b].sort().join('|');
-    const continuing = !!front && !isEmpty
-      && sameMembers(front.primary.memberIds, cleanPrimary.memberIds)
-      && sameMembers(front.coFront.memberIds, cleanCoFront.memberIds)
-      && sameMembers(front.coConscious.memberIds, cleanCoConscious.memberIds);
-
-    const explicitLocation = cleanPrimary.location?.trim() || undefined;
-    const nf: FrontState | null = isEmpty ? null : {primary: {...cleanPrimary, location: explicitLocation}, coFront: cleanCoFront, coConscious: cleanCoConscious, startTime: continuing ? front!.startTime : now};
-
-    let newHistory = [...history];
-    if (front && !continuing) {
-      newHistory = newHistory.map(e =>
-        e.endTime === null && e.startTime === front.startTime && (!e.changeType || e.changeType === 'front') ? {...e, endTime: now} : e);
-    }
-
-    let finalFront = nf;
-    if (nf) {
-      if (continuing) {
-        const extras: HistoryEntry[] = [];
-        const moodChanged = (nf.primary.mood || undefined) !== (front!.primary.mood || undefined);
-        const locChanged = (nf.primary.location || undefined) !== (front!.primary.location || undefined);
-        const noteChanged = (nf.primary.note || undefined) !== (front!.primary.note || undefined);
-        if (moodChanged || locChanged) {
-          const entry = frontToHistoryEntry(nf, null, moodChanged ? 'mood' : 'location');
-          entry.changeTime = now;
-          extras.push(entry);
-        }
-        if (noteChanged) {
-          const entry = frontToHistoryEntry(nf, null, 'note');
-          entry.changeTime = now + 1;
-          extras.push(entry);
-        }
-        const tierTracked = (a: FrontTier, b: FrontTier) =>
-          (a.mood || undefined) !== (b.mood || undefined) || (a.energyLevel ?? undefined) !== (b.energyLevel ?? undefined);
-        const segment = tierTracked(nf.primary, front!.primary) || tierTracked(nf.coFront, front!.coFront)
-          || tierTracked(nf.coConscious, front!.coConscious) || locChanged;
-        if (segment) {
-          // Tracked state changed mid-session: close the open entry as it was
-          // and start a new segment, so history keeps the timeline instead of
-          // overwriting it.
-          finalFront = {...nf, startTime: now};
-          const segEntry = frontToHistoryEntry(finalFront, null, 'front');
-          newHistory = newHistory.map(e =>
-            e.endTime === null && e.startTime === front!.startTime && (!e.changeType || e.changeType === 'front') ? {...e, endTime: now} : e);
-          newHistory = [segEntry, ...extras, ...newHistory];
-        } else {
-          const frontEntry = frontToHistoryEntry(nf, null, 'front');
-          newHistory = newHistory.map(e =>
-            e.endTime === null && e.startTime === front!.startTime && (!e.changeType || e.changeType === 'front') ? frontEntry : e);
-          newHistory = [...extras, ...newHistory];
-        }
-      } else {
-        const frontEntry = frontToHistoryEntry(nf, null, 'front');
-        newHistory = [frontEntry, ...newHistory];
-      }
-    }
-
-    setFront(finalFront);
-    await store.set(KEYS.front, finalFront);
-    await saveHistory(newHistory);
-    await syncFrontToPluralKit(nf);
-
-    if (nf) {
-      const allFrontIds = [...nf.primary.memberIds, ...nf.coFront.memberIds, ...nf.coConscious.memberIds];
-      if (allFrontIds.length > 0) {
-        try {
-          const notes = await store.get<any[]>(KEYS.noteboards) || [];
-          if (notes && notes.length > 0) {
-            const memberNotes: Record<string, number> = {};
-            for (const n of notes) {
-              if (allFrontIds.includes(n.memberId)) {
-                memberNotes[n.memberId] = (memberNotes[n.memberId] || 0) + 1;
-              }
-            }
-            const withNotes = Object.entries(memberNotes);
-            if (withNotes.length > 0) {
-              const names = withNotes.map(([id, count]) => {
-                const m = members.find(mm => mm.id === id);
-                return `${m?.name || '?'} (${count})`;
-              }).join(', ');
-              Alert.alert(t('noteboard.title'), `${names}`);
-            }
-          }
-        } catch {}
-      }
-    }
-
-    if (nf && appSettings.gpsEnabled && !cleanPrimary.location?.trim()) {
-      try {
-        const gpsLocation = await getGPSLocation();
-        if (gpsLocation && gpsLocation !== explicitLocation) {
-          const patched: FrontState = {...nf, primary: {...nf.primary, location: gpsLocation}};
-          setFront(patched);
-          await store.set(KEYS.front, patched);
-          await updateLastLocation(gpsLocation);
-        }
-      } catch (e) { console.error('[PS] GPS post-save error:', e); }
-    } else if (explicitLocation) {
-      await updateLastLocation(explicitLocation);
-    } else if (nf) {
-      await clearLastLocation();
-    }
-  };
-
-  const updateFrontDetails = async (tier: FrontTierKey, mood?: string, location?: string, note?: string) => {
-    if (!front) return;
-    const now = Date.now();
-    const tierData = front[tier];
-    const resolvedLocation = tier === 'primary' ? await maybeGPS(location) : tierData.location;
-    const updatedTier = {...tierData, mood, location: resolvedLocation, note: note ?? tierData.note};
-    const moodChanged = (mood || undefined) !== (tierData.mood || undefined);
-    const locChanged = tier === 'primary' && (resolvedLocation || undefined) !== (tierData.location || undefined);
-    const noteChanged = note !== undefined && (note || undefined) !== (tierData.note || undefined);
-    const segment = moodChanged || locChanged;
-    const updated = segment ? {...front, [tier]: updatedTier, startTime: now} : {...front, [tier]: updatedTier};
-    setFront(updated); await store.set(KEYS.front, updated);
-    if (tier === 'primary') {
-      if (resolvedLocation) await updateLastLocation(resolvedLocation);
-      else await clearLastLocation();
-    }
-    const extras: HistoryEntry[] = [];
-    if (moodChanged || locChanged) { const entry = frontToHistoryEntry(updated, null, moodChanged ? 'mood' : 'location', tier); entry.changeTime = now; extras.push(entry); }
-    if (noteChanged) { const entry = frontToHistoryEntry(updated, null, 'note', tier); entry.changeTime = now + 1; extras.push(entry); }
-    let newHistory = [...history];
-    if (segment) {
-      const segEntry = frontToHistoryEntry(updated, null, 'front');
-      newHistory = newHistory.map(e =>
-        e.endTime === null && e.startTime === front.startTime && (!e.changeType || e.changeType === 'front') ? {...e, endTime: now} : e);
-      newHistory = [segEntry, ...extras, ...newHistory];
-      await saveHistory(newHistory);
-    } else if (extras.length > 0) {
-      await saveHistory([...extras, ...newHistory]);
-    }
-  };
-
-  const quickAddToFront = async (id: string, tierKey: FrontTierKey) => {
-    const strip = (tier: FrontTier): FrontTier => ({...tier, memberIds: tier.memberIds.filter(x => x !== id)});
-    const tiers: Record<FrontTierKey, FrontTier> = {
-      primary: front ? strip(front.primary) : {memberIds: [], note: ''},
-      coFront: front ? strip(front.coFront) : {memberIds: [], note: ''},
-      coConscious: front ? strip(front.coConscious) : {memberIds: [], note: ''},
-    };
-    tiers[tierKey] = {...tiers[tierKey], memberIds: [...tiers[tierKey].memberIds, id]};
-    await updateFront(tiers.primary, tiers.coFront, tiers.coConscious);
-  };
-
-  const removeFromFront = async (id: string) => {
-    if (!front) return;
-    await updateFront(
-      {...front.primary, memberIds: front.primary.memberIds.filter(x => x !== id)},
-      {...front.coFront, memberIds: front.coFront.memberIds.filter(x => x !== id)},
-      {...front.coConscious, memberIds: front.coConscious.memberIds.filter(x => x !== id)},
-    );
-  };
-
-  const saveMember = async (m: Member) => {
-    const u = members.find(x => x.id === m.id) ? members.map(x => (x.id === m.id ? m : x)) : [...members, m];
-    await saveMembers(u);
-  };
-  // Soft-delete: keep a hidden tombstone (archived + deleted) so front history & stats
-  // still resolve the member's name instead of showing the raw ID ("scary symbols").
-  const deleteMember = async (id: string) => saveMembers(members.map(m => m.id === id ? {...m, archived: true, deleted: true} : m));
-  const bulkSetArchived = async (ids: string[], archived: boolean) => {
-    const idSet = new Set(ids);
-    await saveMembers(members.map(m => idSet.has(m.id) ? {...m, archived} : m));
-  };
-  const bulkDeleteMembers = async (ids: string[]) => {
-    const idSet = new Set(ids);
-    await saveMembers(members.map(m => idSet.has(m.id) ? {...m, archived: true, deleted: true} : m));
-  };
-  const bulkAddGroups = async (ids: string[], groupIds: string[]) => {
-    const idSet = new Set(ids);
-    await saveMembers(members.map(m => idSet.has(m.id) ? {...m, groupIds: [...new Set([...(m.groupIds || []), ...groupIds])]} : m));
-  };
-  const saveEntry = async (e: JournalEntry) => {
-    const u = journal.find(x => x.id === e.id) ? journal.map(x => (x.id === e.id ? e : x)) : [e, ...journal];
-    await saveJournal(u);
-  };
-  const deleteEntry = async (id: string) => saveJournal(journal.filter(e => e.id !== id));
-  const addJournalEntry = async (e: JournalEntry) => saveJournal([e, ...journal]);
-
   const handleDeleteAccount = async () => {
+    await CloudServices.unlink().catch(() => {});
     await clearFrontNotification(); await store.clearAll(); await clearAllMedia();
     setSystem({name: '', description: ''}); setMembers([]); setFront(null);
     setHistory([]); setJournal([]); setJournalTemplates([]);
     setShareSettings({showFront: true, showMembers: true, showDescriptions: false});
-    setAppSettings(DEFAULT_SETTINGS); setGroups([]); setPalettes([]);
-    setChatChannels([]); setAllChatMessages([]);
+    setAppSettings(DEFAULT_SETTINGS); setGroups([]); setPalettes([]); setActivePaletteId('__dark__');
+    setChatChannels([]); setChatCategories([]); setAllChatMessages([]);
     setMedical(DEFAULT_MEDICAL); setEmergencyNotificationInfo(null);
-    if (Platform.OS === 'android') {
-      await rescheduleMedicationReminders([]);
-      await rescheduleAppointmentReminders([]);
-    }
+    setPlanner(DEFAULT_PLANNER);
+    await rescheduleMedicationReminders([]);
+    await rescheduleAppointmentReminders([]);
+    await reschedulePlannerNotifications(null);
     setTab('front'); setMountedTabs(['front']); setFirstRun(true);
-  };
-
-  const handleHubSetFront = async (f: FrontState | null) => {
-    setFront(f);
-    await store.set(KEYS.front, f);
   };
 
   const isSinglet = appSettings.accountMode === 'singlet';
   const selfMember = isSinglet
-    ? (members.find(m => m.id === appSettings.selfMemberId && !m.isCustomFront)
-      || members.find(m => !m.isCustomFront && !m.archived))
+    ? (members.find(m => m.id === appSettings.selfMemberId && !m.isCustomFront && !m.isFacet)
+      || members.find(m => !m.isCustomFront && !m.isFacet && !m.archived))
     : undefined;
 
+  const selfMemberId = selfMember?.id;
+  useEffect(() => {
+    if (!loaded) return;
+    let shareFront: any = front;
+    if (isSinglet && selfMemberId && !(front && allFrontMemberIds(front).length > 0)) {
+      shareFront = {primary: {memberIds: [selfMemberId]}, coFront: {memberIds: []}, coConscious: {memberIds: []}};
+    }
+    NetworkManager.updateMyFront(shareFront, members).catch(() => {});
+  }, [loaded, front, members, isSinglet, selfMemberId]);
+
   if (!loaded) {
-    return (
-      <View style={[styles.loading, {backgroundColor: T.bg}]}>
-        <StatusBar barStyle="light-content" backgroundColor={T.bg} translucent={false} />
-        <Image source={require('./src/assets/splash-logo.png')} accessibilityElementsHidden importantForAccessibility="no" style={styles.splashLogo} resizeMode="contain" />
-        <Text style={[styles.splashName, {color: T.accent}]}>Plural Star</Text>
-      </View>
-    );
+    return <SplashView />;
   }
 
   if (firstRun) {
     return (
-      <>
-        <StatusBar barStyle="light-content" backgroundColor={C.bg} translucent={false} />
+      <SafeAreaView edges={['top']} style={[styles.root, {backgroundColor: C.bg}]}>
+        <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
         <SetupScreen theme={C} onSave={async s => {
           await saveSystem({name: s.name, description: s.description});
           if (s.singlet) {
@@ -943,47 +537,31 @@ function MainAppContent() {
           }
           setFirstRun(false); setTimeout(requestPermissions, 500);
         }} />
-      </>
+      </SafeAreaView>
     );
   }
 
   if (locked && appSettings.appLockPassword) {
     return (
-      <>
-        <StatusBar barStyle={C.isLight ? 'dark-content' : 'light-content'} backgroundColor={C.bg} translucent={false} />
+      <SafeAreaView edges={['top']} style={[styles.root, {backgroundColor: C.bg}]}>
+        <StatusBar barStyle={C.isLight ? 'dark-content' : 'light-content'} backgroundColor="transparent" translucent />
         <LockScreen theme={C} password={appSettings.appLockPassword} systemName={system.name} onUnlock={() => setLocked(false)} />
-      </>
+      </SafeAreaView>
     );
   }
 
   const handleEditDetails = (tier: FrontTierKey) => { setEditTier(tier); setShowEditFrontDetail(true); };
 
-  const ensureSelfMember = async (): Promise<Member> => {
-    if (selfMember) {
-      if (selfMember.id !== appSettings.selfMemberId) await saveAppSettings({...appSettings, selfMemberId: selfMember.id});
-      return selfMember;
-    }
-    const nm: Member = {id: uid(), name: system.name || t('share.system'), pronouns: '', role: '', color: '#DAA520', description: '', tags: [], groupIds: [], customFields: [], createdAt: Date.now()};
-    await saveMembers([...members, nm]);
-    await saveAppSettings({...appSettings, selfMemberId: nm.id});
-    return nm;
-  };
-  const tabLabel = (id: Tab): string => {
-    if (isSinglet && id === 'front') return t('tabs.status');
-    if (isSinglet && id === 'members') return t('tabs.profile');
-    return t(`tabs.${id}`);
-  };
-
   const renderShareScreen = () => (
-    <ShareScreen theme={C} system={system} members={members} front={front} history={history} journal={journal} shareSettings={shareSettings} appSettings={appSettings} onSettingsChange={saveShareSettings} getMember={getMember} onDataImported={loadAll} onAddJournalEntry={addJournalEntry} onDeleteAccount={handleDeleteAccount} />
+    <ShareScreen theme={C} onDataImported={loadAll} onAddJournalEntry={addJournalEntry} onDeleteAccount={handleDeleteAccount} />
   );
 
   const renderStatsScreen = () => (
-    <StatsScreen theme={C} history={history} members={members} chatMessages={allChatMessages} singlet={isSinglet} selfId={selfMember?.id} />
+    <StatsScreen theme={C} singlet={isSinglet} selfId={selfMember?.id} />
   );
 
   const renderChatScreen = () => (
-    <ChatScreen theme={C} members={members} channels={chatChannels} onSaveChannels={saveChatChannels} onMentionPress={openMemberById} />
+    <ChatScreen theme={C} onMentionPress={openMemberById} />
   );
 
   const renderCustomFieldsScreen = () => (
@@ -991,41 +569,38 @@ function MainAppContent() {
   );
 
   const renderPollsScreen = () => (
-    <PollsScreen theme={C} members={members} />
+    <PollsScreen theme={C} />
   );
 
   const renderSystemMapScreen = () => (
-    <SystemMapScreen theme={C} members={members} onViewMember={openMemberById} onRelCountChange={setSystemMapRelCount} focus={mapFocus} />
-  );
-
-  const renderMedicalScreen = () => (
-    <MedicalScreen theme={C} medical={medical} onSave={saveMedical} />
+    <SystemMapScreen theme={C} onViewMember={openMemberById} onRelCountChange={setSystemMapRelCount} focus={mapFocus} />
   );
 
   const renderNetworkScreen = () => (
-    <NetworkScreen theme={C} members={members} groups={groups} journal={journal} />
+    <NetworkScreen theme={C} />
   );
 
   const renderMailboxScreen = (onBack: () => void) => (
-    <MailboxScreen theme={C} members={members} onBack={onBack}
-      onSetMailboxPassword={(memberId, password) => {
-        const m = members.find(x => x.id === memberId);
-        if (m) saveMember({...m, mailboxPassword: password});
-      }} />
+    <MailboxScreen theme={C} onBack={onBack} />
   );
 
   const renderWhiteboardScreen = (onBack: () => void) => (
     <WhiteboardScreen theme={C} onBack={onBack} />
   );
 
+  const renderColorsScreen = (onBack: () => void) => (
+    <ColorsScreen theme={C} onBack={onBack} />
+  );
+
   const renderArchiveScreen = () => (
-    <MembersScreen theme={C} members={members} front={front} groups={groups} archiveOnly
+    <MembersScreen theme={C} archiveOnly
       onAdd={() => {}}
       onEdit={m => {setEditMember(m); setViewOnlyMember(false); setAddCustomFront(false); setShowMember(true);}}
       onView={m => {setEditMember(m); setViewOnlyMember(true); setShowMember(true);}}
       onSaveGroups={saveGroups}
       onBulkRestore={(ids: string[]) => bulkSetArchived(ids, false)}
       onBulkDelete={bulkDeleteMembers}
+      onRestoreDeleted={restoreDeletedMember}
     />
   );
 
@@ -1033,82 +608,46 @@ function MainAppContent() {
     switch (id) {
       case 'front':
         if (isSinglet) {
-          return <StatusScreen theme={C} front={front} getMember={getMember} selfId={selfMember?.id}
+          return <StatusScreen theme={C} selfId={selfMember?.id}
             onSetStatus={async () => {await ensureSelfMember(); setShowSetFront(true);}} onEditDetails={handleEditDetails} />;
         }
-        return <FrontScreen theme={C} front={front} getMember={getMember} onSetFront={() => setShowSetFront(true)} onEditDetails={handleEditDetails} />;
+        return <FrontScreen theme={C} onSetFront={() => setShowSetFront(true)} onEditDetails={handleEditDetails} onOpenMember={openMemberById} />;
       case 'members':
         if (isSinglet) {
-          return <ProfileScreen theme={C} member={selfMember} statuses={singletStatuses(members)} front={front}
+          return <ProfileScreen theme={C} member={selfMember}
             onEditProfile={async () => {const self = await ensureSelfMember(); setEditMember(self); setViewOnlyMember(false); setAddCustomFront(false); setShowMember(true);}}
             onAddStatus={() => {setEditCustomFront(null); setShowCustomFront(true);}}
             onEditStatus={m => {setEditCustomFront(m); setShowCustomFront(true);}} />;
         }
-        return <MembersScreen theme={C} members={members} front={front} groups={groups} initialSortMode={appSettings.memberSortMode} memberListFields={appSettings.memberListFields} onSaveListFields={async (next: any) => {const sNext = {...appSettings, memberListFields: next}; setAppSettings(sNext); await store.set(KEYS.settings, sNext);}}
+        return <MembersScreen theme={C} initialSortMode={appSettings.memberSortMode} memberListFields={appSettings.memberListFields} onSaveListFields={saveMemberListFields}
           onQuickAddToFront={quickAddToFront} onRemoveFromFront={removeFromFront}
-          onAdd={() => {setEditMember(null); setViewOnlyMember(false); setAddCustomFront(false); setShowMember(true);}}
+          onAdd={() => {setEditMember(null); setViewOnlyMember(false); setAddCustomFront(false); setAddFacet(false); setShowMember(true);}}
           onAddCustomFront={() => {setEditCustomFront(null); setShowCustomFront(true);}}
+          onAddFacet={() => {setEditMember(null); setViewOnlyMember(false); setAddCustomFront(false); setAddFacet(true); setShowMember(true);}}
           onEdit={m => { if (m.isCustomFront) {setEditCustomFront(m); setShowCustomFront(true);} else {setEditMember(m); setViewOnlyMember(false); setShowMember(true);} }}
           onView={m => { if (m.isCustomFront) {setEditCustomFront(m); setShowCustomFront(true);} else {setEditMember(m); setViewOnlyMember(true); setShowMember(true);} }}
-          onSaveGroups={saveGroups} onSaveSortMode={async (mode) => {const next = normalizeAppearanceSettings({...appSettings, memberSortMode: mode}, systemScheme); setAppSettings(next); await store.set(KEYS.settings, next);}} onReorderMember={async (id, direction) => {
-          const active = members.filter(m => !m.archived);
-          const archived = members.filter(m => m.archived);
-          // Order exactly the way the Members list shows manual sort: by sortOrder,
-          // with members that have none (e.g. freshly imported) falling to the end in
-          // a stable order. Then reindex so those get real positions — previously this
-          // re-seeded from the raw members-array index, which didn't match the on-screen
-          // order, so ▲/▼ moved the wrong neighbours for imported members.
-          const ordered = [...active].sort((a, b) => (a.sortOrder ?? Number.MAX_SAFE_INTEGER) - (b.sortOrder ?? Number.MAX_SAFE_INTEGER));
-          const idx = ordered.findIndex(m => m.id === id);
-          if (idx === -1) return;
-          const swapWith = direction === 'up' ? idx - 1 : idx + 1;
-          if (swapWith < 0 || swapWith >= ordered.length) return;
-          [ordered[idx], ordered[swapWith]] = [ordered[swapWith], ordered[idx]];
-          const reindexed = ordered.map((m, i) => ({...m, sortOrder: i}));
-          await saveMembers([...reindexed, ...archived]);
-        }}
+          onSaveGroups={saveGroups} onSaveSortMode={saveMemberSortMode} onReorderMember={reorderMember}
           onBulkArchive={(ids: string[]) => bulkSetArchived(ids, true)}
           onBulkRestore={(ids: string[]) => bulkSetArchived(ids, false)}
           onBulkDelete={bulkDeleteMembers}
           onBulkAddGroups={bulkAddGroups}
+          onBulkAddTags={bulkAddTags}
+          onBulkSetFacet={bulkSetFacet}
         />;
       case 'hub':
-        return <HubScreen theme={C} singlet={isSinglet} selfId={selfMember?.id} members={members} history={history} front={front} onSaveHistory={saveHistory} onSetFront={handleHubSetFront} renderShareScreen={renderShareScreen} renderStatsScreen={renderStatsScreen} renderChatScreen={renderChatScreen} renderCustomFieldsScreen={renderCustomFieldsScreen} renderSystemManagerScreen={() => <SystemManagerScreen theme={C} members={members} groups={groups} onSaveGroups={saveGroups} onViewMember={openMemberById} />} renderArchiveScreen={renderArchiveScreen} renderPollsScreen={renderPollsScreen} renderSystemMapScreen={renderSystemMapScreen} systemMapRelCount={systemMapRelCount} mapFocus={mapFocus} renderMedicalScreen={renderMedicalScreen} renderMailboxScreen={renderMailboxScreen} renderWhiteboardScreen={renderWhiteboardScreen} renderNetworkScreen={renderNetworkScreen} resetKey={hubResetKey} editHistoryIndex={editHistoryIndex} onClearEditHistory={() => setEditHistoryIndex(null)} />;
+        return <HubScreen theme={C} singlet={isSinglet} selfId={selfMember?.id} renderShareScreen={renderShareScreen} renderStatsScreen={renderStatsScreen} renderChatScreen={renderChatScreen} renderCustomFieldsScreen={renderCustomFieldsScreen} renderSystemManagerScreen={() => <SystemManagerScreen theme={C} onViewMember={openMemberById} />} renderArchiveScreen={renderArchiveScreen} renderPollsScreen={renderPollsScreen} renderSystemMapScreen={renderSystemMapScreen} systemMapRelCount={systemMapRelCount} mapFocus={mapFocus} renderMailboxScreen={renderMailboxScreen} renderWhiteboardScreen={renderWhiteboardScreen} renderColorsScreen={renderColorsScreen} renderNetworkScreen={renderNetworkScreen} resetKey={hubResetKey} editHistoryIndex={editHistoryIndex} onClearEditHistory={() => setEditHistoryIndex(null)} />;
       case 'journal':
-        return <JournalScreen theme={C} journal={journal} templates={journalTemplates} members={members} systemJournalPassword={system.journalPassword} onAdd={() => {setEditJournal(null); setShowJournal(true);}} onEdit={e => {setEditJournal(e); setShowJournal(true);}} onDelete={deleteEntry} onTogglePin={e => saveEntry({...e, pinned: !e.pinned})} onSaveTemplates={saveJournalTemplates} onMentionPress={openMemberById} />;
+        return <JournalScreen theme={C} onAdd={() => {setEditJournal(null); setShowJournal(true);}} onEdit={e => {setEditJournal(e); setShowJournal(true);}} onDelete={deleteEntry} onTogglePin={e => saveEntry({...e, pinned: !e.pinned})} onMentionPress={openMemberById} />;
       case 'history':
-        return <HistoryScreen theme={C} history={history} journal={journal} getMember={getMember} members={members} singlet={isSinglet} selfId={selfMember?.id} onSaveHistory={saveHistory} onEditEntry={(idx: number) => {setEditHistoryIndex(idx); setTab('hub');}} />;
+        return <HistoryScreen theme={C} singlet={isSinglet} selfId={selfMember?.id} onEditEntry={(idx: number) => {setEditHistoryIndex(idx); setTab('hub');}} />;
     }
   };
 
   return (
     <View style={[styles.root, {backgroundColor: C.bg}]}>
-      <StatusBar barStyle={C.isLight ? 'dark-content' : 'light-content'} backgroundColor={C.bg} translucent={false} />
-      <View style={{backgroundColor: C.bg, paddingTop: Platform.OS === 'ios' ? Math.max(insets.top - 6, 0) : Math.max(StatusBar.currentHeight || 0, insets.top || 0, 28), paddingHorizontal: 12, paddingBottom: 8}}>
-        <View style={[styles.header, {borderBottomColor: C.border, backgroundColor: C.surface}]}>
-          <AccentText
-            T={C}
-            style={[styles.headerTitle, {color: C.accent, flex: 1, marginRight: 8}]}
-            numberOfLines={1}
-            accessibilityRole="header"
-            maxFontSizeMultiplier={1.2}>{system.name}</AccentText>
-          <View style={styles.headerRight} accessibilityRole="toolbar" accessibilityLabel={t('a11y.toolbar')}>
-            <TouchableOpacity
-              onPress={() => { if (appSettings.appLockPassword) setLocked(true); }}
-              disabled={!appSettings.appLockPassword}
-              activeOpacity={appSettings.appLockPassword ? 0.7 : 1}
-              accessibilityRole="button"
-              accessibilityLabel={t('a11y.lockApp')}
-              accessibilityState={{disabled: !appSettings.appLockPassword}}
-              style={[styles.settingsBtn, {backgroundColor: C.card, borderColor: C.border}]}>
-              <Text style={[styles.settingsIcon, {color: appSettings.appLockPassword ? C.dim : C.muted, opacity: appSettings.appLockPassword ? 1 : 0.35}]} maxFontSizeMultiplier={1.2} allowFontScaling={false} importantForAccessibility="no" accessibilityElementsHidden>🔒</Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => setShowSystem(true)} activeOpacity={0.7} accessibilityRole="button" accessibilityLabel={t('a11y.settings')} style={[styles.settingsBtn, {backgroundColor: C.card, borderColor: C.border}]}>
-              <Text style={[styles.settingsIcon, {color: C.dim}]} maxFontSizeMultiplier={1.2} allowFontScaling={false} importantForAccessibility="no" accessibilityElementsHidden>⚙</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </View>
+      <StatusBar barStyle={C.isLight ? 'dark-content' : 'light-content'} backgroundColor="transparent" translucent />
+      <AppHeader C={C} systemName={system.name || t('systemProfile.unnamed')} canLock={!!appSettings.appLockPassword} onLock={() => setLocked(true)} onOpenSettings={() => setShowSystem(true)}
+        onOpenProfile={appSettings.accountMode === 'singlet' ? undefined : () => setShowSystemProfile(true)} />
       <View style={styles.content}>
         {TAB_IDS.map(id => mountedTabs.includes(id) ? (
           <View key={id} style={{flex: 1, display: tab === id ? 'flex' : 'none'}}>
@@ -1116,45 +655,46 @@ function MainAppContent() {
           </View>
         ) : null)}
       </View>
-      <View style={[styles.tabBarWrap, {backgroundColor: 'transparent', paddingBottom: Math.max(insets.bottom, 8)}]}>
-        <View style={[styles.tabBar, {backgroundColor: C.surface, borderTopColor: C.border, borderColor: C.border}]} accessibilityRole="tablist" accessibilityLabel={t('a11y.mainNav')}>
-          {TAB_IDS.map(id => (
-            <TouchableOpacity key={id} onPress={() => { if (id === 'hub' && tab === 'hub') setHubResetKey(k => k + 1); setTab(id); }} activeOpacity={0.7} accessibilityRole="tab" accessibilityState={{selected: tab === id}} accessibilityLabel={tabLabel(id)} style={[styles.tabBtn, tab === id && {backgroundColor: C.card}]}>
-              <AccentText T={C} style={[styles.tabIcon, {color: tab === id ? C.accent : C.dim, fontSize: fs(18)}]} maxFontSizeMultiplier={1.2}>{TAB_ICONS[id]}</AccentText>
-              <AccentText T={C} style={[styles.tabLabel, {color: tab === id ? C.accent : C.dim, fontSize: fs(9)}]} numberOfLines={1} allowFontScaling={false}>{tabLabel(id)}</AccentText>
-            </TouchableOpacity>
-          ))}
-        </View>
-      </View>
+      <TabBar C={C} tab={tab} isSinglet={isSinglet} onPressTab={id => { if (id === 'hub' && tab === 'hub') setHubResetKey(k => k + 1); setTab(id); }} />
 
       {isSinglet ? (
         <SetStatusModal visible={showSetFront} theme={C} statuses={singletStatuses(members)} selfId={selfMember?.id} current={front} settings={appSettings}
           lastKnownLocation={lastKnownLocation}
-          onSave={async (primary: FrontTier, coFront: FrontTier, coConscious: FrontTier) => {await updateFront(primary, coFront, coConscious); setShowSetFront(false);}}
+          onSave={async (primary: FrontTier, coFront: FrontTier, coConscious: FrontTier) => {
+            try { await updateFront(primary, coFront, coConscious); } catch (e: any) { Alert.alert(t('modal.saveFailed'), String(e?.message || e || '')); return; }
+            setShowSetFront(false);
+          }}
           onClose={() => setShowSetFront(false)} />
       ) : (
         <SetFrontModal visible={showSetFront} theme={C} members={members.filter(m => !m.archived)} groups={groups} current={front} settings={appSettings}
           lastKnownLocation={lastKnownLocation}
-          onSave={async (primary: FrontTier, coFront: FrontTier, coConscious: FrontTier) => {await updateFront(primary, coFront, coConscious); setShowSetFront(false);}}
+          onSave={async (primary: FrontTier, coFront: FrontTier, coConscious: FrontTier) => {
+            try { await updateFront(primary, coFront, coConscious); } catch (e: any) { Alert.alert(t('modal.saveFailed'), String(e?.message || e || '')); return; }
+            setShowSetFront(false);
+          }}
           onClose={() => setShowSetFront(false)} />
       )}
       {front && (
         <EditFrontDetailModal visible={showEditFrontDetail} theme={C} front={front} tier={editTier} settings={appSettings} statusMode={isSinglet}
           lastKnownLocation={lastKnownLocation}
-          onSave={async (mood: string, location: string, note: string) => {await updateFrontDetails(editTier, mood, location, note); setShowEditFrontDetail(false);}}
+          onSave={async (mood: string, location: string, note: string, energyLevel?: number) => {
+            try { await updateFrontDetails(editTier, mood, location, note, energyLevel); } catch (e: any) { Alert.alert(t('modal.saveFailed'), String(e?.message || e || '')); return; }
+            setShowEditFrontDetail(false);
+          }}
           onClose={() => setShowEditFrontDetail(false)} />
       )}
       <MemberModal key={`${editMember?.id || 'new-member'}-${viewOnlyMember ? 'view' : 'edit'}`} visible={showMember} theme={C} member={editMember} members={members} groups={groups} settings={appSettings}
         readOnly={viewOnlyMember}
+        facetMode={addFacet || !!editMember?.isFacet}
         profileMode={isSinglet && editMember?.id === selfMember?.id && !editMember?.isCustomFront}
         onRequestEdit={isSinglet && viewOnlyMember ? () => setViewOnlyMember(false) : undefined}
         isFronting={!!editMember && allFrontMemberIds(front).includes(editMember.id)}
         onMentionPress={openMemberById}
         onShowOnMap={showMemberOnMap}
-        onSave={async (m: Member) => {await saveMember(addCustomFront && !editMember ? {...m, isCustomFront: true} : m); setShowMember(false); setEditMember(null); setViewOnlyMember(false); setAddCustomFront(false);}}
+        onSave={async (m: Member) => {await saveMember(addCustomFront && !editMember ? {...m, isCustomFront: true} : addFacet && !editMember ? {...m, isFacet: true} : m); setShowMember(false); setEditMember(null); setViewOnlyMember(false); setAddCustomFront(false); setAddFacet(false);}}
         onDelete={async (id: string) => {await deleteMember(id); setShowMember(false); setEditMember(null); setViewOnlyMember(false);}}
-        onClose={() => {setShowMember(false); setEditMember(null); setViewOnlyMember(false);}} />
-      <CustomFrontModal visible={showCustomFront} theme={C} customFront={editCustomFront} statusMode={isSinglet}
+        onClose={() => {setShowMember(false); setEditMember(null); setViewOnlyMember(false); setAddFacet(false);}} />
+      <CustomFrontModal visible={showCustomFront} theme={C} customFront={editCustomFront} statusMode={isSinglet} groups={groups}
         isFronting={!!editCustomFront && allFrontMemberIds(front).includes(editCustomFront.id)}
         onSave={async (m: Member) => {await saveMember({...m, isCustomFront: true}); setShowCustomFront(false); setEditCustomFront(null);}}
         onDelete={async (id: string) => {await deleteMember(id); setShowCustomFront(false); setEditCustomFront(null);}}
@@ -1164,11 +704,12 @@ function MainAppContent() {
         onSave={async (e: JournalEntry) => {await saveEntry(e); setShowJournal(false);}}
         onClose={() => setShowJournal(false)} />
       <SystemModal visible={showSystem} theme={C} system={system} settings={appSettings}
+        palettes={palettes} activePaletteId={activePaletteId}
         onSave={async (s: SystemInfo) => {await saveSystem(s); setShowSystem(false);}}
         onSaveSettings={async (s: AppSettings) => {
           let next = s;
-          if (s.accountMode === 'singlet' && !members.find(m => m.id === s.selfMemberId && !m.isCustomFront)) {
-            const existing = members.find(m => !m.isCustomFront && !m.archived);
+          if (s.accountMode === 'singlet' && !members.find(m => m.id === s.selfMemberId && !m.isCustomFront && !m.isFacet)) {
+            const existing = members.find(m => !m.isCustomFront && !m.isFacet && !m.archived);
             if (existing) {
               next = {...s, selfMemberId: existing.id};
             } else {
@@ -1179,99 +720,31 @@ function MainAppContent() {
           }
           await saveAppSettings(next); setShowSystem(false);
         }}
+        onSavePalettes={savePalettes}
+        onSelectPalette={selectPalette}
+        onOpenProfile={() => { setShowSystem(false); setShowSystemProfile(true); }}
         onClose={() => setShowSystem(false)} />
+      <SystemProfileModal visible={showSystemProfile && appSettings.accountMode !== 'singlet'} theme={C} system={system}
+        onSave={(s: SystemInfo) => { saveSystem(s).catch(e => console.warn('[PS] system profile save failed:', e)); }}
+        onClose={() => setShowSystemProfile(false)} />
+      <ImageCropHost theme={C} />
     </View>
   );
-}
-
-class AppErrorBoundary extends React.Component<{children: React.ReactNode}, {error: Error | null}> {
-  state = {error: null as Error | null};
-  static getDerivedStateFromError(error: Error) {
-    return {error};
-  }
-  componentDidCatch(error: Error, info: React.ErrorInfo) {
-    if (typeof console !== 'undefined' && console.error) {
-      console.error('AppErrorBoundary caught:', error, info?.componentStack);
-    }
-  }
-  reset = () => this.setState({error: null});
-  render() {
-    if (!this.state.error) return this.props.children;
-    const err = this.state.error as Error;
-    const msg = err?.message || String(err);
-    return (
-      <View style={{flex: 1, backgroundColor: '#0a0a0a', padding: 24, justifyContent: 'center', alignItems: 'center'}}>
-        <Text style={{color: '#fff', fontSize: 18, fontWeight: '700', marginBottom: 12, textAlign: 'center'}}>
-          {i18n.t('errorBoundary.title')}
-        </Text>
-        <Text style={{color: '#bbb', fontSize: 13, marginBottom: 24, textAlign: 'center'}}>
-          {i18n.t('errorBoundary.body')}
-        </Text>
-        <Text style={{color: '#666', fontSize: 11, marginBottom: 24, textAlign: 'center'}} numberOfLines={4}>
-          {msg}
-        </Text>
-        <TouchableOpacity onPress={this.reset} style={{paddingHorizontal: 24, paddingVertical: 12, borderRadius: 8, backgroundColor: '#3a7bd5'}}>
-          <Text style={{color: '#fff', fontSize: 14, fontWeight: '600'}}>
-            {i18n.t('errorBoundary.retry')}
-          </Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
 }
 
 export default function App() {
   return (
     <SafeAreaProvider>
-      <AppErrorBoundary>
-        <MainAppContent />
-      </AppErrorBoundary>
+      <KeyboardProvider statusBarTranslucent navigationBarTranslucent>
+        <AppErrorBoundary>
+          <MainAppContent />
+        </AppErrorBoundary>
+      </KeyboardProvider>
     </SafeAreaProvider>
   );
 }
 
 const styles = StyleSheet.create({
   root: {flex: 1},
-  loading: {flex: 1, alignItems: 'center', justifyContent: 'center'},
-  splashLogo: {width: 200, height: 200},
-  splashName: {fontSize: 24, fontWeight: '700', letterSpacing: 1.2, marginTop: 16, textTransform: 'uppercase'},
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderWidth: 0,
-    borderRadius: 24,
-  },
-  headerTitle: {fontSize: 22, fontWeight: '700', letterSpacing: -0.3},
-  headerRight: {flexDirection: 'row', alignItems: 'center', flexShrink: 0},
-  settingsBtn: {
-    width: 36,
-    height: 36,
-    marginLeft: 8,
-    borderRadius: 14,
-    borderWidth: 0,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  settingsIcon: {fontSize: 18},
   content: {flex: 1},
-  tabBarWrap: {paddingHorizontal: 14},
-  tabBar: {
-    flexDirection: 'row',
-    borderWidth: 0,
-    borderRadius: 28,
-    padding: 8,
-    marginBottom: 4,
-  },
-  tabBtn: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 11,
-    borderRadius: 20,
-  },
-  tabIcon: {fontSize: 18, marginBottom: 3},
-  tabLabel: {fontSize: 9, letterSpacing: 0.8, textTransform: 'uppercase'},
 });

@@ -1,9 +1,56 @@
 import Foundation
 import React
+import UIKit
 
 #if canImport(ActivityKit)
 import ActivityKit
 #endif
+
+final class PushTokenHolder {
+  static let shared = PushTokenHolder()
+  private var tokenHex: String?
+  private var failed = false
+  private var waiters: [(String?) -> Void] = []
+
+  func set(_ hex: String) {
+    DispatchQueue.main.async {
+      self.tokenHex = hex
+      self.failed = false
+      let pending = self.waiters
+      self.waiters = []
+      pending.forEach { $0(hex) }
+    }
+  }
+
+  func fail() {
+    DispatchQueue.main.async {
+      self.failed = true
+      let pending = self.waiters
+      self.waiters = []
+      pending.forEach { $0(nil) }
+    }
+  }
+
+  func reset() {
+    DispatchQueue.main.async {
+      self.failed = false
+    }
+  }
+
+  func get(_ cb: @escaping (String?) -> Void) {
+    DispatchQueue.main.async {
+      if let t = self.tokenHex {
+        cb(t)
+        return
+      }
+      if self.failed {
+        cb(nil)
+        return
+      }
+      self.waiters.append(cb)
+    }
+  }
+}
 
 @objc(PluralSpaceLiveActivity)
 class PluralSpaceLiveActivity: NSObject {
@@ -177,6 +224,63 @@ class PluralSpaceLiveActivity: NSObject {
 #else
     resolve(NSNull())
 #endif
+  }
+
+  @objc(getAPNsDeviceToken:rejecter:)
+  func getAPNsDeviceToken(
+    _ resolve: @escaping RCTPromiseResolveBlock,
+    rejecter reject: @escaping RCTPromiseRejectBlock
+  ) {
+    DispatchQueue.main.async {
+      PushTokenHolder.shared.reset()
+      UIApplication.shared.registerForRemoteNotifications()
+      var resolved = false
+      let finish: (String?) -> Void = { hex in
+        if resolved { return }
+        resolved = true
+        if let hex {
+          resolve(hex)
+        } else {
+          resolve(NSNull())
+        }
+      }
+      PushTokenHolder.shared.get(finish)
+      DispatchQueue.main.asyncAfter(deadline: .now() + 10) { finish(nil) }
+    }
+  }
+
+  @objc(waitForProtectedData:rejecter:)
+  func waitForProtectedData(
+    _ resolve: @escaping RCTPromiseResolveBlock,
+    rejecter reject: @escaping RCTPromiseRejectBlock
+  ) {
+    DispatchQueue.main.async {
+      if UIApplication.shared.isProtectedDataAvailable {
+        resolve(true)
+        return
+      }
+      var resolved = false
+      var observer: NSObjectProtocol?
+      var timeoutWork: DispatchWorkItem?
+      let finish: (Bool) -> Void = { ok in
+        if resolved { return }
+        resolved = true
+        if let obs = observer {
+          NotificationCenter.default.removeObserver(obs)
+          observer = nil
+        }
+        timeoutWork?.cancel()
+        resolve(ok)
+      }
+      observer = NotificationCenter.default.addObserver(
+        forName: UIApplication.protectedDataDidBecomeAvailableNotification,
+        object: nil,
+        queue: .main
+      ) { _ in finish(true) }
+      let work = DispatchWorkItem { finish(false) }
+      timeoutWork = work
+      DispatchQueue.main.asyncAfter(deadline: .now() + 30, execute: work)
+    }
   }
 
   @objc(endFriendsActivity:rejecter:)

@@ -1,6 +1,6 @@
 # Plural Star Reimagined Wiki
 
-Plural Star Reimagined is a fork of [Plural Star](https://github.com/TheHanyou/Plural-Star), a private, offline-first React Native app for front tracking, journaling, member management, and shared system tooling.
+Plural Star Reimagined is a fork of [Plural Star](https://github.com/ByHanyou/Plural-Star), a private, offline-first React Native app for front tracking, journaling, member management, and shared system tooling.
 
 ## Install
 

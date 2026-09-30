@@ -2,17 +2,19 @@ import React, {useState, useEffect} from 'react';
 import {View, Image} from 'react-native';
 import {Text} from './AppText';
 import {Member, getInitials} from '../utils';
+import type {ThemeColors} from '../theme';
+import {initialOn} from '../theme';
 
 interface AvatarProps {
   member?: Member | null;
   size?: number;
   pulse?: boolean;
-  T: any;
+  T: ThemeColors;
 }
 
-export const Avatar = ({member, size = 28, pulse = false, T}: AvatarProps) => {
+export const Avatar = React.memo(function Avatar({member, size = 28, pulse = false, T}: AvatarProps) {
   const [imgError, setImgError] = useState(false);
-  useEffect(() => { setImgError(false); }, [member?.avatar]);
+  useEffect(() => { setImgError(false); }, [member?.id, member?.avatar]);
 
   const radius = Math.round(size * 0.22);
 
@@ -69,11 +71,16 @@ export const Avatar = ({member, size = 28, pulse = false, T}: AvatarProps) => {
         style={{
           fontSize: size * 0.35,
           fontWeight: '700',
-          color: 'rgba(0,0,0,0.75)',
+          color: initialOn(member?.color || T.toggleOff),
+          includeFontPadding: false,
+          textAlign: 'center',
+          textAlignVertical: 'center',
         }}
-        allowFontScaling={false}>
+        allowFontScaling={false}
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants">
         {getInitials(member?.name || '?')}
       </Text>
     </View>
   );
-};
+});

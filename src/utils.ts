@@ -20,15 +20,38 @@ export interface MemberGroup {
   parentId?: string | null;
   sortOrder?: number;
   sourceId?: string;
+  description?: string;
+  linkedMemberId?: string;
 }
 
 export const groupKind = (g: MemberGroup): GroupNodeKind => g.kind || 'group';
 export const groupParent = (g: MemberGroup): string | null => g.parentId ?? null;
 
+export const linkedSubsystemsOf = (groups: MemberGroup[], memberId: string): MemberGroup[] =>
+  memberId ? groups.filter(g => groupKind(g) === 'subsystem' && g.linkedMemberId === memberId) : [];
+
+export const setSubsystemLinks = (groups: MemberGroup[], memberId: string, subsystemIds: string[]): MemberGroup[] => {
+  if (!memberId) return groups;
+  const want = new Set(subsystemIds);
+  let changed = false;
+  const next = groups.map(g => {
+    if (groupKind(g) !== 'subsystem') return g;
+    if (want.has(g.id)) {
+      if (g.linkedMemberId === memberId) return g;
+      changed = true;
+      return {...g, linkedMemberId: memberId};
+    }
+    if (g.linkedMemberId !== memberId) return g;
+    changed = true;
+    return {...g, linkedMemberId: undefined};
+  });
+  return changed ? next : groups;
+};
+
 export const childrenOf = (nodes: MemberGroup[], parentId: string | null): MemberGroup[] =>
   nodes
     .filter(n => groupParent(n) === parentId)
-    .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0) || a.name.localeCompare(b.name));
+    .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0) || nameCompare(a.name, b.name));
 
 export const groupDisplayOrder = (nodes: MemberGroup[]): Map<string, number> => {
   const order = new Map<string, number>();
@@ -53,9 +76,14 @@ export const sortGroupsForDisplay = (list: MemberGroup[], all: MemberGroup[]): M
 
 export const descendantsOf = (nodes: MemberGroup[], id: string): MemberGroup[] => {
   const out: MemberGroup[] = [];
+  const seen = new Set<string>([id]);
   const walk = (pid: string) => {
     for (const n of nodes) {
-      if (groupParent(n) === pid) { out.push(n); walk(n.id); }
+      if (groupParent(n) === pid && !seen.has(n.id)) {
+        seen.add(n.id);
+        out.push(n);
+        walk(n.id);
+      }
     }
   };
   walk(id);
@@ -102,12 +130,12 @@ export interface CustomFieldValue {
 
 export interface NoteboardEntry {
   id: string;
-  memberId: string;   // recipient (whose mailbox this lands in)
-  authorId: string;   // sender
+  memberId: string;
+  authorId: string;
   content: string;
   timestamp: number;
   pinned?: boolean;
-  read?: boolean;     // marked true once the recipient's mailbox has been opened
+  read?: boolean;
 }
 
 export interface PollOption {
@@ -125,9 +153,11 @@ export interface MemberPoll {
   createdAt: number;
   closedAt?: number;
   hideVoterNames?: boolean;
+  multipleChoice?: boolean;
 }
 
 export type MemberSortMode = 'alphabetical' | 'reverse-alphabetical' | 'age' | 'color' | 'role' | 'manual';
+export type FrontSortMode = 'added' | 'az' | 'za' | 'custom';
 
 export interface Member {
   id: string;
@@ -139,20 +169,30 @@ export interface Member {
   tags?: string[];
   groupIds?: string[];
   archived?: boolean;
-  // Soft-delete tombstone: hidden from all member lists (roster, archive, pickers) but
-  // kept in storage so front history & stats can still resolve the member's name/color
-  // instead of showing the raw ID.
   deleted?: boolean;
   avatar?: string;
   avatarTransparent?: boolean;
+  profileBg?: boolean;
+  private?: boolean;
   banner?: string;
   customFields?: CustomFieldValue[];
   sortOrder?: number;
   createdAt?: number;
   sourceId?: string;
   isCustomFront?: boolean;
+  isFacet?: boolean;
+  nickname?: string;
   mailboxPassword?: string;
+  pkProxyTags?: {prefix?: string | null; suffix?: string | null}[];
+  pkAvatarUrl?: string;
+  pkBannerUrl?: string;
+  pkKeepProxy?: boolean;
 }
+
+export const isRosterMember = (m: Member): boolean =>
+  !m.isCustomFront && !m.isFacet && !m.deleted;
+
+export const rosterMembers = (members: Member[]): Member[] => members.filter(isRosterMember);
 
 export const DEFAULT_CUSTOM_FRONT_NAMES = ['Chatty', 'Non-Verbal', 'IWC', 'DNI', 'Blurry', 'Blendy', 'Rapid Switching', 'Foggy', 'Grounded', 'Dissociated', 'Anxious', 'Depressed', 'Cheerful', 'Happy', 'Sad', 'Crisis', 'Melancholy', 'Stimming', 'Stressed', 'Working', 'Traveling', 'Sleeping', 'Hyperfocus'];
 
@@ -179,6 +219,7 @@ export interface RelationshipTypeDef {
   color?: string;
   preset?: boolean;
   overridden?: boolean;
+  deleted?: boolean;
 }
 
 export interface Medication {
@@ -231,10 +272,95 @@ export const DEFAULT_MEDICAL: MedicalData = {
   emergency: {showOnNotification: false},
 };
 
+export type PlannerRepeat = 'daily' | 'everyOtherDay' | 'weekly' | 'everyOtherWeek' | 'monthly' | 'everyOtherMonth' | 'annually';
+export type PlannerReminderRepeat = PlannerRepeat | 'once';
+
+export interface PlannerAppointment {
+  id: string;
+  title: string;
+  time: number;
+  location?: string;
+  notes?: string;
+  reminderMinutesBefore?: number;
+  repeat?: PlannerRepeat;
+  color?: string;
+  createdAt: number;
+}
+
+export interface PlannerReminder {
+  id: string;
+  title: string;
+  times: string[];
+  enabled: boolean;
+  notes?: string;
+  repeat?: PlannerReminderRepeat;
+  startDate?: number;
+  createdAt: number;
+}
+
+const plannerDayNumber = (d: Date): number => Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / 86400000;
+
+export const daysInMonth = (year: number, monthZeroIndexed: number): number =>
+  new Date(year, monthZeroIndexed + 1, 0).getDate();
+
+export const plannerOccursOnDay = (anchorTs: number, repeat: PlannerReminderRepeat | undefined, day: Date): boolean => {
+  const a = new Date(anchorTs);
+  const diff = plannerDayNumber(day) - plannerDayNumber(a);
+  if (repeat == null || repeat === 'once') return diff === 0;
+  if (diff < 0) return false;
+  switch (repeat) {
+    case 'daily': return true;
+    case 'everyOtherDay': return diff % 2 === 0;
+    case 'weekly': return diff % 7 === 0;
+    case 'everyOtherWeek': return diff % 14 === 0;
+    case 'monthly':
+    case 'everyOtherMonth': {
+      const months = (day.getFullYear() - a.getFullYear()) * 12 + (day.getMonth() - a.getMonth());
+      if (months < 0) return false;
+      if (repeat === 'everyOtherMonth' && months % 2 !== 0) return false;
+      const dom = Math.min(a.getDate(), daysInMonth(day.getFullYear(), day.getMonth()));
+      return day.getDate() === dom;
+    }
+    case 'annually': {
+      if (day.getFullYear() < a.getFullYear()) return false;
+      if (day.getMonth() !== a.getMonth()) return false;
+      const dom = Math.min(a.getDate(), daysInMonth(day.getFullYear(), day.getMonth()));
+      return day.getDate() === dom;
+    }
+  }
+  return false;
+};
+
+export const plannerNextOccurrence = (anchorTs: number, repeat: PlannerReminderRepeat | undefined, after: number): number | null => {
+  if (repeat == null || repeat === 'once') return anchorTs > after ? anchorTs : null;
+  const a = new Date(anchorTs);
+  const probe = new Date(after);
+  probe.setHours(0, 0, 0, 0);
+  for (let i = 0; i < 800; i++) {
+    if (plannerOccursOnDay(anchorTs, repeat, probe)) {
+      const cand = new Date(probe);
+      cand.setHours(a.getHours(), a.getMinutes(), a.getSeconds(), 0);
+      if (cand.getTime() > after) return cand.getTime();
+    }
+    probe.setDate(probe.getDate() + 1);
+  }
+  return null;
+};
+
+export interface PlannerData {
+  appointments: PlannerAppointment[];
+  reminders: PlannerReminder[];
+  markColor?: string;
+}
+
+export const DEFAULT_PLANNER: PlannerData = {
+  appointments: [],
+  reminders: [],
+};
+
 export const isValidTimeHHMM = (v: string): boolean =>
   /^([01]?\d|2[0-3]):[0-5]\d$/.test(v.trim());
 
-// Convert a 12-hour entry ("9", "9:30") + meridiem to canonical 24h "HH:MM". Returns null if invalid.
 export const time12to24 = (raw: string, ampm: 'AM' | 'PM'): string | null => {
   const m = /^(\d{1,2})(?::(\d{2}))?$/.exec((raw || '').trim());
   if (!m) return null;
@@ -245,7 +371,6 @@ export const time12to24 = (raw: string, ampm: 'AM' | 'PM'): string | null => {
   return `${String(h).padStart(2, '0')}:${String(min).padStart(2, '0')}`;
 };
 
-// Format a canonical 24h "HH:MM" for display as 12-hour with meridiem, e.g. "9:00 PM".
 export const formatTime12 = (hhmm24: string): string => {
   const m = /^(\d{1,2}):(\d{2})$/.exec((hhmm24 || '').trim());
   if (!m) return hhmm24;
@@ -318,6 +443,132 @@ export const DEFAULT_REL_COLOR = '#8A94A6';
 
 export const RELATIONSHIP_COLOR_CHOICES = ['#E05B5B', '#5BBF7A', '#D9B84A', '#E87BA8'];
 
+export const COLOR_NAMES: Record<string, string> = {
+  '#FFFFFF': 'white',
+  '#111111': 'black',
+  '#E05B5B': 'red',
+  '#E8933A': 'orange',
+  '#D9B84A': 'yellow',
+  '#5BBF7A': 'green',
+  '#4AA8D9': 'blue',
+  '#7B6BE8': 'indigo',
+  '#8B5A2B': 'brown',
+  '#9AA5B1': 'gray',
+  '#8A94A6': 'slate',
+  '#DAA520': 'goldenrod',
+  '#7B9FE8': 'periwinkle',
+  '#E87BA8': 'pink',
+  '#7BE8C4': 'mint',
+  '#A87BE8': 'lavender',
+  '#E8A87B': 'peach',
+  '#6EC9A9': 'seaGreen',
+  '#E87B7B': 'coral',
+  '#85B4E8': 'skyBlue',
+  '#C97BE8': 'orchid',
+  '#B4E885': 'lime',
+  '#E8C97B': 'sand',
+};
+
+export const colorName = (hex: string, t: (k: string) => string): string => {
+  if (!hex || typeof hex !== 'string') return '';
+  const key = COLOR_NAMES[hex.toUpperCase()];
+  return key ? t(`colors.${key}`) : hex;
+};
+
+export const BASE_COLORS = Object.keys(COLOR_NAMES);
+
+export type ColorSet = 'default' | 'darker' | 'pastel' | 'neon';
+export const COLOR_SETS: ColorSet[] = ['default', 'darker', 'pastel', 'neon'];
+
+const colorClamp01 = (n: number) => Math.max(0, Math.min(1, n));
+
+const colorHexToHsv = (hex: string) => {
+  const h6 = hex.replace('#', '');
+  const n = parseInt(h6.length === 3 ? h6.split('').map(c => c + c).join('') : h6, 16) || 0;
+  const r = ((n >> 16) & 255) / 255, g = ((n >> 8) & 255) / 255, b = (n & 255) / 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b), d = max - min;
+  let hh = 0;
+  if (d !== 0) {
+    if (max === r) hh = ((g - b) / d) % 6;
+    else if (max === g) hh = (b - r) / d + 2;
+    else hh = (r - g) / d + 4;
+    hh *= 60; if (hh < 0) hh += 360;
+  }
+  return {h: hh, s: max === 0 ? 0 : d / max, v: max};
+};
+
+const colorHsvToHex = (h: number, s: number, v: number) => {
+  h = ((h % 360) + 360) % 360;
+  const c = v * s, x = c * (1 - Math.abs(((h / 60) % 2) - 1)), m = v - c;
+  let r = 0, g = 0, b = 0;
+  if (h < 60) {r = c; g = x;} else if (h < 120) {r = x; g = c;} else if (h < 180) {g = c; b = x;}
+  else if (h < 240) {g = x; b = c;} else if (h < 300) {r = x; b = c;} else {r = c; b = x;}
+  const two = (val: number) => Math.max(0, Math.min(255, Math.round((val + m) * 255))).toString(16).padStart(2, '0');
+  return ('#' + two(r) + two(g) + two(b)).toUpperCase();
+};
+
+const variantHsv = (hex: string, set: ColorSet) => {
+  const {h, s, v} = colorHexToHsv(hex);
+  if (set === 'default') return {h, s, v};
+  if (s < 0.2) {
+    if (set === 'darker') return {h, s, v: colorClamp01(v * 0.6)};
+    if (set === 'pastel') return {h, s: s * 0.5, v: colorClamp01(v + 0.28)};
+    return {h, s, v: colorClamp01(v * 1.25 + 0.02)};
+  }
+  if (set === 'darker') return {h, s: colorClamp01(s * 1.05), v: colorClamp01(v * 0.58)};
+  if (set === 'pastel') return {h, s: s * 0.38, v: Math.max(v, 0.94)};
+  return {h, s: 1, v: 1};
+};
+
+export interface PresetColor {
+  hex: string;
+  baseKey: string;
+  set: ColorSet;
+}
+
+const buildPresetColors = (): PresetColor[] => {
+  const out: PresetColor[] = [];
+  const used = new Set<string>();
+  for (const set of COLOR_SETS) {
+    for (const baseHex of BASE_COLORS) {
+      const hsv = variantHsv(baseHex, set);
+      let hex = colorHsvToHex(hsv.h, hsv.s, hsv.v);
+      let v = hsv.v;
+      let guard = 0;
+      while (used.has(hex) && guard < 24) {
+        v = colorClamp01(v - 0.04);
+        hex = colorHsvToHex(hsv.h, hsv.s, v);
+        guard++;
+      }
+      used.add(hex);
+      out.push({hex, baseKey: COLOR_NAMES[baseHex], set});
+    }
+  }
+  return out;
+};
+
+export const PRESET_COLORS: PresetColor[] = buildPresetColors();
+
+export const presetColorName = (p: PresetColor, t: (k: string, o?: any) => string): string => {
+  const base = t(`colors.${p.baseKey}`);
+  if (p.set === 'default') return base;
+  if (p.set === 'darker') return t('colors.setDarker', {name: base});
+  if (p.set === 'pastel') return t('colors.setPastel', {name: base});
+  return t('colors.setNeon', {name: base});
+};
+
+export const MAX_CUSTOM_COLORS = 24;
+
+export const normalizeCustomColors = (raw: unknown): string[] => {
+  const list = Array.isArray(raw) ? raw : [];
+  const out: string[] = [];
+  for (let i = 0; i < MAX_CUSTOM_COLORS; i++) {
+    const v = typeof list[i] === 'string' ? (list[i] as string).toUpperCase() : '';
+    out.push(/^#[0-9A-F]{6}$/.test(v) ? v : '');
+  }
+  return out;
+};
+
 export interface Relationship {
   id: string;
   fromId: string;
@@ -336,11 +587,13 @@ export const PRESET_RELATIONSHIP_TYPES: RelationshipTypeDef[] = [
 
 export const allRelationshipTypes = (customTypes: RelationshipTypeDef[]): RelationshipTypeDef[] => {
   const overrides = new Map(customTypes.filter(t => t.preset).map(t => [t.id, t]));
-  const presets = PRESET_RELATIONSHIP_TYPES.map(p => {
-    const o = overrides.get(p.id);
-    return o ? {...p, ...o, overridden: true} : p;
-  });
-  return [...presets, ...customTypes.filter(t => !t.preset)];
+  const presets = PRESET_RELATIONSHIP_TYPES
+    .filter(p => !overrides.get(p.id)?.deleted)
+    .map(p => {
+      const o = overrides.get(p.id);
+      return o ? {...p, ...o, overridden: true} : p;
+    });
+  return [...presets, ...customTypes.filter(t => !t.preset && !t.deleted)];
 };
 
 export const relationshipDegrees = (memberIds: string[], relationships: Relationship[]): Record<string, number> => {
@@ -369,6 +622,7 @@ export interface FrontState {
   coFront: FrontTier;
   coConscious: FrontTier;
   startTime: number;
+  memberSince?: Record<string, number>;
 }
 
 export interface HistoryEntry {
@@ -383,10 +637,12 @@ export interface HistoryEntry {
   coFrontMood?: string;
   coFrontNote?: string;
   coFrontEnergy?: number;
+  coFrontLocation?: string;
   coConsciousIds?: string[];
   coConsciousMood?: string;
   coConsciousNote?: string;
   coConsciousEnergy?: number;
+  coConsciousLocation?: string;
   changeType?: HistoryChangeType;
   changeTime?: number;
   changeTier?: FrontTierKey;
@@ -421,9 +677,6 @@ export interface ShareSettings {
 export type TextScale = 1.0 | 1.25 | 1.5;
 
 export type AccountMode = 'system' | 'singlet';
-export type ThemeMode = 'system' | 'light' | 'dark';
-export const DEFAULT_THEME_MODE: ThemeMode = 'system';
-
 export const SINGLET_HIDDEN_STATUS_NAMES = ['Blurry', 'Blendy', 'Rapid Switching', 'Dissociated'];
 export const singletStatuses = (members: Member[]): Member[] =>
   members.filter(m => m.isCustomFront && !m.archived && !SINGLET_HIDDEN_STATUS_NAMES.includes(m.name));
@@ -431,7 +684,6 @@ export const singletStatuses = (members: Member[]): Member[] =>
 export interface AppSettings {
   accountMode?: AccountMode;
   selfMemberId?: string;
-  themeMode?: ThemeMode;
   locations: string[];
   customMoods: string[];
   lightMode: boolean;
@@ -440,9 +692,15 @@ export interface AppSettings {
   language: SupportedLanguage;
   notificationsEnabled: boolean;
   notificationRefreshMinutes?: number;
+  terminology?: Record<string, string>;
+  tierNames?: Record<string, string>;
+  persistentFrontNotif?: boolean;
   activePaletteId: string;
   textScale: TextScale;
   memberSortMode?: MemberSortMode;
+  groupSortMode?: MemberSortMode;
+  frontSortMode?: FrontSortMode;
+  frontCustomOrder?: string[];
   frontCheckInterval?: number;
   noteboardNotifications?: boolean;
   appLockPassword?: string;
@@ -451,7 +709,7 @@ export interface AppSettings {
   pkFrontSyncEnabled?: boolean;
   pkToken?: string;
   customFrontsSeeded?: boolean;
-  memberListFields?: {groups?: boolean; descriptions?: boolean; pronouns?: boolean; roles?: boolean};
+  memberListFields?: {groups?: boolean; descriptions?: boolean; pronouns?: boolean; roles?: boolean; count?: boolean; background?: 'plain' | 'color' | 'banner'; browse?: boolean};
 }
 
 export interface ExportPayload {
@@ -462,6 +720,7 @@ export interface ExportPayload {
   journal: JournalEntry[];
   groups?: MemberGroup[];
   chatChannels?: ChatChannel[];
+  chatCategories?: ChatCategory[];
   chatMessages?: Record<string, ChatMessage[]>;
   settings?: AppSettings;
   front?: FrontState | null;
@@ -476,22 +735,13 @@ export interface ExportPayload {
   relationships?: Relationship[];
   relationshipTypes?: RelationshipTypeDef[];
   systemMapMembers?: string[];
+  systemMapPositions?: Record<string, {x: number; y: number}>;
   medical?: MedicalData;
+  planner?: PlannerData;
+  whiteboard?: any;
+  customColors?: string[];
+  shareSettings?: ShareSettings;
 }
-
-export const paletteIdForThemeMode = (themeMode: ThemeMode, systemScheme: 'light' | 'dark'): string =>
-  themeMode === 'light' ? '__light__' : themeMode === 'dark' ? '__dark__' : (systemScheme === 'light' ? '__light__' : '__dark__');
-
-export const normalizeAppearanceSettings = (settings: AppSettings, systemScheme: 'light' | 'dark'): AppSettings => {
-  let themeMode = settings.themeMode;
-  if (!themeMode) {
-    if (settings.activePaletteId === '__light__' || settings.lightMode) themeMode = 'light';
-    else if (settings.activePaletteId === '__dark__') themeMode = 'dark';
-    else themeMode = DEFAULT_THEME_MODE;
-  }
-  const activePaletteId = paletteIdForThemeMode(themeMode, systemScheme);
-  return {...settings, themeMode, activePaletteId, lightMode: activePaletteId === '__light__'};
-};
 
 export type ChatMessageType = 'text' | 'image' | 'file' | 'reply' | 'reaction';
 
@@ -509,10 +759,47 @@ export interface ChatMessage {
 export interface ChatChannel {
   id: string;
   name: string;
+  categoryId?: string;
+  sortOrder?: number;
   archived?: boolean;
   archivedAt?: number;
   createdAt: number;
 }
+
+export interface ChatCategory {
+  id: string;
+  name: string;
+  sortOrder?: number;
+  collapsed?: boolean;
+  createdAt: number;
+}
+
+const byOrderThenAge = <T extends {sortOrder?: number; createdAt?: number; name?: string}>(a: T, b: T): number => {
+  const ao = typeof a.sortOrder === 'number' ? a.sortOrder : Number.MAX_SAFE_INTEGER;
+  const bo = typeof b.sortOrder === 'number' ? b.sortOrder : Number.MAX_SAFE_INTEGER;
+  if (ao !== bo) return ao - bo;
+  const ac = typeof a.createdAt === 'number' ? a.createdAt : 0;
+  const bc = typeof b.createdAt === 'number' ? b.createdAt : 0;
+  if (ac !== bc) return ac - bc;
+  return nameCompare(a.name, b.name);
+};
+
+export const sortChatCategories = (cats: ChatCategory[]): ChatCategory[] =>
+  [...(cats || [])].sort(byOrderThenAge);
+
+export const chatChannelsIn = (
+  channels: ChatChannel[],
+  categoryId: string | null | undefined,
+  categories: ChatCategory[],
+): ChatChannel[] => {
+  const known = new Set((categories || []).map(c => c.id));
+  return [...(channels || [])]
+    .filter(c => {
+      const own = c.categoryId && known.has(c.categoryId) ? c.categoryId : null;
+      return own === (categoryId || null);
+    })
+    .sort(byOrderThenAge);
+};
 
 export const DEFAULT_CHANNELS: {name: string}[] = [
   {name: 'General'},
@@ -572,16 +859,21 @@ export const historyEntryToFrontState = (entry: HistoryEntry): FrontState => ({
     mood: entry.mood,
     note: entry.note || '',
     location: entry.location,
+    energyLevel: entry.energyLevel,
   },
   coFront: {
     memberIds: entry.coFrontIds || [],
     mood: entry.coFrontMood,
     note: entry.coFrontNote || '',
+    location: entry.coFrontLocation,
+    energyLevel: entry.coFrontEnergy,
   },
   coConscious: {
     memberIds: entry.coConsciousIds || [],
     mood: entry.coConsciousMood,
     note: entry.coConsciousNote || '',
+    location: entry.coConsciousLocation,
+    energyLevel: entry.coConsciousEnergy,
   },
   startTime: entry.startTime,
 });
@@ -618,6 +910,49 @@ export const isFrontEmpty = (f: FrontState | null): boolean =>
 export const allFrontMemberIds = (f: FrontState | null): string[] =>
   f ? [...f.primary.memberIds, ...f.coFront.memberIds, ...f.coConscious.memberIds] : [];
 
+export const frontersFirst = <T extends {id: string}>(items: T[], front: FrontState | null): T[] => {
+  const tier = (x: any): string[] => (x && Array.isArray(x.memberIds) ? x.memberIds : []);
+  const f = front as any;
+  const ids = f ? [...tier(f.primary), ...tier(f.coFront), ...tier(f.coConscious)] : [];
+  if (ids.length === 0) return items;
+  const rank = new Map<string, number>();
+  ids.forEach((id, i) => { if (!rank.has(id)) rank.set(id, i); });
+  const fronting: T[] = [];
+  const rest: T[] = [];
+  for (const it of items) (rank.has(it.id) ? fronting : rest).push(it);
+  fronting.sort((a, b) => (rank.get(a.id) ?? 0) - (rank.get(b.id) ?? 0));
+  return [...fronting, ...rest];
+};
+
+export const withMemberSince = (next: FrontState | null, prev: FrontState | null, now: number): FrontState | null => {
+  if (!next) return next;
+  const prevSince = prev?.memberSince || {};
+  const prevIds = new Set(prev ? allFrontMemberIds(prev) : []);
+  const since: Record<string, number> = {};
+  for (const id of allFrontMemberIds(next)) {
+    since[id] = prevIds.has(id) ? (prevSince[id] ?? prev?.startTime ?? now) : now;
+  }
+  return {...next, memberSince: since};
+};
+
+export const frontSessionStart = (f: FrontState, include?: (id: string) => boolean): number => {
+  const any = f as any;
+  const since: Record<string, number> = any?.memberSince || {};
+  const segment = typeof any?.startTime === 'number' && any.startTime > 0 ? any.startTime : 0;
+  for (const key of ['primary', 'coFront', 'coConscious']) {
+    const tier = any?.[key];
+    const ids: string[] = tier && Array.isArray(tier.memberIds) ? tier.memberIds.filter((id: string) => !include || include(id)) : [];
+    if (ids.length === 0) continue;
+    let earliest = segment;
+    for (const id of ids) {
+      const at = since[id];
+      if (typeof at === 'number' && Number.isFinite(at) && at > 0 && (earliest === 0 || at < earliest)) earliest = at;
+    }
+    return earliest || f.startTime;
+  }
+  return f.startTime;
+};
+
 export const frontToHistoryEntry = (f: FrontState, endTime: number | null, changeType: HistoryChangeType = 'front', changeTier?: FrontTierKey): HistoryEntry => ({
   memberIds: f.primary.memberIds,
   startTime: f.startTime,
@@ -630,10 +965,12 @@ export const frontToHistoryEntry = (f: FrontState, endTime: number | null, chang
   coFrontMood: f.coFront.mood,
   coFrontNote: f.coFront.note || undefined,
   coFrontEnergy: f.coFront.energyLevel,
+  coFrontLocation: f.coFront.location || undefined,
   coConsciousIds: f.coConscious.memberIds.length > 0 ? f.coConscious.memberIds : undefined,
   coConsciousMood: f.coConscious.mood,
   coConsciousNote: f.coConscious.note || undefined,
   coConsciousEnergy: f.coConscious.energyLevel,
+  coConsciousLocation: f.coConscious.location || undefined,
   changeType,
   changeTime: changeType !== 'front' ? Date.now() : undefined,
   changeTier,
@@ -642,11 +979,140 @@ export const frontToHistoryEntry = (f: FrontState, endTime: number | null, chang
 export const uid = (): string =>
   Date.now().toString(36) + Math.random().toString(36).slice(2);
 
-const getLocale = (): string => {
+const LOCALE_OVERRIDES: Record<string, string> = {en: 'en-US', pt: 'pt-BR', zh: 'zh-Hans', zhHant: 'zh-Hant'};
+
+let localeCache: {lang: string; tag: string} | null = null;
+
+export const getLocale = (): string => {
   const lang = i18n.language || 'en';
-  const localeMap: Record<string, string> = {en: 'en-US', es: 'es-ES', fr: 'fr-FR', de: 'de-DE', pt: 'pt-BR', fi: 'fi-FI', nb: 'nb-NO', zh: 'zh-CN', ja: 'ja-JP'};
-  return localeMap[lang] || 'en-US';
+  if (localeCache && localeCache.lang === lang) return localeCache.tag;
+  const candidate = LOCALE_OVERRIDES[lang] || lang;
+  let tag = 'en-US';
+  try {
+    new Date(0).toLocaleDateString(candidate);
+    tag = candidate;
+  } catch (e) {
+    tag = 'en-US';
+  }
+  localeCache = {lang, tag};
+  return tag;
 };
+
+let collatorCache: {tag: string; cmp: (a: string, b: string) => number} | null = null;
+
+const localeComparer = (): ((a: string, b: string) => number) => {
+  const tag = getLocale();
+  if (collatorCache && collatorCache.tag === tag) return collatorCache.cmp;
+  let cmp: (a: string, b: string) => number = (a, b) => a.localeCompare(b);
+  try {
+    const IntlAny: any = typeof Intl !== 'undefined' ? Intl : null;
+    if (IntlAny && typeof IntlAny.Collator === 'function') {
+      const collator = new IntlAny.Collator(tag);
+      cmp = (a, b) => collator.compare(a, b);
+    }
+  } catch {}
+  collatorCache = {tag, cmp};
+  return cmp;
+};
+
+export const nameCompare = (a: unknown, b: unknown): number =>
+  localeComparer()(String(a ?? ''), String(b ?? ''));
+
+export const orderFronters = (ids: string[], mode: FrontSortMode | undefined, nameOf: (id: string) => string, custom?: string[]): string[] => {
+  if (mode === 'az') return [...ids].sort((a, b) => nameCompare(nameOf(a), nameOf(b)));
+  if (mode === 'za') return [...ids].sort((a, b) => nameCompare(nameOf(b), nameOf(a)));
+  if (mode === 'custom' && custom && custom.length > 0) {
+    const rank = new Map(custom.map((id, i) => [id, i]));
+    return ids
+      .map((id, i) => ({id, key: rank.get(id) ?? custom.length + i}))
+      .sort((a, b) => a.key - b.key)
+      .map(x => x.id);
+  }
+  return ids;
+};
+
+export const placeInCustomOrder = (custom: string[] | undefined, ordered: string[], keep: (id: string) => boolean): string[] => {
+  const tier = [...new Set(ordered)];
+  const inTier = new Set(tier);
+  const base = [...new Set((custom || []).filter(id => inTier.has(id) || keep(id)))];
+  for (const id of tier) if (!base.includes(id)) base.push(id);
+  let k = 0;
+  return base.map(id => (inTier.has(id) ? tier[k++] : id));
+};
+
+let clockCache: {tag: string; hour12: boolean; am: string; pm: string} | null = null;
+
+const clockInfo = (): {tag: string; hour12: boolean; am: string; pm: string} => {
+  const tag = getLocale();
+  if (clockCache && clockCache.tag === tag) return clockCache;
+  let hour12 = true;
+  let am = 'AM';
+  let pm = 'PM';
+  try {
+    const IntlAny: any = typeof Intl !== 'undefined' ? Intl : null;
+    if (IntlAny && typeof IntlAny.DateTimeFormat === 'function') {
+      const resolved = new IntlAny.DateTimeFormat(tag, {hour: 'numeric'}).resolvedOptions();
+      if (typeof resolved.hour12 === 'boolean') hour12 = resolved.hour12;
+      else if (typeof resolved.hourCycle === 'string') hour12 = resolved.hourCycle === 'h11' || resolved.hourCycle === 'h12';
+      const twelve = new IntlAny.DateTimeFormat(tag, {hour: 'numeric', hour12: true});
+      if (typeof twelve.formatToParts === 'function') {
+        const period = (d: Date): string | null => {
+          const part = twelve.formatToParts(d).find((p: any) => p && p.type === 'dayPeriod');
+          return part && part.value ? String(part.value) : null;
+        };
+        const a = period(new Date(2000, 0, 1, 1, 0, 0));
+        const p = period(new Date(2000, 0, 1, 13, 0, 0));
+        if (a && p && a !== p) { am = a; pm = p; }
+      }
+    }
+  } catch {}
+  clockCache = {tag, hour12, am, pm};
+  return clockCache;
+};
+
+export const uses12HourClock = (): boolean => clockInfo().hour12;
+
+export const dayPeriodLabel = (isPM: boolean): string => (isPM ? clockInfo().pm : clockInfo().am);
+
+export const fmtClock = (hours: number, minutes: number): string => {
+  const d = new Date(2000, 0, 1, hours, minutes, 0);
+  try {
+    return d.toLocaleTimeString(getLocale(), {hour: 'numeric', minute: '2-digit'});
+  } catch {
+    return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+  }
+};
+
+export const fmtClockHHMM = (hhmm: string): string => {
+  const m = /^(\d{1,2}):(\d{2})$/.exec((hhmm || '').trim());
+  if (!m) return hhmm;
+  return fmtClock(parseInt(m[1], 10), parseInt(m[2], 10));
+};
+
+const numberFormatCache = new Map<string, (n: number) => string>();
+
+const numberFormatter = (style: 'decimal' | 'percent', minFrac: number, maxFrac: number): ((n: number) => string) => {
+  const tag = getLocale();
+  const key = `${tag}|${style}|${minFrac}|${maxFrac}`;
+  const cached = numberFormatCache.get(key);
+  if (cached) return cached;
+  let fmt: (n: number) => string = n => (style === 'percent' ? `${(n * 100).toFixed(maxFrac)}%` : n.toFixed(maxFrac));
+  try {
+    const IntlAny: any = typeof Intl !== 'undefined' ? Intl : null;
+    if (IntlAny && typeof IntlAny.NumberFormat === 'function') {
+      const nf = new IntlAny.NumberFormat(tag, {style, minimumFractionDigits: minFrac, maximumFractionDigits: maxFrac});
+      fmt = n => nf.format(n);
+    }
+  } catch {}
+  numberFormatCache.set(key, fmt);
+  return fmt;
+};
+
+export const fmtNum = (n: number, maxFractionDigits = 1, minFractionDigits = 0): string =>
+  numberFormatter('decimal', Math.min(minFractionDigits, maxFractionDigits), maxFractionDigits)(n);
+
+export const fmtPercent = (ratio: number, maxFractionDigits = 1, minFractionDigits = 0): string =>
+  numberFormatter('percent', Math.min(minFractionDigits, maxFractionDigits), maxFractionDigits)(ratio);
 
 export const fmtTime = (ts: number): string =>
   new Date(ts).toLocaleString(getLocale(), {
@@ -663,13 +1129,53 @@ export const fmtDur = (start: number, end?: number | null): string => {
   const ms = (end ?? Date.now()) - start;
   const h = Math.floor(ms / 3600000);
   const m = Math.floor((ms % 3600000) / 60000);
-  if (h >= 24) return `${Math.floor(h / 24)}d ${h % 24}h`;
-  if (h > 0) return `${h}h ${m}m`;
-  return m > 0 ? `${m}m` : '<1m';
+  if (h >= 24) return i18n.t('common.durDaysHours', {d: Math.floor(h / 24), h: h % 24});
+  if (h > 0) return i18n.t('common.durHoursMinutes', {h, m});
+  return m > 0 ? i18n.t('common.durMinutes', {m}) : i18n.t('common.durUnderMinute');
+};
+
+const SUNDAY_FIRST_LANGS = new Set(['en', 'pt', 'ja', 'ko', 'hi', 'th', 'zhHant', 'af']);
+
+export const firstDayOfWeek = (): number => (SUNDAY_FIRST_LANGS.has(i18n.language || 'en') ? 0 : 1);
+
+export const truncateRunes = (s: string, max: number, ellipsis = ''): string => {
+  const runes = Array.from(String(s ?? ''));
+  if (runes.length <= max) return runes.join('');
+  return runes.slice(0, Math.max(0, max)).join('') + ellipsis;
+};
+
+export const upperRune = (ch: string): string => {
+  const up = ch.toUpperCase();
+  const cp = up.codePointAt(0) ?? 0;
+  if (cp >= 0x1c90 && cp <= 0x1cbf) return ch;
+  return up;
+};
+
+export const upperText = (s: string): string => Array.from(String(s ?? '')).map(upperRune).join('');
+
+export const lowerRune = (ch: string): string => {
+  const low = ch.toLowerCase();
+  const cp = low.codePointAt(0) ?? 0;
+  if (cp >= 0xab70 && cp <= 0xabbf) return ch;
+  return low;
+};
+
+export const fileSlug = (name: string, fallback = 'plural-star'): string => {
+  const cleaned = String(name ?? '')
+    .normalize('NFC')
+    .replace(/[\\/:*?"<>| -]+/g, '-')
+    .replace(/\s+/g, '-')
+    .replace(/-{2,}/g, '-')
+    .replace(/^-+|-+$/g, '');
+  const slug = Array.from(truncateRunes(cleaned, 60)).map(lowerRune).join('').replace(/^-+|-+$/g, '');
+  return slug || fallback;
 };
 
 export const getInitials = (name: string): string =>
-  name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+  Array.from(String(name ?? '').split(' ').map(w => Array.from(w)[0] ?? '').join('')).slice(0, 2).map(ch => {
+    const up = upperRune(ch);
+    return Array.from(up).length === 1 ? up : ch;
+  }).join('');
 
 export const isValidHex = (hex: string): boolean =>
   /^#[0-9A-Fa-f]{6}$/.test(hex);
@@ -677,28 +1183,55 @@ export const isValidHex = (hex: string): boolean =>
 export const normalizeHex = (input: string): string =>
   (input.startsWith('#') ? input : `#${input}`).toUpperCase();
 
-export const sortMembersBySearch = <T extends {name: string}>(items: T[], search: string): T[] => {
-  if (!search) return [...items].sort((a, b) => a.name.localeCompare(b.name));
+const asStr = (v: unknown): string => (typeof v === 'string' ? v : v == null ? '' : String(v));
+
+export const tagKey = (tag: string): string => asStr(tag).normalize('NFC').toLowerCase();
+
+export const tagFromInput = (input: string): string | null => {
+  const raw = asStr(input).trim().replace(/^#/, '').normalize('NFC');
+  return raw ? `#${raw}` : null;
+};
+
+export const mergeTags = (cur: string[] | undefined, add: string[]): string[] => {
+  const out = [...(cur || [])];
+  const have = new Set(out.map(tagKey));
+  for (const tag of add) {
+    const k = tagKey(tag);
+    if (!k || have.has(k)) continue;
+    have.add(k);
+    out.push(tag);
+  }
+  return out;
+};
+
+export const memberMatchesSearch = (m: {name: string; nickname?: string; tags?: string[]}, search: string): boolean => {
+  const q = asStr(search).trim().toLowerCase();
+  if (!q) return true;
+  return asStr(m.name).toLowerCase().includes(q) || asStr(m.nickname || '').toLowerCase().includes(q)
+    || (m.tags || []).some(tag => tagKey(tag).includes(q));
+};
+
+export const sortMembersBySearch = <T extends {name: string; nickname?: string}>(items: T[], search: string): T[] => {
+  if (!search) return [...items].sort((a, b) => nameCompare(a.name, b.name));
   const q = search.toLowerCase();
+  const starts = (x: T) => asStr(x.name).toLowerCase().startsWith(q) || asStr(x.nickname || '').toLowerCase().startsWith(q);
   return [...items].sort((a, b) => {
-    const an = a.name.toLowerCase();
-    const bn = b.name.toLowerCase();
-    const aStarts = an.startsWith(q);
-    const bStarts = bn.startsWith(q);
+    const aStarts = starts(a);
+    const bStarts = starts(b);
     if (aStarts && !bStarts) return -1;
     if (!aStarts && bStarts) return 1;
-    return an.localeCompare(bn);
+    return nameCompare(asStr(a.name).toLowerCase(), asStr(b.name).toLowerCase());
   });
 };
 
 export const sortMembers = (members: Member[], mode: MemberSortMode = 'alphabetical'): Member[] => {
   const sorted = [...members];
   switch (mode) {
-    case 'alphabetical': return sorted.sort((a, b) => a.name.localeCompare(b.name));
-    case 'reverse-alphabetical': return sorted.sort((a, b) => b.name.localeCompare(a.name));
+    case 'alphabetical': return sorted.sort((a, b) => nameCompare(a.name, b.name));
+    case 'reverse-alphabetical': return sorted.sort((a, b) => nameCompare(b.name, a.name));
     case 'age': return sorted.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
-    case 'color': return sorted.sort((a, b) => a.color.localeCompare(b.color));
-    case 'role': return sorted.sort((a, b) => (a.role || '').localeCompare(b.role || ''));
+    case 'color': return sorted.sort((a, b) => asStr(a.color).localeCompare(asStr(b.color)));
+    case 'role': return sorted.sort((a, b) => nameCompare(a.role, b.role));
     case 'manual': return sorted.sort((a, b) => (a.sortOrder ?? Number.MAX_SAFE_INTEGER) - (b.sortOrder ?? Number.MAX_SAFE_INTEGER));
     default: return sorted;
   }

@@ -1,11 +1,14 @@
 import React, {useState, useEffect, useRef} from 'react';
-import {View, ScrollView, TouchableOpacity, Alert, KeyboardAvoidingView, AccessibilityInfo, findNodeHandle} from 'react-native';
+import {View, ScrollView, TouchableOpacity, Alert, AccessibilityInfo, findNodeHandle, LayoutChangeEvent} from 'react-native';
+import {KeyboardAwareScrollView, KeyboardStickyView} from 'react-native-keyboard-controller';
 import {Text, TextInput} from '../components/AppText';
-import {useKeyboardBehavior} from '../hooks/useKeyboardBehavior';
+import {useDragReorder} from '../hooks/useDragReorder';
+import {DragHandle, ReorderLockButton} from '../components/DragHandle';
 import {useTranslation} from 'react-i18next';
-import {Fonts, UI} from '../theme';
+import {Fonts, fontScale, ThemeColors} from '../theme';
 import {CustomFieldDef, CustomFieldType, uid} from '../utils';
 import {store, KEYS} from '../storage';
+import {NetworkManager} from '../network/NetworkManager';
 
 const FIELD_TYPES: {type: CustomFieldType; label: string; icon: string}[] = [
   {type: 'text', label: 'Text', icon: 'Tt'},
@@ -24,24 +27,47 @@ const FIELD_TYPES: {type: CustomFieldType; label: string; icon: string}[] = [
 ];
 
 interface Props {
-  theme: any;
+  theme: ThemeColors;
   onUpdate: () => void;
 }
 
 export const CustomFieldsScreen = ({theme: T, onUpdate}: Props) => {
   const {t} = useTranslation();
-  const fs = (s: number) => Math.round(s * (T.textScale || 1));
-  const behavior = useKeyboardBehavior();
+  const fs = fontScale(T);
   const [fields, setFields] = useState<CustomFieldDef[]>([]);
   const [newName, setNewName] = useState('');
   const [newType, setNewType] = useState<CustomFieldType>('text');
   const [newMarkdown, setNewMarkdown] = useState(false);
   const [showTypePicker, setShowTypePicker] = useState(false);
+  const [barH, setBarH] = useState(0);
+  const onBarLayout = (e: LayoutChangeEvent) => {
+    const h = Math.round(e.nativeEvent.layout.height);
+    setBarH(prev => (Math.abs(prev - h) > 1 ? h : prev));
+  };
+  const clearance = Math.max(barH, 64) + 24;
   const [editId, setEditId] = useState<string | null>(null);
+  const [retypeId, setRetypeId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
+  const [reorderOn, setReorderOn] = useState(false);
+
+  const onDropField = (_key: string, from: number, to: number) => {
+    const updated = [...fields];
+    const [moved] = updated.splice(from, 1);
+    updated.splice(to, 0, moved);
+    save(updated.map((f, i) => ({...f, sortOrder: i})));
+    const msg = to === 0
+      ? t('common.movedToTop')
+      : to === updated.length - 1
+        ? t('common.movedToBottom')
+        : t('common.movedBelow', {name: updated[to - 1].name});
+    AccessibilityInfo.announceForAccessibility(msg);
+  };
+  const {drag, dragging, registerHeight, makeHandlePanHandlers} = useDragReorder({enabled: reorderOn, onDrop: onDropField});
 
   useEffect(() => {
-    store.get<CustomFieldDef[]>(KEYS.customFieldDefs, []).then(d => setFields(d || []));
+    const load = () => { store.get<CustomFieldDef[]>(KEYS.customFieldDefs, []).then(d => setFields(d || [])); };
+    load();
+    return NetworkManager.onSyncApplied(load);
   }, []);
 
   const save = async (updated: CustomFieldDef[]) => {
@@ -103,26 +129,36 @@ export const CustomFieldsScreen = ({theme: T, onUpdate}: Props) => {
   const typeLabel = (type: CustomFieldType) => t(`customFields.type${type.charAt(0).toUpperCase() + type.slice(1)}` as any);
 
   return (
-    <KeyboardAvoidingView style={{flex: 1}} behavior={behavior}>
-      <ScrollView style={{flex: 1, backgroundColor: T.bg}} contentContainerStyle={{padding: UI.screenPadding, paddingBottom: 120}}>
-        <View style={{backgroundColor: T.card, borderRadius: UI.radiusLg, borderWidth: 1, borderColor: `${T.accent}24`, padding: 18, marginBottom: 16}}>
-          <Text style={{fontSize: fs(10), letterSpacing: 1.5, textTransform: 'uppercase', color: T.dim, fontWeight: '700', marginBottom: 6}}>
-            {t('customFields.title')}
-          </Text>
-          <Text style={{fontFamily: Fonts.display, fontSize: fs(24), color: T.text, marginBottom: 6}}>
-            {t('customFields.title')}
-          </Text>
-        </View>
-
+    <View style={{flex: 1}}>
+      <KeyboardAwareScrollView style={{flex: 1}} contentContainerStyle={{padding: 16, paddingBottom: clearance}} scrollEnabled={!dragging} bottomOffset={clearance}>
+        {fields.length > 1 && (
+          <View style={{flexDirection: 'row', justifyContent: 'flex-end', marginBottom: 10}}>
+            <ReorderLockButton T={T} on={reorderOn} onToggle={() => setReorderOn(v => !v)} />
+          </View>
+        )}
         {fields.length === 0 && (
-          <View style={{alignItems: 'center', paddingVertical: 48, backgroundColor: T.card, borderRadius: UI.radiusLg, borderWidth: 1, borderColor: T.border}}>
+          <View style={{alignItems: 'center', paddingVertical: 48}}>
             <Text style={{fontSize: fs(13), color: T.dim}}>{t('customFields.noFields')}</Text>
           </View>
         )}
 
         {fields.map((fd, i) => (
-          <View key={fd.id} style={{backgroundColor: T.card, borderRadius: UI.radiusLg, borderWidth: 1, borderColor: T.border, padding: 14, marginBottom: 10}}>
+          <View
+            key={fd.id}
+            onLayout={e => registerHeight(fd.id, e.nativeEvent.layout.height + 10)}
+            style={{
+              backgroundColor: T.card,
+              borderRadius: 12,
+              borderWidth: 1,
+              borderColor: dragging && drag.key !== fd.id && drag.target === i ? T.accent : T.border,
+              padding: 14,
+              marginBottom: 10,
+              ...(drag.key === fd.id ? {transform: [{translateY: drag.dy}], zIndex: 10, elevation: 6} : null),
+            }}>
             <View style={{flexDirection: 'row', alignItems: 'center', gap: 10}}>
+              <DragHandle T={T} active={reorderOn} panHandlers={makeHandlePanHandlers(fd.id, () => fields.map(f => f.id))} name={fd.name}
+                position={i + 1} count={fields.length}
+                onStep={dir => moveField(fd.id, dir === 1 ? 'down' : 'up')} />
               <View style={{alignItems: 'center', gap: 2}}>
                 <TouchableOpacity
                   ref={(el) => { moveBtnRefs.current[fd.id] = el; }}
@@ -151,8 +187,8 @@ export const CustomFieldsScreen = ({theme: T, onUpdate}: Props) => {
               <View style={{flex: 1}}>
                 {editId === fd.id ? (
                   <View style={{flexDirection: 'row', gap: 8, alignItems: 'center'}}>
-                    <TextInput value={editName} onChangeText={setEditName} autoFocus
-                      style={{flex: 1, backgroundColor: T.surface, color: T.text, borderWidth: 1, borderColor: T.border, borderRadius: UI.radiusMd, paddingHorizontal: 10, paddingVertical: 6, fontSize: fs(14)}}
+                    <TextInput value={editName} onChangeText={setEditName} autoFocus accessibilityLabel={t('customFields.fieldName')}
+                      style={{flex: 1, backgroundColor: T.surface, color: T.text, borderWidth: 1, borderColor: T.border, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, fontSize: fs(14)}}
                       onSubmitEditing={() => renameField(fd.id)} />
                     <TouchableOpacity onPress={() => renameField(fd.id)} activeOpacity={0.7} accessibilityRole="button" accessibilityLabel={t('common.save')}>
                       <Text style={{fontSize: fs(16), color: T.accent}}>✓</Text>
@@ -171,10 +207,26 @@ export const CustomFieldsScreen = ({theme: T, onUpdate}: Props) => {
 
             <View style={{flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8}}>
               <Text style={{fontSize: fs(11), color: T.dim}}>{t('customFields.fieldType')}</Text>
-              <View style={{backgroundColor: T.surface, paddingHorizontal: 10, paddingVertical: 4, borderRadius: UI.radiusSm, borderWidth: 1, borderColor: T.border}}>
-                <Text style={{fontSize: fs(12), color: T.muted}}>{typeLabel(fd.type)}</Text>
-              </View>
+              <TouchableOpacity onPress={() => setRetypeId(retypeId === fd.id ? null : fd.id)} activeOpacity={0.7}
+                accessibilityRole="button" accessibilityState={{expanded: retypeId === fd.id}}
+                accessibilityLabel={`${t('customFields.fieldType')} — ${fd.name}`} accessibilityValue={{text: typeLabel(fd.type)}}
+                style={{backgroundColor: T.surface, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6, borderWidth: 1, borderColor: retypeId === fd.id ? `${T.accent}60` : T.border}}>
+                <Text style={{fontSize: fs(12), color: T.muted}}>{typeLabel(fd.type)} ▾</Text>
+              </TouchableOpacity>
             </View>
+            {retypeId === fd.id && (
+              <View style={{flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 8}}>
+                {FIELD_TYPES.map(ft => (
+                  <TouchableOpacity key={ft.type} activeOpacity={0.7}
+                    onPress={() => { save(fields.map(f => f.id === fd.id ? {...f, type: ft.type} : f)); setRetypeId(null); }}
+                    accessibilityRole="menuitem" accessibilityState={{selected: fd.type === ft.type}} accessibilityLabel={typeLabel(ft.type)}
+                    style={{paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999, borderWidth: 1,
+                      backgroundColor: fd.type === ft.type ? T.accentBg : T.surface, borderColor: fd.type === ft.type ? `${T.accent}50` : T.border}}>
+                    <Text style={{fontSize: fs(11), color: fd.type === ft.type ? T.accent : T.dim}}>{typeLabel(ft.type)}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
 
             {(fd.type === 'text' || fd.type === 'markdown') && (
               <TouchableOpacity onPress={() => toggleMarkdown(fd.id)} activeOpacity={0.7} accessibilityRole="checkbox" accessibilityState={{checked: !!fd.markdown}} accessibilityLabel={t('customFields.markdownSupport')} style={{flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8}}>
@@ -184,27 +236,29 @@ export const CustomFieldsScreen = ({theme: T, onUpdate}: Props) => {
             )}
           </View>
         ))}
-      </ScrollView>
+      </KeyboardAwareScrollView>
 
-      <View style={{position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: T.surface, borderTopWidth: 1, borderTopColor: T.border, paddingHorizontal: UI.screenPadding, paddingTop: 12, paddingBottom: 12}}>
+      <KeyboardStickyView style={{position: 'absolute', bottom: 0, left: 0, right: 0}}>
+      <View onLayout={onBarLayout} style={{backgroundColor: T.surface, borderTopWidth: 1, borderTopColor: T.border, padding: 12}}>
         <View style={{flexDirection: 'row', gap: 8, alignItems: 'center'}}>
-          <TextInput value={newName} onChangeText={setNewName} placeholder={t('customFields.fieldName')} placeholderTextColor={T.muted}
-            style={{flex: 1, backgroundColor: T.bg, color: T.text, borderWidth: 1, borderColor: T.border, borderRadius: UI.radiusMd, paddingHorizontal: 12, paddingVertical: 9, fontSize: fs(13)}}
+          <TextInput value={newName} onChangeText={setNewName} accessibilityLabel={t('customFields.fieldName')} placeholder={t('customFields.fieldName')} placeholderTextColor={T.muted}
+            style={{flex: 1, backgroundColor: T.bg, color: T.text, borderWidth: 1, borderColor: T.border, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 9, fontSize: fs(13)}}
             onSubmitEditing={addField} />
           <TouchableOpacity onPress={() => setShowTypePicker(!showTypePicker)} activeOpacity={0.7}
             accessibilityRole="button" accessibilityState={{expanded: showTypePicker}} accessibilityLabel={t('customFields.fieldType')} accessibilityValue={{text: typeLabel(newType)}}
-            style={{backgroundColor: T.bg, borderWidth: 1, borderColor: T.border, borderRadius: UI.radiusMd, paddingHorizontal: 10, paddingVertical: 9}}>
+            style={{backgroundColor: T.bg, borderWidth: 1, borderColor: T.border, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 9}}>
             <Text style={{fontSize: fs(12), color: T.dim}}>{typeLabel(newType)} ▾</Text>
           </TouchableOpacity>
           <TouchableOpacity onPress={addField} activeOpacity={0.7}
             accessibilityRole="button" accessibilityLabel={t('common.add')}
-            style={{backgroundColor: T.accentBg, borderWidth: 1, borderColor: `${T.accent}40`, borderRadius: UI.pill, paddingHorizontal: 14, paddingVertical: 9}}>
+            style={{backgroundColor: T.accentBg, borderWidth: 1, borderColor: `${T.accent}40`, borderRadius: 8, paddingHorizontal: 14, paddingVertical: 9}}>
             <Text style={{fontSize: fs(13), fontWeight: '600', color: T.accent}}>+</Text>
           </TouchableOpacity>
         </View>
 
         {showTypePicker && (
-          <View style={{backgroundColor: T.card, borderRadius: UI.radiusLg, borderWidth: 1, borderColor: T.border, marginTop: 8, overflow: 'hidden'}}>
+          <ScrollView style={{maxHeight: 240, marginTop: 8}} keyboardShouldPersistTaps="handled"
+            contentContainerStyle={{backgroundColor: T.card, borderRadius: 10, borderWidth: 1, borderColor: T.border, overflow: 'hidden'}}>
             {FIELD_TYPES.map(ft => (
               <TouchableOpacity key={ft.type} onPress={() => {setNewType(ft.type); setShowTypePicker(false);}} activeOpacity={0.7}
                 accessibilityRole="menuitem" accessibilityState={{selected: newType === ft.type}} accessibilityLabel={typeLabel(ft.type)}
@@ -214,9 +268,10 @@ export const CustomFieldsScreen = ({theme: T, onUpdate}: Props) => {
                 <Text style={{fontSize: fs(13), color: newType === ft.type ? T.accent : T.text, fontWeight: newType === ft.type ? '600' : '400'}}>{typeLabel(ft.type)}</Text>
               </TouchableOpacity>
             ))}
-          </View>
+          </ScrollView>
         )}
       </View>
-    </KeyboardAvoidingView>
+      </KeyboardStickyView>
+    </View>
   );
 };

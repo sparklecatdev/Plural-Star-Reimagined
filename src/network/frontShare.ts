@@ -1,9 +1,4 @@
-// Build the front/status payload a friend shares over the network. This mirrors
-// NotificationService.buildFrontContent so a friend's row shows the same content
-// the on-device notification would (names resolved here; duration derived from
-// startTime on the receiving side so it stays live).
-
-import { Member } from '../utils';
+import { Member, frontSessionStart } from '../utils';
 import { FrontShare } from './types';
 
 const getTierIds = (front: any, tier: string): string[] => {
@@ -21,26 +16,63 @@ const getTierField = (front: any, tier: string, field: string): string | undefin
 const resolveNames = (ids: string[], members: Member[]): string =>
   ids.map(id => members.find(m => m.id === id)?.name).filter(Boolean).join(', ');
 
-export const buildFrontShare = (front: any, members: Member[]): FrontShare | null => {
+export interface FrontShareDetails { mood?: boolean; location?: boolean; note?: boolean }
+
+export const buildFrontShare = (front: any, members: Member[], allowedIds?: Set<string> | null, facetAllowedIds?: Set<string> | null, customFrontAllowedIds?: Set<string> | null, details?: FrontShareDetails): FrontShare | null => {
   if (!front) return null;
-  const primaryIds = getTierIds(front, 'primary');
-  const coFrontIds = getTierIds(front, 'coFront');
-  const coConsciousIds = getTierIds(front, 'coConscious');
+  const shareMood = details?.mood !== false;
+  const shareLocation = details?.location !== false;
+  const shareNote = details?.note !== false;
+  const facetIds = facetAllowedIds === undefined ? null : new Set(members.filter(m => m.isFacet && !m.isCustomFront).map(m => m.id));
+  const customFrontIds = customFrontAllowedIds === undefined ? null : new Set(members.filter(m => m.isCustomFront).map(m => m.id));
+  const permit = (ids: string[]) => ids.filter(id => {
+    if (facetIds && facetIds.has(id)) return facetAllowedIds === null ? true : !!facetAllowedIds?.has(id);
+    if (customFrontIds && customFrontIds.has(id)) return customFrontAllowedIds === null ? true : !!customFrontAllowedIds?.has(id);
+    return allowedIds ? allowedIds.has(id) : true;
+  });
+  const primaryIds = permit(getTierIds(front, 'primary'));
+  const coFrontIds = permit(getTierIds(front, 'coFront'));
+  const coConsciousIds = permit(getTierIds(front, 'coConscious'));
   if (primaryIds.length === 0 && coFrontIds.length === 0 && coConsciousIds.length === 0) return null;
 
   const primary = resolveNames(primaryIds, members);
   const coFront = resolveNames(coFrontIds, members);
   const coConscious = resolveNames(coConsciousIds, members);
   if (!primary && !coFront && !coConscious) return null;
+  const shown = new Set([...primaryIds, ...coFrontIds, ...coConsciousIds].filter(id => !!members.find(m => m.id === id)?.name));
 
   return {
-    fronters: primary || coFront || coConscious,
+    fronters: [primary, coFront, coConscious].filter(Boolean).join(', '),
     primary: primary || undefined,
     coFront: coFront || undefined,
     coConscious: coConscious || undefined,
-    mood: getTierField(front, 'primary', 'mood'),
-    location: getTierField(front, 'primary', 'location'),
-    note: getTierField(front, 'primary', 'note'),
-    startTime: typeof front.startTime === 'number' ? front.startTime : undefined,
+    mood: primary && shareMood ? getTierField(front, 'primary', 'mood') : undefined,
+    location: primary && shareLocation ? getTierField(front, 'primary', 'location') : undefined,
+    note: primary && shareNote ? getTierField(front, 'primary', 'note') : undefined,
+    startTime: typeof front.startTime === 'number' ? frontSessionStart(front, id => shown.has(id)) : undefined,
+  };
+};
+
+export const gatewayFrontToShare = (entry: any, prev: FrontShare | null | undefined): FrontShare | null => {
+  const str = (v: any): string | undefined => {
+    const s = typeof v === 'string' ? v.trim() : '';
+    return s.length > 0 ? s : undefined;
+  };
+  const primary = str(entry?.primary);
+  const coFront = str(entry?.co_front);
+  const coConscious = str(entry?.co_conscious);
+  const fronters = str(entry?.fronters) || [primary, coFront, coConscious].filter(Boolean).join(', ');
+  if (!fronters) return null;
+  const samePeople = !!prev && prev.fronters === fronters;
+  const start = typeof entry?.start_time === 'number' && entry.start_time > 0 ? entry.start_time : undefined;
+  return {
+    fronters,
+    primary,
+    coFront,
+    coConscious,
+    mood: samePeople ? prev?.mood : undefined,
+    location: samePeople ? prev?.location : undefined,
+    note: samePeople ? prev?.note : undefined,
+    startTime: start ?? (samePeople ? prev?.startTime : undefined),
   };
 };

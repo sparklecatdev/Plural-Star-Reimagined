@@ -1,40 +1,83 @@
 import React, {useState, useEffect, useRef} from 'react';
 import {View, ScrollView, TouchableOpacity, Switch, Alert, AccessibilityInfo, Modal} from 'react-native';
+import {KeyboardAwareScrollView} from 'react-native-keyboard-controller';
 import Clipboard from '@react-native-clipboard/clipboard';
 import {Text, TextInput} from '../components/AppText';
 import {useTranslation} from 'react-i18next';
-import {fmtDur, fmtTime, uid, Member, MemberGroup, JournalEntry} from '../utils';
+import {fmtDur, fmtTime, uid, Member, MemberGroup, JournalEntry, CustomFieldDef, Relationship, RelationshipTypeDef, PRESET_RELATIONSHIP_TYPES, memberMatchesSearch} from '../utils';
+import {fontScale, ThemeColors} from '../theme';
+import {useAppStore} from '../store/appStore';
+import {useMinuteTick} from '../hooks/useMinuteTick';
+import {logError} from '../utils/log';
 import {store, KEYS} from '../storage';
 import {useNetwork} from '../network/useNetwork';
 import {NetworkManager} from '../network/NetworkManager';
-import {Friend, MAX_NOTIF_FRIENDS, PrivacyBucket, PrivacyScope, PrivacyScopeMode, PRIVACY_BUCKETS_KEY} from '../network/types';
+import {Friend, MAX_NOTIF_FRIENDS, PrivacyBucket, PrivacyScope, PrivacyScopeMode, PRIVACY_BUCKETS_KEY, MirrorFeature, friendNotifyLevel} from '../network/types';
+import {MirrorScreen} from './MirrorScreen';
+import {useKeyboardHeight} from '../hooks/useKeyboardHeight';
+import {CloudServices} from '../cloud/cloudPlatform';
+import {useCloud} from '../cloud/useCloud';
+import {passwordRuleFailing} from '../cloud/cloudCrypto';
 
 interface Props {
-  theme: any;
-  members?: Member[];
-  groups?: MemberGroup[];
-  journal?: JournalEntry[];
+  theme: ThemeColors;
 }
 
 type NetTab = 'friends' | 'settings' | 'privacy';
 type Kind = 'friend' | 'device';
-type BucketFeature = 'members' | 'groups' | 'journal' | 'history';
+type BucketFeature = 'front' | 'members' | 'groups' | 'journal' | 'history' | 'customFields' | 'medical' | 'connections' | 'systemProfile' | 'whiteboard' | 'planner' | 'facets' | 'customFronts';
+const BUCKET_ROWS: BucketFeature[] = ['front', 'members', 'facets', 'customFronts', 'groups', 'journal', 'history', 'customFields', 'connections', 'systemProfile', 'whiteboard', 'planner'];
+
+type Bucket = PrivacyBucket & {front: PrivacyScope; systemProfile: PrivacyScope; whiteboard: PrivacyScope; planner: PrivacyScope; facets: PrivacyScope; customFronts: PrivacyScope};
 
 const emptyScope = (): PrivacyScope => ({mode: 'none', ids: []});
-const newBucket = (name: string): PrivacyBucket => ({
+const allScope = (): PrivacyScope => ({mode: 'all', ids: []});
+const newBucket = (name: string): Bucket => ({
   id: uid(),
   name,
+  front: allScope(),
   members: emptyScope(),
   groups: emptyScope(),
   journal: emptyScope(),
   history: emptyScope(),
+  customFields: emptyScope(),
+  medical: emptyScope(),
+  connections: emptyScope(),
+  systemProfile: emptyScope(),
+  whiteboard: emptyScope(),
+  planner: emptyScope(),
+  facets: emptyScope(),
+  customFronts: emptyScope(),
   friendPeerIds: [],
   createdAt: Date.now(),
 });
 
-export const NetworkScreen = ({theme: T, members = [], groups = [], journal = []}: Props) => {
+const normalizeBucket = (b: PrivacyBucket): Bucket => ({
+  ...b,
+  front: b.front || allScope(),
+  members: b.members || emptyScope(),
+  groups: b.groups || emptyScope(),
+  journal: b.journal || emptyScope(),
+  history: b.history || emptyScope(),
+  customFields: b.customFields || emptyScope(),
+  medical: b.medical || emptyScope(),
+  connections: b.connections || emptyScope(),
+  systemProfile: b.systemProfile || emptyScope(),
+  whiteboard: b.whiteboard || emptyScope(),
+  planner: b.planner || emptyScope(),
+  facets: b.facets || (b.members ? {mode: b.members.mode, ids: [...(b.members.ids || [])]} : emptyScope()),
+  customFronts: b.customFronts || (b.members ? {mode: b.members.mode, ids: [...(b.members.ids || [])]} : emptyScope()),
+  friendPeerIds: b.friendPeerIds || [],
+});
+
+export const NetworkScreen = ({theme: T}: Props) => {
+  const kbHeight = useKeyboardHeight();
+  useMinuteTick();
+  const members = useAppStore(s => s.members);
+  const groups = useAppStore(s => s.groups);
+  const journal = useAppStore(s => s.journal);
   const {t} = useTranslation();
-  const fs = (s: number) => Math.round(s * (T.textScale || 1));
+  const fs = fontScale(T);
   const net = useNetwork();
 
   const [tab, setTab] = useState<NetTab>('friends');
@@ -45,21 +88,40 @@ export const NetworkScreen = ({theme: T, members = [], groups = [], journal = []
   const [busy, setBusy] = useState(false);
   const [copiedKind, setCopiedKind] = useState<Kind | null>(null);
   const [, setNowTick] = useState(0);
-  const [buckets, setBuckets] = useState<PrivacyBucket[]>([]);
-  const [editBucket, setEditBucket] = useState<PrivacyBucket | null>(null);
+  const [buckets, setBuckets] = useState<Bucket[]>([]);
+  const [editBucket, setEditBucket] = useState<Bucket | null>(null);
   const [pickerFeature, setPickerFeature] = useState<BucketFeature | null>(null);
   const [pickerSearch, setPickerSearch] = useState('');
+  const [mirrorMenuFor, setMirrorMenuFor] = useState<Friend | null>(null);
+  const [mirror, setMirror] = useState<{peerId: string; name: string; feature: MirrorFeature} | null>(null);
+  const [fieldDefs, setFieldDefs] = useState<CustomFieldDef[]>([]);
+  const [relationships, setRelationships] = useState<Relationship[]>([]);
+  const [relTypes, setRelTypes] = useState<RelationshipTypeDef[]>([]);
+  const cloud = useCloud();
+  const [cloudOn, setCloudOn] = useState(false);
+  const [cloudPw, setCloudPw] = useState('');
+  const [cloudMedia, setCloudMedia] = useState(false);
+  const cloudRule = passwordRuleFailing(cloudPw);
+  const cloudBusy = cloud.phase !== 'idle';
 
   useEffect(() => {
-    store.get<PrivacyBucket[]>(PRIVACY_BUCKETS_KEY, []).then(saved => {
-      if (saved && Array.isArray(saved)) setBuckets(saved);
-    }).catch(() => {});
+    const load = () => {
+      store.get<PrivacyBucket[]>(PRIVACY_BUCKETS_KEY, []).then(saved => {
+        if (saved && Array.isArray(saved)) setBuckets(saved.map(normalizeBucket));
+      }).catch(e => logError('network', e));
+      store.get<CustomFieldDef[]>(KEYS.customFieldDefs, []).then(d => setFieldDefs(d || [])).catch(e => logError('network', e));
+      store.get<Relationship[]>(KEYS.relationships, []).then(r => setRelationships(r || [])).catch(e => logError('network', e));
+      store.get<RelationshipTypeDef[]>(KEYS.relationshipTypes, []).then(rt => setRelTypes(rt || [])).catch(e => logError('network', e));
+    };
+    load();
+    return NetworkManager.onSyncApplied(load);
   }, []);
 
-  const saveBuckets = async (next: PrivacyBucket[]) => {
+  const saveBuckets = async (next: Bucket[]) => {
     setBuckets(next);
     await store.set(PRIVACY_BUCKETS_KEY, next);
     NetworkManager.notifyDataChanged();
+    NetworkManager.refreshAllMirrors();
   };
 
   useEffect(() => {
@@ -67,7 +129,6 @@ export const NetworkScreen = ({theme: T, members = [], groups = [], journal = []
     return () => clearInterval(id);
   }, []);
 
-  // Screen-reader announcements.
   const prevStatus = useRef(net.status);
   useEffect(() => {
     if (prevStatus.current !== net.status) {
@@ -121,22 +182,109 @@ export const NetworkScreen = ({theme: T, members = [], groups = [], journal = []
     }
   };
 
-  // ---- handlers ----
   const onToggle = (v: boolean) => guard(() => NetworkManager.setEnabled(v));
-  const onSaveRelay = () => guard(() => NetworkManager.setRelayOverride(relayUrl.trim() || undefined, relayToken.trim() || undefined));
-  const onGenerate = (kind: Kind) => guard(async () => {
-    try {
-      await NetworkManager.generateCode(kind);
-    } catch {
-      throw new Error(t('network.publishFailed'));
+
+  const cloudRuleText = (): string => {
+    switch (cloudRule) {
+      case 'length': return t('network.cloudRuleLength');
+      case 'upper': return t('network.cloudRuleUpper');
+      case 'lower': return t('network.cloudRuleLower');
+      case 'digit': return t('network.cloudRuleDigit');
+      case 'symbol': return t('network.cloudRuleSymbol');
+      default: return '';
     }
-  });
+  };
+  const cloudPhaseText = (): string => {
+    switch (cloud.phase) {
+      case 'deriving': return t('network.cloudDeriving');
+      case 'uploading': return t('network.cloudUploading');
+      case 'importing': return t('network.cloudImporting');
+      case 'checking': return t('network.cloudChecking');
+      default: return '';
+    }
+  };
+  const onCloudToggle = (v: boolean) => {
+    if (v && net.devices.length > 0) {
+      Alert.alert(t('network.cloudTitle'), t('network.cloudWarning'));
+      return;
+    }
+    setCloudOn(v);
+    if (!v) { setCloudPw(''); CloudServices.cancelPendingLink(); }
+  };
+  const onCloudSubmit = async () => {
+    if (cloudRule || cloudBusy) return;
+    const pw = cloudPw;
+    try {
+      const outcome = await CloudServices.linkWithPassword(pw, cloudMedia);
+      if (outcome.kind === 'created') { setCloudPw(''); return; }
+      Alert.alert(t('network.cloudExistsTitle'), t('network.cloudExistsMsg'), [
+        {text: t('common.cancel'), style: 'cancel', onPress: () => CloudServices.cancelPendingLink()},
+        {text: t('network.cloudImport'), style: 'destructive', onPress: () => {
+          Alert.alert(t('network.cloudImportConfirmTitle'), t('network.cloudImportConfirmMsg'), [
+            {text: t('common.cancel'), style: 'cancel', onPress: () => CloudServices.cancelPendingLink()},
+            {text: t('network.cloudImport'), style: 'destructive', onPress: () => {
+              CloudServices.importExisting(cloudMedia)
+                .then(() => setCloudPw(''))
+                .catch((e: any) => Alert.alert(t('network.errorTitle'), String(e?.message || e)));
+            }},
+          ]);
+        }},
+      ]);
+    } catch (e: any) {
+      Alert.alert(t('network.errorTitle'), String(e?.message || e));
+    }
+  };
+  const onCloudUnlink = () => {
+    Alert.alert(t('network.cloudUnlink'), t('network.cloudUnlinkMsg'), [
+      {text: t('common.cancel'), style: 'cancel'},
+      {text: t('network.cloudUnlink'), style: 'destructive', onPress: () => {
+        Alert.alert(t('network.cloudUnlink'), t('network.cloudUnlinkConfirm2'), [
+          {text: t('common.cancel'), style: 'cancel'},
+          {text: t('network.cloudUnlink'), style: 'destructive', onPress: () => {
+            CloudServices.unlink().then(() => setCloudOn(false)).catch((e: any) => Alert.alert(t('network.errorTitle'), String(e?.message || e)));
+          }},
+        ]);
+      }},
+    ]);
+  };
+  const onSaveRelay = () => guard(() => NetworkManager.setRelayOverride(relayUrl.trim() || undefined, relayToken.trim() || undefined));
+  const cloudBlocksSync = (kind: Kind): boolean => {
+    if (kind !== 'device' || !cloud.linked) return false;
+    Alert.alert(t('network.cloudTitle'), t('network.cloudBlocksSync'));
+    return true;
+  };
+  const cloudErrorText = (raw: string): string => {
+    const s = raw.toLowerCase();
+    const m = raw.match(/^Left out, larger than \d+ MB: (.*)$/);
+    if (m) return t('network.cloudErrTooLarge', {keys: m[1]});
+    if (s.includes('object too large')) return t('network.cloudErrTooLarge', {keys: ''});
+    if (s.includes('rate limited') || s.includes('429')) return t('network.cloudErrRate');
+    if (s.includes('quota') || s.includes('watermark') || s.includes('507')) return t('network.cloudErrFull');
+    if (s.includes('undecryptable') || s.includes('malformed') || s.includes('hash mismatch') || s.includes('bad password')) return t('network.cloudErrCorrupt');
+    if (s.includes('conflict') || s.includes('network') || s.includes('timed out') || s.includes('failed') || s.includes('fetch') || s.includes('not connected') || s.includes('unreach') || /http 5\d\d/.test(s)) return t('network.cloudErrNetwork');
+    return raw;
+  };
+  const onGenerate = (kind: Kind) => {
+    if (cloudBlocksSync(kind)) return;
+    guard(async () => {
+      try {
+        await NetworkManager.generateCode(kind);
+      } catch {
+        throw new Error(t('network.publishFailed'));
+      }
+    });
+  };
 
   const onCopy = (kind: Kind, code: string | null) => {
     if (!code) return;
     Clipboard.setString(code);
     setCopiedKind(kind);
-    AccessibilityInfo.announceForAccessibility(t('network.codeCopied'));
+    setTimeout(() => {
+      const msg = t('network.codeCopied');
+      const AI: any = AccessibilityInfo;
+      if (AI.announceForAccessibilityWithOptions) AI.announceForAccessibilityWithOptions(msg, {queue: true});
+      else AccessibilityInfo.announceForAccessibility(msg);
+    }, 400);
     setTimeout(() => setCopiedKind(c => (c === kind ? null : c)), 1500);
   };
 
@@ -148,16 +296,18 @@ export const NetworkScreen = ({theme: T, members = [], groups = [], journal = []
         clear();
       } catch (e: any) {
         const msg = String(e?.message || e).toLowerCase();
-        if (msg.includes('own')) throw new Error(t('network.ownCode'));
+        const sync = kind === 'device';
+        if (msg.includes('own')) throw new Error(t(sync ? 'network.ownSyncCode' : 'network.ownCode'));
         if (msg.includes('not found') || msg.includes('expired')) throw new Error(t('network.notFound'));
         if (msg.includes('timed out') || msg.includes('network request failed') || msg.includes('not connected')) throw new Error(t('network.publishFailed'));
-        throw new Error(t('network.invalidCode'));
+        throw new Error(t(sync ? 'network.invalidSyncCode' : 'network.invalidCode'));
       }
     });
   };
 
   const onEnter = (kind: Kind, value: string, clear: () => void) => {
     if (!value.trim()) return;
+    if (cloudBlocksSync(kind)) return;
     if (kind === 'device') {
       Alert.alert(
         t('network.syncDirectionTitle'),
@@ -174,9 +324,18 @@ export const NetworkScreen = ({theme: T, members = [], groups = [], journal = []
   };
 
   const onRemove = (f: Friend) => {
-    Alert.alert(t('network.remove'), f.displayName, [
+    const body = f.kind === 'device'
+      ? f.displayName
+      : t('network.removeFriendWarn', {name: f.displayName});
+    Alert.alert(t('network.remove'), body, [
       {text: t('common.cancel'), style: 'cancel'},
-      {text: t('network.remove'), style: 'destructive', onPress: () => guard(() => NetworkManager.removeFriend(f.peerId))},
+      {text: t('network.remove'), style: 'destructive', onPress: () => {
+        if (f.kind === 'device') { guard(() => NetworkManager.removeFriend(f.peerId)); return; }
+        Alert.alert(t('journal.areYouSure'), t('network.removeFriendWarn', {name: f.displayName}), [
+          {text: t('common.cancel'), style: 'cancel'},
+          {text: t('network.remove'), style: 'destructive', onPress: () => guard(() => NetworkManager.removeFriend(f.peerId))},
+        ]);
+      }},
     ]);
   };
 
@@ -186,8 +345,6 @@ export const NetworkScreen = ({theme: T, members = [], groups = [], journal = []
     return `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, '0')}`;
   };
 
-  // Shared pairing block: their-code input + (Generate Code button OR your live,
-  // tap-to-copy code with countdown).
   const renderPairing = (kind: Kind, code: string | null, expiresAt: number | null, theirVal: string, setTheirVal: (s: string) => void) => (
     <>
       <TextInput
@@ -240,16 +397,17 @@ export const NetworkScreen = ({theme: T, members = [], groups = [], journal = []
   const renderFriendStatus = (f: Friend) => {
     if (f.status === 'entered_theirs') return <Text style={{fontSize: fs(11), color: T.dim, marginTop: 2}}>{t('network.waitingThem')}</Text>;
     if (f.status === 'entered_mine') return <Text style={{fontSize: fs(11), color: T.accent, marginTop: 2}}>{t('network.waitingYou')}</Text>;
+    if (f.needsRefriend) return <Text style={{fontSize: fs(11), color: T.danger, marginTop: 2}}>{t('network.needsRefriend')}</Text>;
     const online = net.onlinePeers.includes(f.peerId);
     const s = f.lastStatus;
     const head = online ? T.text : T.muted;
     const sub = online ? T.dim : T.muted;
     if (!s) return <Text style={{fontSize: fs(11), color: sub, marginTop: 2}}>{online ? t('network.online') : t('network.offline')}</Text>;
     const dur = s.startTime ? fmtDur(s.startTime) : '';
-    const line = (txt: string, key: string) => <Text key={key} style={{fontSize: fs(11), color: sub}} numberOfLines={2}>{txt}</Text>;
+    const line = (txt: string, key: string) => <Text key={key} style={{fontSize: fs(11), color: sub}}>{txt}</Text>;
     return (
       <View style={{marginTop: 2}}>
-        <Text style={{fontSize: fs(12), fontWeight: '600', color: head}} numberOfLines={1}>◈ {s.fronters}{dur ? `  ·  ${dur}` : ''}</Text>
+        <Text style={{fontSize: fs(12), fontWeight: '600', color: head}}>◈ {s.fronters}{dur ? `  ·  ${dur}` : ''}</Text>
         {s.primary ? line(t('notification.primary', {names: s.primary, defaultValue: `Primary: ${s.primary}`}), 'p') : null}
         {s.coFront ? line(t('notification.coFront', {names: s.coFront, defaultValue: `Co-Front: ${s.coFront}`}), 'cf') : null}
         {s.coConscious ? line(t('notification.coConscious', {names: s.coConscious, defaultValue: `Co-Conscious: ${s.coConscious}`}), 'cc') : null}
@@ -263,9 +421,23 @@ export const NetworkScreen = ({theme: T, members = [], groups = [], journal = []
   };
 
   const featureLabel = (f: BucketFeature): string =>
-    f === 'members' ? t('tabs.members') : f === 'groups' ? t('members.fieldGroups') : f === 'journal' ? t('tabs.journal') : t('tabs.history');
+    f === 'front' ? t('tabs.front') : f === 'members' ? t('tabs.members') : f === 'facets' ? t('members.facets') : f === 'customFronts' ? t('members.customFronts') : f === 'groups' ? t('members.fieldGroups') : f === 'journal' ? t('tabs.journal') : f === 'history' ? t('tabs.history') : f === 'customFields' ? t('customFields.title') : f === 'systemProfile' ? t('systemProfile.title') : f === 'whiteboard' ? t('whiteboard.title') : f === 'planner' ? t('planner.title') : t('systemMap.title');
   const scopeSummary = (s: PrivacyScope): string =>
     s.mode === 'all' ? t('network.scopeAll') : s.mode === 'none' ? t('network.scopeNone') : `${s.ids.length}`;
+  const effectiveShare = (peerId: string, f: BucketFeature): PrivacyScope => {
+    const mine = buckets.filter(b => (b.friendPeerIds || []).includes(peerId));
+    const ids = new Set<string>();
+    let all = false;
+    for (const b of mine) {
+      const s = b[f];
+      if (!s || s.mode === 'none') continue;
+      if (s.mode === 'all') { all = true; continue; }
+      (s.ids || []).forEach(id => ids.add(id));
+    }
+    if (all) return {mode: 'all', ids: []};
+    if (ids.size === 0) return {mode: 'none', ids: []};
+    return {mode: 'select', ids: [...ids]};
+  };
   const setScopeMode = (f: BucketFeature, mode: PrivacyScopeMode) => {
     if (!editBucket) return;
     setEditBucket({...editBucket, [f]: {...editBucket[f], mode}});
@@ -286,14 +458,26 @@ export const NetworkScreen = ({theme: T, members = [], groups = [], journal = []
     await saveBuckets(next);
     setEditBucket(null);
   };
-  const cloneBucket = (b: PrivacyBucket) => {
+  const cloneBucket = (b: Bucket) => {
     setEditBucket({
       id: uid(),
       name: `${b.name} 2`,
+      front: {mode: b.front.mode, ids: []},
+      frontMood: b.frontMood,
+      frontLocation: b.frontLocation,
+      frontNote: b.frontNote,
       members: {mode: b.members.mode, ids: [...b.members.ids]},
       groups: {mode: b.groups.mode, ids: [...b.groups.ids]},
       journal: {mode: b.journal.mode, ids: [...b.journal.ids]},
       history: {mode: b.history.mode, ids: [...b.history.ids]},
+      customFields: {mode: b.customFields.mode, ids: [...b.customFields.ids]},
+      medical: {mode: b.medical.mode, ids: [...b.medical.ids]},
+      connections: {mode: b.connections.mode, ids: [...b.connections.ids]},
+      systemProfile: {mode: b.systemProfile.mode, ids: [...b.systemProfile.ids]},
+      whiteboard: {mode: b.whiteboard.mode, ids: [...b.whiteboard.ids]},
+      planner: {mode: b.planner.mode, ids: [...b.planner.ids]},
+      facets: {mode: b.facets.mode, ids: [...b.facets.ids]},
+      customFronts: {mode: b.customFronts.mode, ids: [...b.customFronts.ids]},
       friendPeerIds: [],
       createdAt: Date.now(),
     });
@@ -301,10 +485,65 @@ export const NetworkScreen = ({theme: T, members = [], groups = [], journal = []
   const confirmDeleteBucket = (b: PrivacyBucket) => {
     Alert.alert(t('network.deleteBucket'), t('network.deleteBucketMsg', {name: b.name}), [
       {text: t('common.cancel'), style: 'cancel'},
-      {text: t('common.delete'), style: 'destructive', onPress: () => { saveBuckets(buckets.filter(x => x.id !== b.id)).catch(() => {}); }},
+      {text: t('common.delete'), style: 'destructive', onPress: () => { saveBuckets(buckets.filter(x => x.id !== b.id)).catch(e => logError('network', e)); }},
     ]);
   };
-  const pickableMembers = members.filter(m => !m.deleted && !m.isCustomFront);
+  const pickableMembers = members.filter(m => !m.deleted && !m.isCustomFront && !m.isFacet);
+  const pickableFacets = members.filter(m => !m.deleted && !m.isCustomFront && m.isFacet);
+  const pickableCustomFronts = members.filter(m => !m.deleted && m.isCustomFront);
+  const splitKinds = (b: Bucket): Bucket => {
+    const facetIds = new Set(pickableFacets.map(m => m.id));
+    const cfIds = new Set(pickableCustomFronts.map(m => m.id));
+    return {
+      ...b,
+      members: {...b.members, ids: b.members.ids.filter(id => !facetIds.has(id) && !cfIds.has(id))},
+      facets: {...b.facets, ids: b.facets.ids.filter(id => facetIds.has(id))},
+      customFronts: {...b.customFronts, ids: b.customFronts.ids.filter(id => cfIds.has(id))},
+    };
+  };
+  const memberName = (id: string) => members.find(m => m.id === id)?.name || '?';
+  const isPrivateId = (id: string) => !!members.find(m => m.id === id)?.private;
+  const relLabel = (r: Relationship): string => {
+    const rt = relTypes.find(x => x.id === r.typeId) || PRESET_RELATIONSHIP_TYPES.find(x => x.id === r.typeId);
+    const arrow = rt?.directional ? '→' : '↔';
+    return `${memberName(r.fromId)} ${arrow} ${memberName(r.toId)}${rt ? `  ·  ${rt.name}` : ''}`;
+  };
+
+  const pickerItems: {id: string; name: string}[] = !pickerFeature ? [] : (pickerFeature === 'groups'
+    ? groups.map(g => ({id: g.id, name: g.name}))
+    : pickerFeature === 'journal'
+    ? journal
+        .filter(e => !pickerSearch.trim() || (e.title || '').toLowerCase().includes(pickerSearch.trim().toLowerCase()))
+        .map(e => ({id: e.id, name: `${e.password ? '🔒 ' : ''}${e.title || fmtTime(e.timestamp)}`}))
+    : pickerFeature === 'customFields'
+    ? [...fieldDefs]
+        .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
+        .map(d => ({id: d.id, name: d.name}))
+        .filter(x => !pickerSearch.trim() || (x.name || '').toLowerCase().includes(pickerSearch.trim().toLowerCase()))
+    : pickerFeature === 'connections'
+    ? relationships
+        .filter(r => !isPrivateId(r.fromId) && !isPrivateId(r.toId))
+        .map(r => ({id: r.id, name: relLabel(r)}))
+        .filter(x => !pickerSearch.trim() || (x.name || '').toLowerCase().includes(pickerSearch.trim().toLowerCase()))
+    : pickerFeature === 'facets'
+    ? pickableFacets
+        .filter(m => !m.private && memberMatchesSearch(m, pickerSearch))
+        .map(m => ({id: m.id, name: m.name}))
+    : pickerFeature === 'customFronts'
+    ? pickableCustomFronts
+        .filter(m => !m.private && memberMatchesSearch(m, pickerSearch))
+        .map(m => ({id: m.id, name: m.name}))
+    : pickableMembers
+        .filter(m => !m.private && memberMatchesSearch(m, pickerSearch))
+        .map(m => ({id: m.id, name: m.name})));
+  const allPickedChecked = !!editBucket && !!pickerFeature && pickerItems.length > 0 && pickerItems.every(i => editBucket[pickerFeature].ids.includes(i.id));
+  const toggleSelectAllPicked = () => {
+    if (!editBucket || !pickerFeature) return;
+    const sc = editBucket[pickerFeature];
+    const listed = new Set(pickerItems.map(i => i.id));
+    const ids = allPickedChecked ? sc.ids.filter(x => !listed.has(x)) : [...new Set([...sc.ids, ...pickerItems.map(i => i.id)])];
+    setEditBucket({...editBucket, [pickerFeature]: {...sc, ids}});
+  };
 
   const deviceStatusText = (f: Friend): string => {
     if (f.status === 'entered_theirs') return t('network.waitingThem');
@@ -315,28 +554,49 @@ export const NetworkScreen = ({theme: T, members = [], groups = [], journal = []
     return net.onlinePeers.includes(f.peerId) ? t('network.online') : t('network.offline');
   };
 
-  const renderRow = (f: Friend, statusNode: React.ReactNode, a11y: string) => {
+  const renderRow = (f: Friend, statusNode: React.ReactNode, a11y: string, orderIdx?: number, orderCount?: number) => {
     const online = f.status === 'accepted' && net.onlinePeers.includes(f.peerId);
     return (
       <View key={f.peerId} style={{flexDirection: 'row', alignItems: 'flex-start', paddingVertical: 10, borderTopWidth: 1, borderTopColor: T.border}}>
         <View style={{width: 8, height: 8, borderRadius: 4, marginRight: 10, marginTop: 5, backgroundColor: f.status !== 'accepted' ? T.muted : online ? '#2faa55' : T.muted}} importantForAccessibility="no" accessibilityElementsHidden />
         <View style={{flex: 1, marginRight: 8}} accessible accessibilityRole="text" accessibilityLabel={`${f.displayName}. ${a11y}`}>
-          <Text style={{fontSize: fs(14), fontWeight: '600', color: online || f.status !== 'accepted' ? T.text : T.muted}} numberOfLines={1} importantForAccessibility="no">{f.displayName}</Text>
-          <View importantForAccessibility="no">{statusNode}</View>
+          <Text style={{fontSize: fs(14), fontWeight: '600', color: online || f.status !== 'accepted' ? T.text : T.muted}} numberOfLines={1} accessibilityElementsHidden importantForAccessibility="no">{f.displayName}</Text>
+          <View accessibilityElementsHidden importantForAccessibility="no">{statusNode}</View>
         </View>
+        {orderIdx !== undefined && orderCount !== undefined && orderCount > 1 && ([
+          [-1, orderIdx === 0, '▲', t('members.moveUp')],
+          [1, orderIdx === orderCount - 1, '▼', t('members.moveDown')],
+        ] as [(-1 | 1), boolean, string, string][]).map(([dir, atEnd, glyph, label]) => (
+          <TouchableOpacity key={glyph} onPress={() => { if (!atEnd) NetworkManager.moveFriend(f.peerId, dir).catch(e => logError('network', e)); }}
+            activeOpacity={0.7} accessibilityRole="button" accessibilityState={{disabled: atEnd}}
+            accessibilityLabel={`${label}, ${f.displayName}`}
+            style={{padding: 10, opacity: atEnd ? 0.3 : 1}} hitSlop={{top: 8, bottom: 8, left: 2, right: 2}}>
+            <Text style={{color: T.dim, fontSize: fs(13)}} accessibilityElementsHidden importantForAccessibility="no">{glyph}</Text>
+          </TouchableOpacity>
+        ))}
+        {f.kind !== 'device' && f.status === 'accepted' && (
+          <TouchableOpacity onPress={() => setMirrorMenuFor(f)} activeOpacity={0.7} accessibilityRole="button"
+            accessibilityLabel={`${t('network.viewShared')}, ${f.displayName}`} style={{padding: 10}} hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}>
+            <Text style={{color: T.dim, fontSize: fs(16)}} accessibilityElementsHidden importantForAccessibility="no">⋯</Text>
+          </TouchableOpacity>
+        )}
         {f.kind !== 'device' && f.status === 'accepted' && (() => {
-          const atCap = !f.showInNotification && net.friends.filter(x => x.showInNotification).length >= MAX_NOTIF_FRIENDS;
+          const level = friendNotifyLevel(f);
+          const atCap = level !== 'full' && net.friends.filter(x => friendNotifyLevel(x) === 'full').length >= MAX_NOTIF_FRIENDS;
+          const nextLevel = level === 'full' ? 'alerts' : level === 'alerts' ? 'off' : atCap ? 'alerts' : 'full';
+          const levelLabel = level === 'full' ? t('network.notifFull') : level === 'alerts' ? t('network.notifAlerts') : t('network.notifOff');
           return (
-            <TouchableOpacity onPress={() => { if (!atCap) NetworkManager.setFriendShowInNotification(f.peerId, !f.showInNotification); }} activeOpacity={0.7}
-              accessibilityRole="switch" accessibilityState={{checked: !!f.showInNotification, disabled: atCap}}
-              accessibilityLabel={`${t('network.showInNotif')}, ${f.displayName}`}
-              style={{padding: 10, opacity: atCap ? 0.35 : 1}} hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}>
-              <Text style={{color: f.showInNotification ? T.accent : T.dim, fontSize: fs(15)}} importantForAccessibility="no">{f.showInNotification ? '🔔' : '🔕'}</Text>
+            <TouchableOpacity onPress={() => NetworkManager.setFriendNotifyLevel(f.peerId, nextLevel)} activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel={`${levelLabel}, ${f.displayName}`}
+              accessibilityValue={{text: levelLabel}}
+              style={{padding: 10}} hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}>
+              <Text style={{color: level === 'full' ? T.accent : T.dim, fontSize: fs(15), opacity: level === 'off' ? 0.45 : 1}} accessibilityElementsHidden importantForAccessibility="no">{level === 'full' ? '🔔' : level === 'alerts' ? '📳' : '🔕'}</Text>
             </TouchableOpacity>
           );
         })()}
         <TouchableOpacity onPress={() => onRemove(f)} activeOpacity={0.7} accessibilityRole="button" accessibilityLabel={`${t('network.remove')}, ${f.displayName}`} style={{padding: 10}} hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}>
-          <Text style={{color: T.dim, fontSize: fs(16)}} importantForAccessibility="no">✕</Text>
+          <Text style={{color: T.dim, fontSize: fs(16)}} accessibilityElementsHidden importantForAccessibility="no">✕</Text>
         </TouchableOpacity>
       </View>
     );
@@ -357,7 +617,7 @@ export const NetworkScreen = ({theme: T, members = [], groups = [], journal = []
         <TabBtn id="settings" label={t('network.tabSettings')} />
       </View>
 
-      <ScrollView style={{flex: 1}} contentContainerStyle={{padding: 16}} keyboardShouldPersistTaps="handled">
+      <KeyboardAwareScrollView style={{flex: 1}} contentContainerStyle={{padding: 16}} keyboardShouldPersistTaps="handled" bottomOffset={24}>
         {tab === 'friends' ? (
           <>
             <View style={card}>
@@ -371,7 +631,7 @@ export const NetworkScreen = ({theme: T, members = [], groups = [], journal = []
               {net.friends.length === 0 ? (
                 <Text style={{fontSize: fs(12), color: T.dim}}>{t('network.noFriends')}</Text>
               ) : (
-                net.friends.map(f => renderRow(f, renderFriendStatus(f), friendStatusA11y(f)))
+                net.friends.map((f, i) => renderRow(f, renderFriendStatus(f), friendStatusA11y(f), i, net.friends.length))
               )}
             </View>
           </>
@@ -391,19 +651,19 @@ export const NetworkScreen = ({theme: T, members = [], groups = [], journal = []
                 <Text style={{fontSize: fs(12), color: T.dim}}>{t('network.noBuckets')}</Text>
               ) : buckets.map(b => (
                 <View key={b.id} style={{flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderTopWidth: 1, borderTopColor: T.border}}>
-                  <TouchableOpacity style={{flex: 1, marginRight: 8}} onPress={() => setEditBucket({...b})} activeOpacity={0.7}
+                  <TouchableOpacity style={{flex: 1, marginRight: 8}} onPress={() => setEditBucket(splitKinds({...b}))} activeOpacity={0.7}
                     accessibilityRole="button"
-                    accessibilityLabel={`${b.name}. ${(['members', 'groups', 'journal', 'history'] as BucketFeature[]).map(f => `${featureLabel(f)}: ${scopeSummary(b[f])}`).join(', ')}`}>
-                    <Text style={{fontSize: fs(14), fontWeight: '600', color: T.text}} numberOfLines={1} importantForAccessibility="no">{b.name}</Text>
-                    <Text style={{fontSize: fs(11), color: T.dim, marginTop: 2}} numberOfLines={2} importantForAccessibility="no">
-                      {(['members', 'groups', 'journal', 'history'] as BucketFeature[]).map(f => `${featureLabel(f)}: ${scopeSummary(b[f])}`).join('  ·  ')}
+                    accessibilityLabel={`${b.name}. ${BUCKET_ROWS.map(f => `${featureLabel(f)}: ${scopeSummary(b[f])}`).join(', ')}`}>
+                    <Text style={{fontSize: fs(14), fontWeight: '600', color: T.text}} numberOfLines={1} accessibilityElementsHidden importantForAccessibility="no">{b.name}</Text>
+                    <Text style={{fontSize: fs(11), color: T.dim, marginTop: 2}} numberOfLines={2} accessibilityElementsHidden importantForAccessibility="no">
+                      {BUCKET_ROWS.map(f => `${featureLabel(f)}: ${scopeSummary(b[f])}`).join('  ·  ')}
                     </Text>
                   </TouchableOpacity>
                   <TouchableOpacity onPress={() => cloneBucket(b)} activeOpacity={0.7} accessibilityRole="button" accessibilityLabel={`${t('network.cloneBucket')}, ${b.name}`} style={{padding: 10}} hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}>
-                    <Text style={{color: T.dim, fontSize: fs(15)}} importantForAccessibility="no">⧉</Text>
+                    <Text style={{color: T.dim, fontSize: fs(15)}} accessibilityElementsHidden importantForAccessibility="no">⧉</Text>
                   </TouchableOpacity>
                   <TouchableOpacity onPress={() => confirmDeleteBucket(b)} activeOpacity={0.7} accessibilityRole="button" accessibilityLabel={`${t('network.deleteBucket')}, ${b.name}`} style={{padding: 10}} hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}>
-                    <Text style={{color: T.dim, fontSize: fs(16)}} importantForAccessibility="no">✕</Text>
+                    <Text style={{color: T.dim, fontSize: fs(16)}} accessibilityElementsHidden importantForAccessibility="no">✕</Text>
                   </TouchableOpacity>
                 </View>
               ))}
@@ -411,7 +671,6 @@ export const NetworkScreen = ({theme: T, members = [], groups = [], journal = []
           </>
         ) : (
           <>
-            {/* Connection */}
             <View style={card}>
               <View style={{flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between'}}>
                 <Text accessibilityRole="header" style={{fontSize: fs(15), fontWeight: '600', color: T.text, flex: 1, marginRight: 12}}>{t('network.enable')}</Text>
@@ -420,11 +679,10 @@ export const NetworkScreen = ({theme: T, members = [], groups = [], journal = []
               <Text style={{fontSize: fs(12), color: T.dim, marginTop: 8}}>{t('network.enableDesc')}</Text>
               <View style={{flexDirection: 'row', alignItems: 'center', marginTop: 12}} accessible accessibilityRole="text" accessibilityLabel={`${t('network.enable')} — ${statusLabel()}`}>
                 <View style={{width: 9, height: 9, borderRadius: 5, backgroundColor: statusColor(), marginRight: 8}} importantForAccessibility="no" accessibilityElementsHidden />
-                <Text style={{fontSize: fs(12), color: T.text}} importantForAccessibility="no">{statusLabel()}</Text>
+                <Text style={{fontSize: fs(12), color: T.text}} accessibilityElementsHidden importantForAccessibility="no">{statusLabel()}</Text>
               </View>
             </View>
 
-            {/* Sync (your own devices) */}
             <View style={card}>
               <Text accessibilityRole="header" style={labelStyle}>{t('network.syncTitle')}</Text>
               <Text style={{fontSize: fs(12), color: T.dim, marginBottom: 12}}>{t('network.syncDesc')}</Text>
@@ -439,7 +697,97 @@ export const NetworkScreen = ({theme: T, members = [], groups = [], journal = []
               </View>
             </View>
 
-            {/* Other / custom network — optional. The toggle uses the default network automatically. */}
+            <Text style={{fontSize: fs(12), color: T.danger, marginTop: -4, marginBottom: 10, paddingHorizontal: 2}} accessibilityRole="text">
+              {t('network.cloudWarning')}
+            </Text>
+
+            <View style={card}>
+              <View style={{flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6}}>
+                <Text accessibilityRole="header" style={[labelStyle, {marginBottom: 0}]}>{t('network.cloudTitle')}</Text>
+                <View style={{paddingHorizontal: 7, paddingVertical: 2, borderRadius: 999, borderWidth: 1, borderColor: `${T.info}60`, backgroundColor: `${T.info}18`}}>
+                  <Text style={{fontSize: fs(9), letterSpacing: 0.8, textTransform: 'uppercase', color: T.info, fontWeight: '700'}}>{t('network.cloudExperimental')}</Text>
+                </View>
+              </View>
+              <Text style={{fontSize: fs(12), color: T.dim, marginBottom: 12}}>{t('network.cloudDesc')}</Text>
+
+              {cloud.linked ? (
+                <>
+                  <Text style={{fontSize: fs(12), color: T.text}}>{t('network.cloudLinkedDevices', {n: cloud.deviceCount})}</Text>
+                  {cloud.lastSyncAt > 0 && (
+                    <Text style={{fontSize: fs(11), color: T.dim, marginTop: 2}}>{t('network.cloudLastSync', {time: fmtTime(cloud.lastSyncAt)})}</Text>
+                  )}
+                  {cloud.pendingKeys > 0 && (
+                    <Text style={{fontSize: fs(11), color: T.dim, marginTop: 2}}>{t('network.cloudPending', {n: cloud.pendingKeys})}</Text>
+                  )}
+                  {cloudBusy && (
+                    <Text style={{fontSize: fs(11), color: T.accent, marginTop: 6}} accessibilityLiveRegion="polite">
+                      {cloudPhaseText()}{cloud.progress > 0 && cloud.progress < 1 ? ` ${Math.round(cloud.progress * 100)}%` : ''}
+                    </Text>
+                  )}
+                  {cloud.lastError ? (
+                    <Text style={{fontSize: fs(11), color: T.danger, marginTop: 6}}>{t('network.cloudError', {error: cloudErrorText(cloud.lastError || '')})}</Text>
+                  ) : null}
+                  <View style={{flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 14}}>
+                    <View style={{flex: 1, marginRight: 12}}>
+                      <Text style={{fontSize: fs(13), fontWeight: '600', color: T.text}}>{t('network.cloudMediaTier')}</Text>
+                      <Text style={{fontSize: fs(11), color: T.dim, marginTop: 2}}>{t('network.cloudMediaTierDesc')}</Text>
+                    </View>
+                    <Switch value={cloud.mediaTier} disabled={cloudBusy} onValueChange={v => CloudServices.setMediaTier(v).catch(() => {})}
+                      accessibilityRole="switch" accessibilityLabel={t('network.cloudMediaTier')} accessibilityState={{checked: cloud.mediaTier, disabled: cloudBusy}} />
+                  </View>
+                  <TouchableOpacity onPress={onCloudUnlink} disabled={cloudBusy} activeOpacity={0.8}
+                    style={{marginTop: 14, borderRadius: 8, paddingVertical: 12, alignItems: 'center', borderWidth: 1, borderColor: `${T.danger}60`, backgroundColor: `${T.danger}12`}}
+                    accessibilityRole="button" accessibilityLabel={t('network.cloudUnlink')} accessibilityState={{disabled: cloudBusy}}>
+                    <Text style={{color: T.danger, fontWeight: '600', fontSize: fs(13)}}>{t('network.cloudUnlink')}</Text>
+                  </TouchableOpacity>
+                </>
+              ) : (
+                <>
+                  <View style={{flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between'}}>
+                    <Text style={{fontSize: fs(15), fontWeight: '600', color: T.text, flex: 1, marginRight: 12}}>{t('network.cloudEnable')}</Text>
+                    <Switch value={cloudOn} disabled={cloudBusy || !cloud.available} onValueChange={onCloudToggle}
+                      accessibilityRole="switch" accessibilityLabel={t('network.cloudEnable')} accessibilityState={{checked: cloudOn, disabled: cloudBusy || !cloud.available}} />
+                  </View>
+                  {!cloud.available && (
+                    <Text style={{fontSize: fs(11), color: T.muted, marginTop: 8}}>{t('network.cloudUnavailable')}</Text>
+                  )}
+                  {cloudOn && (
+                    <View style={{marginTop: 12}}>
+                      <Text style={labelStyle} nativeID="lblCloudPw">{t('network.cloudPassword')}</Text>
+                      <TextInput value={cloudPw} onChangeText={setCloudPw} secureTextEntry autoCapitalize="none" autoCorrect={false}
+                        textContentType="password" placeholder={t('network.cloudPassword')} placeholderTextColor={T.muted}
+                        style={inputStyle} editable={!cloudBusy}
+                        accessibilityLabel={t('network.cloudPassword')} accessibilityLabelledBy="lblCloudPw" />
+                      <Text style={{fontSize: fs(11), color: cloudPw && cloudRule ? T.danger : T.dim, marginTop: 6}} accessibilityLiveRegion="polite">
+                        {cloudPw && cloudRule ? cloudRuleText() : t('network.cloudPasswordHint')}
+                      </Text>
+                      <View style={{flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 12}}>
+                        <View style={{flex: 1, marginRight: 12}}>
+                          <Text style={{fontSize: fs(13), fontWeight: '600', color: T.text}}>{t('network.cloudMediaTier')}</Text>
+                          <Text style={{fontSize: fs(11), color: T.dim, marginTop: 2}}>{t('network.cloudMediaTierDesc')}</Text>
+                        </View>
+                        <Switch value={cloudMedia} disabled={cloudBusy} onValueChange={setCloudMedia}
+                          accessibilityRole="switch" accessibilityLabel={t('network.cloudMediaTier')} accessibilityState={{checked: cloudMedia, disabled: cloudBusy}} />
+                      </View>
+                      <TouchableOpacity onPress={onCloudSubmit} disabled={!!cloudRule || cloudBusy} activeOpacity={0.8}
+                        style={[primaryBtn, {marginTop: 12, opacity: !!cloudRule || cloudBusy ? 0.45 : 1}]}
+                        accessibilityRole="button" accessibilityLabel={t('network.cloudSubmit')} accessibilityState={{disabled: !!cloudRule || cloudBusy}}>
+                        <Text style={{color: '#fff', fontWeight: '600', fontSize: fs(13)}}>{t('network.cloudSubmit')}</Text>
+                      </TouchableOpacity>
+                      {cloudBusy && (
+                        <Text style={{fontSize: fs(11), color: T.accent, marginTop: 8}} accessibilityLiveRegion="polite">
+                          {cloudPhaseText()}{cloud.progress > 0 && cloud.progress < 1 ? ` ${Math.round(cloud.progress * 100)}%` : ''}
+                        </Text>
+                      )}
+                      {cloud.lastError ? (
+                        <Text style={{fontSize: fs(11), color: T.danger, marginTop: 6}}>{t('network.cloudError', {error: cloudErrorText(cloud.lastError || '')})}</Text>
+                      ) : null}
+                    </View>
+                  )}
+                </>
+              )}
+            </View>
+
             <View style={card}>
               <Text accessibilityRole="header" style={labelStyle}>{t('network.customNetwork')}</Text>
               <Text style={{fontSize: fs(12), color: T.dim, marginBottom: 12}}>{t('network.customNetworkDesc')}</Text>
@@ -454,25 +802,26 @@ export const NetworkScreen = ({theme: T, members = [], groups = [], journal = []
             </View>
           </>
         )}
-      </ScrollView>
+      </KeyboardAwareScrollView>
 
       <Modal visible={!!editBucket && !pickerFeature} transparent animationType="fade" onRequestClose={() => setEditBucket(null)}>
-        <View style={{flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', padding: 24}}>
-          <View style={{backgroundColor: T.card, borderRadius: 14, borderWidth: 1, borderColor: T.border, overflow: 'hidden'}}>
+        <View style={{flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', padding: 24, paddingBottom: 24 + kbHeight}}>
+          <View accessibilityViewIsModal onAccessibilityEscape={() => setEditBucket(null)} style={{backgroundColor: T.card, borderRadius: 14, borderWidth: 1, borderColor: T.border, overflow: 'hidden', maxHeight: '85%'}}>
             <Text accessibilityRole="header" style={{fontSize: fs(15), fontWeight: '600', color: T.text, padding: 16, paddingBottom: 8}}>
               {editBucket && buckets.some(b => b.id === editBucket.id) ? editBucket.name : t('network.newBucket')}
             </Text>
+            <ScrollView style={{flexGrow: 0, flexShrink: 1}}>
             <View style={{paddingHorizontal: 16, paddingBottom: 4}}>
               <Text style={labelStyle} nativeID="lblBucketName">{t('network.bucketName')}</Text>
               <TextInput value={editBucket?.name || ''} onChangeText={v => editBucket && setEditBucket({...editBucket, name: v})}
                 placeholder={t('network.bucketName')} placeholderTextColor={T.muted} style={inputStyle}
                 accessibilityLabel={t('network.bucketName')} accessibilityLabelledBy="lblBucketName" />
             </View>
-            {editBucket && (['members', 'groups', 'journal', 'history'] as BucketFeature[]).map(f => (
+            {editBucket && BUCKET_ROWS.map(f => (
               <View key={f} style={{paddingHorizontal: 16, paddingVertical: 8, borderTopWidth: 1, borderTopColor: T.border}}>
                 <View style={{flexDirection: 'row', alignItems: 'center'}}>
                   <Text style={{flex: 1, fontSize: fs(13), fontWeight: '600', color: T.text}}>{featureLabel(f)}</Text>
-                  {(['all', 'select', 'none'] as PrivacyScopeMode[]).map(mode => {
+                  {((f === 'front' || f === 'history' || f === 'systemProfile' || f === 'whiteboard' || f === 'planner' ? ['all', 'none'] : ['all', 'select', 'none']) as PrivacyScopeMode[]).map(mode => {
                     const sel = editBucket[f].mode === mode;
                     const label = mode === 'all' ? t('network.scopeAll') : mode === 'select' ? t('network.scopeSelect') : t('network.scopeNone');
                     return (
@@ -480,7 +829,7 @@ export const NetworkScreen = ({theme: T, members = [], groups = [], journal = []
                         accessibilityRole="button" accessibilityState={{selected: sel}} accessibilityLabel={`${featureLabel(f)}: ${label}`}
                         style={{marginLeft: 6, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999, borderWidth: 1,
                           backgroundColor: sel ? T.accentBg : 'transparent', borderColor: sel ? T.accent : T.border}}>
-                        <Text style={{fontSize: fs(11), color: sel ? T.accent : T.dim}} importantForAccessibility="no">{label}</Text>
+                        <Text style={{fontSize: fs(11), color: sel ? T.accent : T.dim}} accessibilityElementsHidden importantForAccessibility="no">{label}</Text>
                       </TouchableOpacity>
                     );
                   })}
@@ -492,8 +841,54 @@ export const NetworkScreen = ({theme: T, members = [], groups = [], journal = []
                     <Text style={{fontSize: fs(11), color: T.accent}}>{`${editBucket[f].ids.length} ✎`}</Text>
                   </TouchableOpacity>
                 )}
+                {f === 'front' && editBucket.front.mode !== 'none' && (
+                  <View style={{flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 8}}>
+                    {([['frontMood', t('modal.mood')], ['frontLocation', t('modal.location')], ['frontNote', t('modal.note')]] as const).map(([key, label]) => {
+                      const on = editBucket[key] !== false;
+                      return (
+                        <TouchableOpacity key={key} onPress={() => setEditBucket({...editBucket, [key]: !on})} activeOpacity={0.7}
+                          accessibilityRole="checkbox" accessibilityState={{checked: on}} accessibilityLabel={label}
+                          style={{flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999, borderWidth: 1,
+                            backgroundColor: on ? T.accentBg : 'transparent', borderColor: on ? T.accent : T.border}}>
+                          <Text style={{fontSize: fs(11), color: on ? T.accent : T.dim}} accessibilityElementsHidden importantForAccessibility="no">{on ? '✓ ' : ''}{label}</Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                )}
               </View>
             ))}
+            {editBucket && (
+              <View style={{paddingHorizontal: 16, paddingVertical: 8, borderTopWidth: 1, borderTopColor: T.border}}>
+                <Text style={{fontSize: fs(13), fontWeight: '600', color: T.text, marginBottom: 6}}>{t('network.friends')}</Text>
+                {net.friends.filter(f => f.kind !== 'device' && f.status === 'accepted').length === 0 ? (
+                  <Text style={{fontSize: fs(11), color: T.dim}}>{t('network.noFriends')}</Text>
+                ) : (
+                  <View>
+                    {net.friends.filter(f => f.kind !== 'device' && f.status === 'accepted').map(f => {
+                      const checked = (editBucket.friendPeerIds || []).includes(f.peerId);
+                      return (
+                        <TouchableOpacity key={f.peerId} activeOpacity={0.7}
+                          onPress={() => setEditBucket({
+                            ...editBucket,
+                            friendPeerIds: checked
+                              ? (editBucket.friendPeerIds || []).filter(id => id !== f.peerId)
+                              : [...(editBucket.friendPeerIds || []), f.peerId],
+                          })}
+                          accessibilityRole="checkbox" accessibilityState={{checked}} accessibilityLabel={f.displayName}
+                          style={{flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 7}}>
+                          <View style={{width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: checked ? T.accent : T.border, backgroundColor: checked ? T.accent : 'transparent', alignItems: 'center', justifyContent: 'center'}} accessibilityElementsHidden importantForAccessibility="no">
+                            {checked && <Text style={{fontSize: fs(11), fontWeight: '700', color: T.bg}}>✓</Text>}
+                          </View>
+                          <Text style={{flex: 1, fontSize: fs(13), color: T.text}} numberOfLines={1} accessibilityElementsHidden importantForAccessibility="no">{f.displayName}</Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                )}
+              </View>
+            )}
+            </ScrollView>
             <View style={{flexDirection: 'row', gap: 10, padding: 16, borderTopWidth: 1, borderTopColor: T.border}}>
               <TouchableOpacity onPress={() => setEditBucket(null)} activeOpacity={0.7} accessibilityRole="button" accessibilityLabel={t('common.cancel')}
                 style={{flex: 1, alignItems: 'center', paddingVertical: 11, borderRadius: 8, borderWidth: 1, borderColor: T.border}}>
@@ -511,7 +906,7 @@ export const NetworkScreen = ({theme: T, members = [], groups = [], journal = []
 
       <Modal visible={!!editBucket && !!pickerFeature} transparent animationType="fade" onRequestClose={() => setPickerFeature(null)}>
         <View style={{flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', padding: 24}}>
-          <View style={{backgroundColor: T.card, borderRadius: 14, borderWidth: 1, borderColor: T.border, maxHeight: '75%', overflow: 'hidden'}}>
+          <View accessibilityViewIsModal onAccessibilityEscape={() => setPickerFeature(null)} style={{backgroundColor: T.card, borderRadius: 14, borderWidth: 1, borderColor: T.border, maxHeight: '75%', overflow: 'hidden'}}>
             <Text accessibilityRole="header" style={{fontSize: fs(15), fontWeight: '600', color: T.text, padding: 16, paddingBottom: 8}}>
               {pickerFeature ? featureLabel(pickerFeature) : ''} — {t('network.scopeSelect')}
             </Text>
@@ -520,26 +915,29 @@ export const NetworkScreen = ({theme: T, members = [], groups = [], journal = []
                 <TextInput value={pickerSearch} onChangeText={setPickerSearch} placeholder={t('common.search')} placeholderTextColor={T.muted} style={inputStyle} accessibilityLabel={t('common.search')} />
               </View>
             )}
+            {pickerItems.length > 0 && (
+              <TouchableOpacity onPress={toggleSelectAllPicked} activeOpacity={0.7} accessibilityRole="checkbox"
+                accessibilityState={{checked: allPickedChecked}} accessibilityLabel={allPickedChecked ? t('network.deselectAll') : t('network.selectAll')}
+                style={{flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingVertical: 10, borderTopWidth: 1, borderTopColor: T.border}}>
+                <View style={{width: 20, height: 20, borderRadius: 6, borderWidth: 2, borderColor: T.accent, backgroundColor: allPickedChecked ? T.accent : 'transparent', alignItems: 'center', justifyContent: 'center'}} accessibilityElementsHidden importantForAccessibility="no">
+                  {allPickedChecked && <Text style={{fontSize: fs(11), fontWeight: '700', color: T.bg}}>✓</Text>}
+                </View>
+                <Text style={{flex: 1, fontSize: fs(13), fontWeight: '600', color: T.accent}} numberOfLines={1} accessibilityElementsHidden importantForAccessibility="no">
+                  {allPickedChecked ? t('network.deselectAll') : t('network.selectAll')}
+                </Text>
+              </TouchableOpacity>
+            )}
             <ScrollView style={{maxHeight: 340}}>
-              {(pickerFeature === 'groups'
-                ? groups.map(g => ({id: g.id, name: g.name}))
-                : pickerFeature === 'journal'
-                ? journal
-                    .filter(e => !pickerSearch.trim() || (e.title || '').toLowerCase().includes(pickerSearch.trim().toLowerCase()))
-                    .map(e => ({id: e.id, name: `${e.password ? '🔒 ' : ''}${e.title || fmtTime(e.timestamp)}`}))
-                : pickableMembers
-                    .filter(m => !pickerSearch.trim() || m.name.toLowerCase().includes(pickerSearch.trim().toLowerCase()))
-                    .map(m => ({id: m.id, name: m.name}))
-              ).map(item => {
+              {pickerItems.map(item => {
                 const checked = !!(editBucket && pickerFeature && editBucket[pickerFeature].ids.includes(item.id));
                 return (
                   <TouchableOpacity key={item.id} onPress={() => togglePickId(item.id)} activeOpacity={0.7}
                     accessibilityRole="checkbox" accessibilityState={{checked}} accessibilityLabel={item.name}
                     style={{flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingVertical: 10, borderTopWidth: 1, borderTopColor: T.border}}>
-                    <View style={{width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: checked ? T.accent : T.border, backgroundColor: checked ? T.accent : 'transparent', alignItems: 'center', justifyContent: 'center'}} importantForAccessibility="no">
+                    <View style={{width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: checked ? T.accent : T.border, backgroundColor: checked ? T.accent : 'transparent', alignItems: 'center', justifyContent: 'center'}} accessibilityElementsHidden importantForAccessibility="no">
                       {checked && <Text style={{fontSize: fs(11), fontWeight: '700', color: T.bg}}>✓</Text>}
                     </View>
-                    <Text style={{flex: 1, fontSize: fs(13), color: T.text}} numberOfLines={1} importantForAccessibility="no">{item.name}</Text>
+                    <Text style={{flex: 1, fontSize: fs(13), color: T.text}} numberOfLines={1} accessibilityElementsHidden importantForAccessibility="no">{item.name}</Text>
                   </TouchableOpacity>
                 );
               })}
@@ -551,6 +949,58 @@ export const NetworkScreen = ({theme: T, members = [], groups = [], journal = []
           </View>
         </View>
       </Modal>
+
+      <Modal visible={!!mirrorMenuFor} transparent animationType="fade" onRequestClose={() => setMirrorMenuFor(null)}>
+        <TouchableOpacity style={{flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', padding: 24}} activeOpacity={1} onPress={() => setMirrorMenuFor(null)} accessible={false} importantForAccessibility="no">
+          <View accessibilityViewIsModal onAccessibilityEscape={() => setMirrorMenuFor(null)} style={{backgroundColor: T.card, borderRadius: 14, borderWidth: 1, borderColor: T.border, overflow: 'hidden'}}>
+            <Text accessibilityRole="header" style={{fontSize: fs(15), fontWeight: '600', color: T.text, padding: 16, paddingBottom: 8}} numberOfLines={1}>
+              {mirrorMenuFor?.displayName} — {t('network.viewShared')}
+            </Text>
+            {mirrorMenuFor && (
+              <Text style={{fontSize: fs(11), color: T.dim, paddingHorizontal: 16, paddingBottom: 12}}>
+                {BUCKET_ROWS
+                  .map(f => `${featureLabel(f)}: ${scopeSummary(effectiveShare(mirrorMenuFor.peerId, f))}`)
+                  .join('  ·  ')}
+              </Text>
+            )}
+            {([
+              {feature: 'systemProfile' as MirrorFeature, label: t('systemProfile.title')},
+              {feature: 'members' as MirrorFeature, label: t('tabs.members')},
+              {feature: 'groups' as MirrorFeature, label: t('members.fieldGroups')},
+              {feature: 'journal' as MirrorFeature, label: t('tabs.journal')},
+              {feature: 'history' as MirrorFeature, label: t('tabs.history')},
+              {feature: 'whiteboard' as MirrorFeature, label: t('whiteboard.title')},
+              {feature: 'planner' as MirrorFeature, label: t('planner.title')},
+            ]).map(opt => (
+              <TouchableOpacity key={opt.feature} activeOpacity={0.7}
+                onPress={() => {
+                  const f = mirrorMenuFor;
+                  setMirrorMenuFor(null);
+                  if (f) setMirror({peerId: f.peerId, name: f.displayName, feature: opt.feature});
+                }}
+                accessibilityRole="button" accessibilityLabel={opt.label}
+                style={{paddingHorizontal: 16, paddingVertical: 13, borderTopWidth: 1, borderTopColor: T.border}}>
+                <Text style={{fontSize: fs(14), color: T.text}}>{opt.label}</Text>
+              </TouchableOpacity>
+            ))}
+            <TouchableOpacity onPress={() => setMirrorMenuFor(null)} activeOpacity={0.7} accessibilityRole="button" accessibilityLabel={t('common.cancel')}
+              style={{alignItems: 'center', paddingVertical: 13, borderTopWidth: 1, borderTopColor: T.border}}>
+              <Text style={{fontSize: fs(13), color: T.dim}}>{t('common.cancel')}</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {mirror && (
+        <MirrorScreen
+          theme={T}
+          visible
+          peerId={mirror.peerId}
+          displayName={mirror.name}
+          feature={mirror.feature}
+          onClose={() => setMirror(null)}
+        />
+      )}
     </View>
   );
 };

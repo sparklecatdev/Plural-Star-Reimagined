@@ -1,34 +1,37 @@
-import React, {useState} from 'react';
+import React, {useState, useMemo} from 'react';
 import {View, ScrollView, StyleSheet, TouchableOpacity, Image} from 'react-native';
 import {Text} from '../components/AppText';
 import {useTranslation} from 'react-i18next';
-import {Fonts, UI} from '../theme';
+import {Fonts, fontScale, ThemeColors, initialOn, profileTheme} from '../theme';
 import {AccentText} from '../components/AccentText';
 import {RichText} from '../components/MarkdownRenderer';
-import {Member, FrontState, getInitials, allFrontMemberIds} from '../utils';
+import {Member, FrontState, getInitials, allFrontMemberIds, singletStatuses, isValidHex} from '../utils';
+import {useAppStore} from '../store/appStore';
 
 type SubTab = 'profile' | 'statuses';
 
 interface Props {
-  theme: any;
+  theme: ThemeColors;
   member?: Member;
-  statuses: Member[];
-  front: FrontState | null;
   onEditProfile: () => void;
   onAddStatus: () => void;
   onEditStatus: (m: Member) => void;
 }
 
-export const ProfileScreen = ({theme: T, member, statuses, front, onEditProfile, onAddStatus, onEditStatus}: Props) => {
+export const ProfileScreen = ({theme: T, member, onEditProfile, onAddStatus, onEditStatus}: Props) => {
+  const front = useAppStore(s => s.front);
+  const members = useAppStore(s => s.members);
+  const statuses = singletStatuses(members);
   const {t} = useTranslation();
-  const fs = (n: number) => Math.round(n * (T.textScale || 1));
+  const fs = fontScale(T);
   const [subTab, setSubTab] = useState<SubTab>('profile');
   const activeIds = allFrontMemberIds(front);
+  const bgOn = !!member?.profileBg && isValidHex(member.color);
+  const P = useMemo(() => (bgOn && member ? profileTheme(T, member.color) : T), [bgOn, T, member?.color]);
 
   return (
     <View style={{flex: 1, backgroundColor: T.bg}}>
-      <View style={{paddingHorizontal: UI.screenPadding, paddingTop: UI.screenPadding}}>
-        <View style={[s.headerCard, {backgroundColor: T.card, borderColor: T.border}]}>
+      <View style={{paddingHorizontal: 16, paddingTop: 16}}>
         <View style={{flexDirection: 'row', alignItems: 'center'}}>
           <Text accessibilityRole="header" style={[s.heading, {color: T.text, flex: 1, fontSize: fs(22)}]} numberOfLines={1} maxFontSizeMultiplier={1.2}>
             {t('tabs.profile')}
@@ -45,63 +48,58 @@ export const ProfileScreen = ({theme: T, member, statuses, front, onEditProfile,
             </TouchableOpacity>
           )}
         </View>
-        <View style={[s.segmentWrap, {backgroundColor: T.surface, borderColor: T.border}]}>
+        <View style={{flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: T.border, marginTop: 4}}>
           {(['profile', 'statuses'] as SubTab[]).map(tab => (
             <TouchableOpacity key={tab} onPress={() => setSubTab(tab)} activeOpacity={0.7}
               accessibilityRole="tab" accessibilityState={{selected: subTab === tab}}
-              style={[s.subtab, subTab === tab && {backgroundColor: T.accentBg, borderColor: `${T.accent}45`}]}>
-              <AccentText T={T} numberOfLines={2} maxFontSizeMultiplier={1.3} style={{fontSize: fs(13), textAlign: 'center', fontWeight: subTab === tab ? '600' : '500', color: subTab === tab ? T.accent : T.dim}}>
+              style={[s.subtab, {flex: 1, alignItems: 'center', borderBottomWidth: 2, borderBottomColor: subTab === tab ? T.accent : 'transparent'}]}>
+              <AccentText T={T} numberOfLines={2} maxFontSizeMultiplier={1.3} style={{fontSize: fs(13), textAlign: 'center', fontWeight: subTab === tab ? '600' : '400', color: subTab === tab ? T.accent : T.dim}}>
                 {tab === 'profile' ? t('tabs.profile') : t('profile.statuses')}
               </AccentText>
             </TouchableOpacity>
           ))}
         </View>
       </View>
-      </View>
 
       {subTab === 'profile' && (
-        <ScrollView style={{flex: 1}} contentContainerStyle={{paddingHorizontal: UI.screenPadding, paddingTop: 8, paddingBottom: 140}}>
-          <View style={[s.profileShell, {backgroundColor: T.card, borderColor: T.border}]}>
-            {member?.banner ? (
-              <Image source={{uri: member.banner}} style={s.banner} resizeMode="cover" />
-            ) : (
-              <View style={[s.bannerFallback, {backgroundColor: T.accentBg}]} />
-            )}
-            <View style={[s.profileCard, {backgroundColor: T.bg, borderColor: T.border}]}>
-            <View style={{alignItems: 'center', marginBottom: 14}}>
+        <ScrollView style={{flex: 1, backgroundColor: P.bg}} contentContainerStyle={{paddingBottom: 140}}>
+          {member?.banner ? (
+            <Image source={{uri: member.banner}} accessibilityElementsHidden importantForAccessibility="no" style={{width: '100%', aspectRatio: 3}} resizeMode="cover" />
+          ) : null}
+          <View style={{paddingHorizontal: 16, paddingTop: member?.banner ? 0 : 20}}>
+            <View style={{alignItems: 'center', marginTop: member?.banner ? -36 : 0, marginBottom: 14}}>
               {member?.avatar ? (
-                <Image source={{uri: member.avatar}} accessibilityRole="image" accessibilityLabel={member.name} style={{width: 88, height: 88, borderRadius: 20, borderWidth: 2, borderColor: member.color || T.accent}} resizeMode="cover" />
+                <Image source={{uri: member.avatar}} accessibilityRole="image" accessibilityLabel={member.name} style={{width: 88, height: 88, borderRadius: 20, borderWidth: 2, borderColor: bgOn ? P.border : (member.color || T.accent)}} resizeMode="cover" />
               ) : (
-                <View style={{width: 88, height: 88, borderRadius: 20, backgroundColor: member?.color || T.accent, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: 'rgba(255,255,255,0.15)'}}>
-                  <Text style={{fontSize: fs(30), fontWeight: '700', color: 'rgba(0,0,0,0.75)'}}>{getInitials(member?.name || '?')}</Text>
+                <View style={{width: 88, height: 88, borderRadius: 20, backgroundColor: bgOn ? P.surface : (member?.color || T.accent), alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: bgOn ? P.border : 'rgba(255,255,255,0.15)'}}>
+                  <Text style={{fontSize: fs(30), fontWeight: '700', color: bgOn ? P.text : initialOn(member?.color || T.accent), includeFontPadding: false, textAlign: 'center', textAlignVertical: 'center'}}>{getInitials(member?.name || '?')}</Text>
                 </View>
               )}
-              <Text style={{fontSize: fs(22), fontWeight: '600', color: T.text, marginTop: 10, textAlign: 'center'}} numberOfLines={2}>
+              <Text style={{fontSize: fs(22), fontWeight: '600', color: P.text, marginTop: 10, textAlign: 'center'}} numberOfLines={2}>
                 {member?.name || t('profile.notSetUp')}
               </Text>
-              {member?.pronouns ? <Text style={{fontSize: fs(14), color: T.dim, marginTop: 3}}>{member.pronouns}</Text> : null}
+              {member?.pronouns ? <Text style={{fontSize: fs(14), color: P.dim, marginTop: 3}}>{member.pronouns}</Text> : null}
               {member ? (
                 <View style={{flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8}}>
-                  <Text style={{fontSize: fs(10), letterSpacing: 1, textTransform: 'uppercase', color: T.dim, fontWeight: '600'}}>{t('profile.favoriteColor')}</Text>
-                  <View style={{width: 16, height: 16, borderRadius: 8, backgroundColor: member.color || T.accent, borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)'}} />
+                  <Text style={{fontSize: fs(10), letterSpacing: 1, textTransform: 'uppercase', color: P.dim, fontWeight: '600'}}>{t('profile.favoriteColor')}</Text>
+                  <View style={{width: 16, height: 16, borderRadius: 8, backgroundColor: member.color || T.accent, borderWidth: 1, borderColor: bgOn ? P.border : 'rgba(255,255,255,0.2)'}} />
                 </View>
               ) : null}
             </View>
 
-            <View style={[s.card, {backgroundColor: T.surface, borderColor: T.border, padding: 16}]}>
+            <View style={[s.card, {backgroundColor: bgOn ? P.surface : T.card, borderColor: P.border, padding: 14}]}>
               {member?.description ? (
-                <RichText text={member.description} T={T} />
+                <RichText text={member.description} T={P} />
               ) : (
-                <Text style={{fontSize: fs(12), color: T.muted, fontStyle: 'italic'}}>{t('profile.noDescription')}</Text>
+                <Text style={{fontSize: fs(12), color: P.muted, fontStyle: 'italic'}}>{t('profile.noDescription')}</Text>
               )}
-            </View>
             </View>
           </View>
         </ScrollView>
       )}
 
       {subTab === 'statuses' && (
-        <ScrollView style={{flex: 1}} contentContainerStyle={{padding: UI.screenPadding, paddingBottom: 140}}>
+        <ScrollView style={{flex: 1}} contentContainerStyle={{padding: 16, paddingBottom: 140}}>
           <Text style={{fontSize: fs(11), color: T.muted, marginBottom: 12, lineHeight: fs(16)}}>{t('profile.statusesDesc')}</Text>
           {statuses.length === 0 ? (
             <View style={[s.card, {backgroundColor: T.card, borderColor: T.border, padding: 18, alignItems: 'center'}]}>
@@ -122,7 +120,7 @@ export const ProfileScreen = ({theme: T, member, statuses, front, onEditProfile,
                         <Text style={{fontSize: fs(10), color: T.success, fontWeight: '600'}}>{t('profile.activeStatus')}</Text>
                       </View>
                     )}
-                    <Text style={{fontSize: fs(12), color: T.muted}}>›</Text>
+                    <Text style={{fontSize: fs(12), color: T.muted}} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">›</Text>
                   </TouchableOpacity>
                 );
               })}
@@ -135,14 +133,8 @@ export const ProfileScreen = ({theme: T, member, statuses, front, onEditProfile,
 };
 
 const s = StyleSheet.create({
-  headerCard: {borderRadius: UI.radiusLg, borderWidth: 1, padding: 14, marginBottom: 8},
-  heading: {fontFamily: Fonts.display, letterSpacing: -0.5},
-  segmentWrap: {flexDirection: 'row', borderWidth: 1, borderRadius: UI.radiusMd, padding: 4, marginTop: 12},
-  subtab: {flex: 1, alignItems: 'center', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 14, borderWidth: 1, borderColor: 'transparent'},
-  btn: {paddingHorizontal: 14, paddingVertical: 8, borderRadius: 12, borderWidth: 1},
-  profileShell: {borderRadius: UI.radiusLg, borderWidth: 1, overflow: 'hidden'},
-  banner: {width: '100%', aspectRatio: 2.4},
-  bannerFallback: {width: '100%', aspectRatio: 2.4},
-  profileCard: {margin: 12, marginTop: -48, borderRadius: UI.radiusLg, borderWidth: 1, padding: 16},
-  card: {borderRadius: UI.radiusMd, borderWidth: 1},
+  heading: {fontFamily: Fonts.display, fontWeight: '600', fontStyle: 'italic'},
+  subtab: {paddingHorizontal: 16, paddingVertical: 10, marginBottom: -1},
+  btn: {paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, borderWidth: 1},
+  card: {borderRadius: 14, borderWidth: 1},
 });

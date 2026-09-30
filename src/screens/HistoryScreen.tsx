@@ -1,18 +1,35 @@
 import React, {useState, useMemo, useCallback, useDeferredValue} from 'react';
-import {View, ScrollView, TouchableOpacity, StyleSheet, Alert} from 'react-native';
+import {View, ScrollView, TouchableOpacity, StyleSheet, Alert, useWindowDimensions} from 'react-native';
 import {Text, TextInput} from '../components/AppText';
 import {Avatar} from '../components/Avatar';
 import {useTranslation} from 'react-i18next';
-import {Fonts, UI} from '../theme';
+import {Fonts, fontScale, ThemeColors} from '../theme';
+import {useAppStore} from '../store/appStore';
+import {useMinuteTick} from '../hooks/useMinuteTick';
+import {saveHistory} from '../store/actions';
 import {AccentText} from '../components/AccentText';
-import {HistoryEntry, JournalEntry, Member, FrontTierKey, fmtTime, fmtDate, fmtDur, TIER_LABELS, translateMood, sortMembersBySearch, singletStatuses, buildEffectiveEnd} from '../utils';
+import {HistoryEntry, JournalEntry, Member, FrontTierKey, fmtTime, fmtDate, fmtDur, fmtNum, TIER_LABELS, translateMood, sortMembersBySearch, memberMatchesSearch, singletStatuses, buildEffectiveEnd} from '../utils';
 import {store, KEYS} from '../storage';
 import {FlashList} from '@shopify/flash-list';
+import {FrontTimeline} from '../components/FrontTimeline';
 
 const memberInEntry = (memberId: string, entry: HistoryEntry): boolean =>
   (entry.memberIds || []).includes(memberId) ||
   (entry.coFrontIds || []).includes(memberId) ||
   (entry.coConsciousIds || []).includes(memberId);
+
+const tierDetailsFor = (memberId: string, entry: HistoryEntry): {mood?: string; note?: string; location?: string; energy?: number} => {
+  const tier = memberTierInEntry(memberId, entry);
+  if (tier === 'coFront') return {mood: entry.coFrontMood, note: entry.coFrontNote, location: entry.coFrontLocation, energy: entry.coFrontEnergy};
+  if (tier === 'coConscious') return {mood: entry.coConsciousMood, note: entry.coConsciousNote, location: entry.coConsciousLocation, energy: entry.coConsciousEnergy};
+  return {mood: entry.mood, note: entry.note, location: entry.location, energy: entry.energyLevel};
+};
+
+const changeTierDetailsFor = (entry: HistoryEntry): {mood?: string; note?: string; location?: string; energy?: number} => {
+  if (entry.changeTier === 'coFront') return {mood: entry.coFrontMood, note: entry.coFrontNote, location: entry.coFrontLocation, energy: entry.coFrontEnergy};
+  if (entry.changeTier === 'coConscious') return {mood: entry.coConsciousMood, note: entry.coConsciousNote, location: entry.coConsciousLocation, energy: entry.coConsciousEnergy};
+  return {mood: entry.mood, note: entry.note, location: entry.location, energy: entry.energyLevel};
+};
 
 const memberTierInEntry = (memberId: string, entry: HistoryEntry): FrontTierKey | null =>
   (entry.memberIds || []).includes(memberId) ? 'primary'
@@ -20,23 +37,22 @@ const memberTierInEntry = (memberId: string, entry: HistoryEntry): FrontTierKey 
   : (entry.coConsciousIds || []).includes(memberId) ? 'coConscious'
   : null;
 
-type SubTab = 'front' | 'member';
+type SubTab = 'front' | 'member' | 'timeline';
 
 interface Props {
-  theme: any;
-  history: HistoryEntry[];
-  journal: JournalEntry[];
-  getMember: (id: string) => Member | undefined;
-  members: Member[];
+  theme: ThemeColors;
   singlet?: boolean;
   selfId?: string;
-  onSaveHistory: (h: HistoryEntry[]) => void;
   onEditEntry?: (originalIndex: number) => void;
+  readOnly?: boolean;
+  historyOverride?: HistoryEntry[];
+  membersOverride?: Member[];
+  journalOverride?: JournalEntry[];
 }
 
 const TierRow = React.memo(function TierRow({label, ids, color, expanded, cap, memberMap, fs, T}: {
   label: string; ids: string[] | undefined; color: string; expanded?: boolean; cap?: number;
-  memberMap: Map<string, Member>; fs: (n: number) => number; T: any;
+  memberMap: Map<string, Member>; fs: (n: number) => number; T: ThemeColors;
 }) {
   const allMembers = (ids || []).map(id => memberMap.get(id)).filter(Boolean) as Member[];
   if (allMembers.length === 0) return null;
@@ -59,7 +75,7 @@ interface FrontHistoryEntryRowProps {
   entryKey: string;
   isExpanded: boolean;
   memberMap: Map<string, Member>;
-  T: any;
+  T: ThemeColors;
   fs: (n: number) => number;
   t: (key: string, opts?: any) => string;
   selfId?: string;
@@ -67,7 +83,7 @@ interface FrontHistoryEntryRowProps {
   effectiveEnd: number | null;
   onToggleExpand: (key: string) => void;
   onEditEntry?: (originalIndex: number) => void;
-  onDelete: (originalIndex: number) => void;
+  onDelete?: (originalIndex: number) => void;
 }
 
 const FrontHistoryEntryRow = React.memo(function FrontHistoryEntryRow({
@@ -104,8 +120,8 @@ const FrontHistoryEntryRow = React.memo(function FrontHistoryEntryRow({
         {!isLastInGroup &&
           <View style={{flex: 1, width: 1, backgroundColor: T.border, marginTop: 2}} />}
       </View>
-      <View style={[s.card, {flex: 1, backgroundColor: T.surface,
-        borderColor: isOpen ? `${T.accent}22` : 'transparent', marginBottom: 10}]}>
+      <View style={[s.card, {flex: 1, backgroundColor: T.card,
+        borderColor: isOpen ? `${T.accent}40` : T.border, marginBottom: 8}]}>
         <View style={{flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 4}}>
           <View style={{flexDirection: 'row'}}>
             {primaryFronters.slice(0, 3).map((m, j) => (
@@ -131,24 +147,65 @@ const FrontHistoryEntryRow = React.memo(function FrontHistoryEntryRow({
           {fmtTime(entry.startTime)}
           {isOpen ? ` → ${t('history.now')}` : displayEnd ? ` → ${fmtTime(displayEnd)}` : ''}
         </Text>
-        {(entry.mood || entry.location) && (
+        {(entry.mood || entry.location || entry.energyLevel !== undefined) && (
           <View style={{flexDirection: 'row', gap: 8, flexWrap: 'wrap', marginBottom: 4}}>
             {entry.mood && (
-              <View style={[s.badge, {backgroundColor: T.card}]}>
+              <View style={[s.badge, {backgroundColor: T.surface}]}>
                 <Text style={{fontSize: fs(10), color: T.dim}}>{t('history.mood')} </Text>
                 <Text style={{fontSize: fs(11), color: T.text, fontWeight: '500'}}>{translateMood(entry.mood, t)}</Text>
               </View>
             )}
             {entry.location && (
-              <View style={[s.badge, {backgroundColor: T.card}]}>
+              <View style={[s.badge, {backgroundColor: T.surface}]}>
                 <Text style={{fontSize: fs(10), color: T.dim}}>{t('history.at')} </Text>
-                <Text style={{fontSize: fs(11), color: T.text, fontWeight: '500'}}>{entry.location}</Text>
+                <Text style={{flexShrink: 1, fontSize: fs(11), color: T.text, fontWeight: '500'}} numberOfLines={1}>{entry.location}</Text>
+              </View>
+            )}
+            {entry.energyLevel !== undefined && (
+              <View style={[s.badge, {backgroundColor: T.surface}]}>
+                <Text style={{fontSize: fs(10), color: T.dim}}>{t('energy.label')} </Text>
+                <Text style={{fontSize: fs(11), color: T.text, fontWeight: '500'}}>{entry.energyLevel}/10</Text>
               </View>
             )}
           </View>
         )}
+        {isExpanded && ([
+          {label: t('tier.coFrontShort'), color: T.info, mood: entry.coFrontMood, location: entry.coFrontLocation, energy: entry.coFrontEnergy, note: entry.coFrontNote},
+          {label: t('tier.coConShort'), color: T.success, mood: entry.coConsciousMood, location: entry.coConsciousLocation, energy: entry.coConsciousEnergy, note: entry.coConsciousNote},
+        ] as const).map(td => (
+          (td.mood || td.location || td.energy !== undefined || td.note) ? (
+            <View key={td.label} style={{marginBottom: 4}}>
+              <View style={{flexDirection: 'row', gap: 8, flexWrap: 'wrap', alignItems: 'center'}}>
+                <Text style={{fontSize: fs(10), color: td.color, fontWeight: '600'}}>{td.label}</Text>
+                {td.mood ? (
+                  <View style={[s.badge, {backgroundColor: T.surface}]}>
+                    <Text style={{fontSize: fs(10), color: T.dim}}>{t('history.mood')} </Text>
+                    <Text style={{fontSize: fs(11), color: T.text, fontWeight: '500'}}>{translateMood(td.mood, t)}</Text>
+                  </View>
+                ) : null}
+                {td.location ? (
+                  <View style={[s.badge, {backgroundColor: T.surface}]}>
+                    <Text style={{fontSize: fs(10), color: T.dim}}>{t('history.at')} </Text>
+                    <Text style={{flexShrink: 1, fontSize: fs(11), color: T.text, fontWeight: '500'}} numberOfLines={1}>{td.location}</Text>
+                  </View>
+                ) : null}
+                {td.energy !== undefined ? (
+                  <View style={[s.badge, {backgroundColor: T.surface}]}>
+                    <Text style={{fontSize: fs(10), color: T.dim}}>{t('energy.label')} </Text>
+                    <Text style={{fontSize: fs(11), color: T.text, fontWeight: '500'}}>{td.energy}/10</Text>
+                  </View>
+                ) : null}
+              </View>
+              {td.note ? (
+                <View style={{backgroundColor: T.surface, borderRadius: 6, padding: 7, marginTop: 4}}>
+                  <Text style={{fontSize: fs(12), color: T.dim, lineHeight: 17}}>{td.note}</Text>
+                </View>
+              ) : null}
+            </View>
+          ) : null
+        ))}
         {entry.note ? (
-          <View style={{backgroundColor: T.card, borderRadius: UI.radiusSm, padding: 10}}>
+          <View style={{backgroundColor: T.surface, borderRadius: 6, padding: 8}}>
             <Text style={{fontSize: fs(12), color: T.dim, lineHeight: 18}}>{entry.note}</Text>
           </View>
         ) : null}
@@ -170,11 +227,13 @@ const FrontHistoryEntryRow = React.memo(function FrontHistoryEntryRow({
                 <Text style={{fontSize: fs(10), color: T.accent, opacity: 0.8}}>{t('history.editEntry')}</Text>
               </TouchableOpacity>
             )}
-            <TouchableOpacity onPress={() => onDelete(originalIndex)} activeOpacity={0.7}
-              accessibilityRole="button" accessibilityLabel={t('history.deleteEntry')}
-              style={{paddingVertical: 2, paddingHorizontal: 6}}>
-              <Text style={{fontSize: fs(10), color: T.danger, opacity: 0.6}}>{t('history.deleteEntry')}</Text>
-            </TouchableOpacity>
+            {onDelete && (
+              <TouchableOpacity onPress={() => onDelete(originalIndex)} activeOpacity={0.7}
+                accessibilityRole="button" accessibilityLabel={t('history.deleteEntry')}
+                style={{paddingVertical: 2, paddingHorizontal: 6}}>
+                <Text style={{fontSize: fs(10), color: T.danger, opacity: 0.6}}>{t('history.deleteEntry')}</Text>
+              </TouchableOpacity>
+            )}
           </View>
         </View>
       </View>
@@ -182,9 +241,20 @@ const FrontHistoryEntryRow = React.memo(function FrontHistoryEntryRow({
   );
 });
 
-export const HistoryScreen = ({theme: T, history, journal, getMember, members, singlet = false, selfId, onSaveHistory, onEditEntry}: Props) => {
+export const HistoryScreen = ({theme: T, singlet = false, selfId, onEditEntry, readOnly = false, historyOverride, membersOverride, journalOverride}: Props) => {
+  useMinuteTick();
+  const storeHistory = useAppStore(s => s.history);
+  const storeJournal = useAppStore(s => s.journal);
+  const storeMembers = useAppStore(s => s.members);
+  const history = historyOverride ?? storeHistory;
+  const journal = journalOverride ?? storeJournal;
+  const members = membersOverride ?? storeMembers;
+  const onSaveHistory = saveHistory;
+  const getMember = (id: string) => members.find(m => m.id === id);
   const {t} = useTranslation();
-  const fs = useCallback((s: number) => Math.round(s * (T.textScale || 1)), [T.textScale]);
+  const fs = useCallback(fontScale(T), [T.textScale]);
+  const win = useWindowDimensions();
+  const landscape = win.width > win.height;
   const [subTab, setSubTab] = useState<SubTab>('front');
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
   const [memberSearch, setMemberSearch] = useState('');
@@ -282,11 +352,11 @@ export const HistoryScreen = ({theme: T, history, journal, getMember, members, s
         singlet={singlet}
         effectiveEnd={item.effectiveEnd}
         onToggleExpand={toggleEntryExpanded}
-        onEditEntry={onEditEntry}
-        onDelete={startDelete}
+        onEditEntry={readOnly ? undefined : onEditEntry}
+        onDelete={readOnly ? undefined : startDelete}
       />
     );
-  }, [expandedEntries, memberMap, T, fs, t, singlet, selfId, toggleEntryExpanded, onEditEntry, startDelete]);
+  }, [expandedEntries, memberMap, T, fs, t, singlet, selfId, toggleEntryExpanded, onEditEntry, startDelete, readOnly]);
 
   const tierNames = (ids: string[] | undefined) =>
     (ids || []).map(id => memberMap.get(id)).filter(Boolean).map(m => m!.name).join(', ');
@@ -318,6 +388,7 @@ export const HistoryScreen = ({theme: T, history, journal, getMember, members, s
       ...mergedSessions.map(m => ({
         type: 'front',
         time: m.startTime,
+        tier: m.tier,
         entry: {...m.last, startTime: m.startTime, endTime: m.endTime},
       })),
       ...history
@@ -342,52 +413,67 @@ export const HistoryScreen = ({theme: T, history, journal, getMember, members, s
     journal:  '📖',
   };
 
-  const getEventLabel = (type: string, entry: HistoryEntry): string => {
-    const tierSuffix = entry.changeTier && entry.changeTier !== 'primary' ? t('history.tierSuffix', {tier: t(`tier.${entry.changeTier === 'coFront' ? 'coFront' : 'coConscious'}`)}) : '';
-    if ((type === 'mood' || type === 'location') && entry.mood && entry.location) return t('history.moodLocationChanged') + tierSuffix;
+  const eventDetails = (type: string, entry: HistoryEntry) =>
+    type === 'mood' || type === 'location' || type === 'note'
+      ? changeTierDetailsFor(entry)
+      : selectedMemberId
+      ? tierDetailsFor(selectedMemberId, entry)
+      : {mood: entry.mood, note: entry.note, location: entry.location, energy: entry.energyLevel};
+
+  const suffixFor = (tier?: FrontTierKey | null): string =>
+    tier && tier !== 'primary' ? t('history.tierSuffix', {tier: t(`tier.${tier === 'coFront' ? 'coFront' : 'coConscious'}`)}) : '';
+
+  const getEventLabel = (type: string, entry: HistoryEntry, d: {mood?: string; location?: string}, frontTier?: FrontTierKey | null): string => {
+    const tierSuffix = suffixFor(entry.changeTier);
+    if ((type === 'mood' || type === 'location') && d.mood && d.location) return t('history.moodLocationChanged') + tierSuffix;
     if (type === 'mood')     return t('history.moodChanged') + tierSuffix;
     if (type === 'location') return t('history.locationChanged') + tierSuffix;
     if (type === 'note')     return t('history.noteUpdated') + tierSuffix;
     if (type === 'journal')  return t('history.journalEntry');
-    return singlet ? t('history.statusChange') : t('history.frontSwitch');
+    return (singlet ? t('history.statusChange') : t('history.frontSwitch')) + (singlet ? '' : suffixFor(frontTier));
   };
+  const tierColor = (tier?: FrontTierKey | null): string => tier === 'coFront' ? T.info : tier === 'coConscious' ? T.success : T.accent;
 
   const pickerMembers = singlet
     ? [...members.filter(m => m.id === selfId), ...singletStatuses(members)]
-    : members;
+    : members.filter(m => !m.isFacet && !m.isCustomFront && !m.deleted);
+  const pickerCustomFronts = singlet ? [] : members.filter(m => m.isCustomFront && !m.deleted);
 
   return (
     <View style={{flex: 1, backgroundColor: T.bg}}>
-      <View style={{backgroundColor: T.bg, paddingHorizontal: UI.screenPadding, paddingTop: UI.screenPadding}}>
-        <View style={[s.headerCard, {backgroundColor: T.surface, borderColor: 'transparent'}]}>
-          <Text
-            accessibilityRole="header"
-            style={[s.heading, {color: T.text}]}
-            numberOfLines={1}
-            maxFontSizeMultiplier={1.2}>
-            {t('history.title')}
-          </Text>
-          <View style={[s.segmentWrap, {backgroundColor: T.card, borderColor: 'transparent'}]}>
-          {(['front', 'member'] as SubTab[]).map(tab => (
+      <View style={{backgroundColor: T.bg, paddingHorizontal: 16, paddingTop: landscape ? 6 : 16}}>
+        <Text
+          accessibilityRole="header"
+          style={[s.heading, {color: T.text}, landscape && {fontSize: fs(15)}]}
+          numberOfLines={1}
+          maxFontSizeMultiplier={1.2}>
+          {t('history.title')}
+        </Text>
+        <View style={{flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: T.border, marginTop: 4}}>
+          {(['front', 'member', 'timeline'] as SubTab[]).map(tab => (
             <TouchableOpacity key={tab} onPress={() => setSubTab(tab)} activeOpacity={0.7}
               accessibilityRole="tab" accessibilityState={{selected: subTab === tab}}
               style={[s.subtab, {
-                backgroundColor: subTab === tab ? T.surface : 'transparent',
-                borderColor: 'transparent',
+                flex: 1,
+                alignItems: 'center',
+                paddingVertical: landscape ? 5 : 10,
+                borderBottomWidth: 2,
+                borderBottomColor: subTab === tab ? T.accent : 'transparent',
               }]}>
-              <AccentText style={{
+              <AccentText T={T} numberOfLines={2} maxFontSizeMultiplier={1.3} style={{
                 fontSize: fs(13),
-                fontWeight: subTab === tab ? '700' : '500',
+                fontWeight: subTab === tab ? '600' : '400',
                 color: subTab === tab ? T.accent : T.dim,
                 textAlign: 'center',
               }}>
                 {tab === 'front'
                   ? (singlet ? t('history.statusHistory') : t('history.frontHistory'))
-                  : (singlet ? t('history.byStatus') : t('history.memberHistory'))}
+                  : tab === 'member'
+                  ? (singlet ? t('history.byStatus') : t('history.memberHistory'))
+                  : t('history.timeline')}
               </AccentText>
             </TouchableOpacity>
           ))}
-          </View>
         </View>
       </View>
 
@@ -396,10 +482,10 @@ export const HistoryScreen = ({theme: T, history, journal, getMember, members, s
           data={deferredRows}
           keyExtractor={(item) => item.key}
           getItemType={(item) => item.kind}
-          contentContainerStyle={{padding: UI.screenPadding, paddingBottom: 32}}
+          contentContainerStyle={{padding: 16, paddingBottom: 32}}
           ListEmptyComponent={
-            <View style={[s.emptyState, {backgroundColor: T.surface, borderColor: 'transparent'}]}>
-              <Text style={{fontSize: fs(36), opacity: 0.4, marginBottom: 12}}>◷</Text>
+            <View style={{alignItems: 'center', paddingVertical: 48}}>
+              <Text style={{fontSize: fs(36), opacity: 0.4, marginBottom: 12}} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">◷</Text>
               <Text style={{fontSize: fs(13), color: T.dim, textAlign: 'center'}}>
                 {singlet ? t('history.noHistorySinglet') : t('history.noHistory')}
               </Text>
@@ -409,18 +495,22 @@ export const HistoryScreen = ({theme: T, history, journal, getMember, members, s
         />
       )}
 
+      {subTab === 'timeline' && (
+        <FrontTimeline T={T} history={history} members={members} singlet={singlet} />
+      )}
+
       {subTab === 'member' && (
         <View style={{flex: 1}}>
-          {pickerMembers.length === 0 ? (
+          {pickerMembers.length === 0 && pickerCustomFronts.length === 0 && !members.some(m => m.isFacet && !m.deleted) ? (
             <View style={{alignItems: 'center', paddingVertical: 48}}>
               <Text style={{fontSize: fs(13), color: T.dim}}>{singlet ? t('profile.noStatuses') : t('history.noMembers')}</Text>
             </View>
           ) : (
             <>
-              <View style={{margin: UI.screenPadding, marginBottom: 0}}>
+              <View style={{margin: 16, marginBottom: 0}}>
                 {selectedMember && (
-                  <View style={{flexDirection: 'row', alignItems: 'center', gap: 10, padding: 14, borderRadius: UI.radiusMd,
-                    backgroundColor: T.surface, marginBottom: 8}}>
+                  <View style={{flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, borderRadius: 10, borderWidth: 1,
+                    backgroundColor: T.card, borderColor: `${selectedMember.color}50`, marginBottom: 8}}>
                     <Avatar member={selectedMember} size={32} T={T} />
                     <View style={{flex: 1}}>
                       <Text style={{fontSize: fs(15), fontWeight: '500', color: T.text}}>{selectedMember.name}</Text>
@@ -431,25 +521,51 @@ export const HistoryScreen = ({theme: T, history, journal, getMember, members, s
                     </TouchableOpacity>
                   </View>
                 )}
-                <TextInput value={memberSearch} onChangeText={setMemberSearch} placeholder={singlet ? t('history.searchStatus') : t('history.searchMember')} placeholderTextColor={T.muted}
-                  style={{backgroundColor: T.card, color: T.text, borderWidth: 0, borderColor: 'transparent', borderRadius: UI.radiusMd, paddingHorizontal: 16, paddingVertical: 12, fontSize: fs(13)}} />
+                <TextInput value={memberSearch} onChangeText={setMemberSearch} accessibilityLabel={singlet ? t('history.searchStatus') : t('history.searchMember')} placeholder={singlet ? t('history.searchStatus') : t('history.searchMember')} placeholderTextColor={T.muted}
+                  style={{backgroundColor: T.surface, color: T.text, borderWidth: 1, borderColor: T.border, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 9, fontSize: fs(13)}} />
                 {memberSearch.length > 0 && (
-                  <View style={{backgroundColor: T.surface, borderRadius: UI.radiusMd, borderWidth: 0, borderColor: 'transparent', overflow: 'hidden', marginTop: 6, maxHeight: 280}}>
+                  <View style={{backgroundColor: T.card, borderRadius: 10, borderWidth: 1, borderColor: T.border, overflow: 'hidden', marginTop: 4, maxHeight: 280}}>
                     <ScrollView nestedScrollEnabled showsVerticalScrollIndicator={true}>
-                      {sortMembersBySearch(pickerMembers.filter(m => m.name.toLowerCase().includes(memberSearch.toLowerCase())), memberSearch).map(m => (
-                        <TouchableOpacity key={m.id}
-                          onPress={() => {setSelectedMemberId(m.id); setMemberSearch('');}}
-                          activeOpacity={0.7}
-                          accessibilityRole="button" accessibilityState={{selected: selectedMemberId === m.id}} accessibilityLabel={m.name}
-                          style={{flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12,
-                            borderBottomWidth: 0,
-                            borderBottomColor: 'transparent',
-                            backgroundColor: selectedMemberId === m.id ? `${m.color}12` : 'transparent'}}>
-                          <Avatar member={m} size={28} T={T} />
-                          <Text style={{fontSize: fs(14), fontWeight: '500', color: T.text}}>{m.name}</Text>
-                          {selectedMemberId === m.id && <Text style={{color: m.color, marginLeft: 'auto'}} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">✓</Text>}
-                        </TouchableOpacity>
-                      ))}
+                      {(() => {
+                        const q = memberSearch.toLowerCase();
+                        const row = (m: Member) => (
+                          <TouchableOpacity key={m.id}
+                            onPress={() => {setSelectedMemberId(m.id); setMemberSearch('');}}
+                            activeOpacity={0.7}
+                            accessibilityRole="button" accessibilityState={{selected: selectedMemberId === m.id}} accessibilityLabel={m.name}
+                            style={{flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12,
+                              borderBottomWidth: 1, borderBottomColor: T.border,
+                              backgroundColor: selectedMemberId === m.id ? `${m.color}12` : 'transparent'}}>
+                            <Avatar member={m} size={28} T={T} />
+                            <Text style={{fontSize: fs(14), fontWeight: '500', color: T.text}}>{m.name}</Text>
+                            {selectedMemberId === m.id && <Text style={{color: m.color, marginLeft: 'auto'}} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">✓</Text>}
+                          </TouchableOpacity>
+                        );
+                        const facets = singlet ? [] : sortMembersBySearch(members.filter(m => m.isFacet && !m.deleted && memberMatchesSearch(m, q)), memberSearch);
+                        const customFronts = sortMembersBySearch(pickerCustomFronts.filter(m => memberMatchesSearch(m, q)), memberSearch);
+                        const roster = sortMembersBySearch(pickerMembers.filter(m => memberMatchesSearch(m, q)), memberSearch);
+                        const header = (label: string) => (
+                          <Text accessibilityRole="header" style={{fontSize: fs(10), letterSpacing: 1, textTransform: 'uppercase', color: T.dim, fontWeight: '600', paddingHorizontal: 12, paddingTop: 10, paddingBottom: 4}}>{label}</Text>
+                        );
+                        return (
+                          <>
+                            {!singlet && roster.length > 0 && header(t('members.title'))}
+                            {roster.map(row)}
+                            {facets.length > 0 && (
+                              <>
+                                {header(t('members.facets'))}
+                                {facets.map(row)}
+                              </>
+                            )}
+                            {customFronts.length > 0 && (
+                              <>
+                                {header(t('members.customFronts'))}
+                                {customFronts.map(row)}
+                              </>
+                            )}
+                          </>
+                        );
+                      })()}
                     </ScrollView>
                   </View>
                 )}
@@ -462,32 +578,41 @@ export const HistoryScreen = ({theme: T, history, journal, getMember, members, s
                   return sum + Math.max(0, end - m.startTime);
                 }, 0);
                 const entryEvents = allMemberEvents.filter((e: any) => e.entry);
+                const details = entryEvents.map((e: any) => tierDetailsFor(selectedMember.id, e.entry));
                 const moodCounts: Record<string, number> = {};
-                entryEvents.forEach((e: any) => {if (e.entry.mood) moodCounts[e.entry.mood] = (moodCounts[e.entry.mood] || 0) + 1;});
+                details.forEach(d => {if (d.mood) moodCounts[d.mood] = (moodCounts[d.mood] || 0) + 1;});
                 const topMood = Object.entries(moodCounts).sort((a, b) => b[1] - a[1])[0];
                 const locCounts: Record<string, number> = {};
-                entryEvents.forEach((e: any) => {if (e.entry.location) locCounts[e.entry.location] = (locCounts[e.entry.location] || 0) + 1;});
+                details.forEach(d => {if (d.location) locCounts[d.location] = (locCounts[d.location] || 0) + 1;});
                 const topLoc = Object.entries(locCounts).sort((a, b) => b[1] - a[1])[0];
+                const energies = details.map(d => d.energy).filter((v): v is number => typeof v === 'number');
+                const avgEnergy = energies.length > 0 ? energies.reduce((a, b) => a + b, 0) / energies.length : null;
                 return (
-                  <View style={{flexDirection: 'row', gap: 8, margin: UI.screenPadding, marginBottom: 8}}>
-                    <View style={[s.stat, {backgroundColor: T.surface, borderColor: 'transparent'}]}>
+                  <View style={{flexDirection: 'row', gap: 8, margin: 16, marginBottom: 8}}>
+                    <View style={[s.stat, {backgroundColor: T.card, borderColor: T.border}]}>
                       <Text style={{fontSize: fs(9), letterSpacing: 1, textTransform: 'uppercase', color: T.dim, marginBottom: 3}}>{t('history.totalTime')}</Text>
                       <AccentText T={T} style={{fontSize: fs(15), fontWeight: '700', color: T.accent}}>{fmtDur(0, totalMs)}</AccentText>
                     </View>
-                    <View style={[s.stat, {backgroundColor: T.surface, borderColor: 'transparent'}]}>
+                    <View style={[s.stat, {backgroundColor: T.card, borderColor: T.border}]}>
                       <Text style={{fontSize: fs(9), letterSpacing: 1, textTransform: 'uppercase', color: T.dim, marginBottom: 3}}>{t('history.sessions')}</Text>
                       <Text style={{fontSize: fs(15), fontWeight: '700', color: T.text}}>{mergedSessions.length}</Text>
                     </View>
                     {topMood && (
-                      <View style={[s.stat, {backgroundColor: T.surface, borderColor: 'transparent'}]}>
+                      <View style={[s.stat, {backgroundColor: T.card, borderColor: T.border}]}>
                         <Text style={{fontSize: fs(9), letterSpacing: 1, textTransform: 'uppercase', color: T.dim, marginBottom: 3}}>{t('history.topMood')}</Text>
                         <Text style={{fontSize: fs(12), fontWeight: '600', color: T.text}} numberOfLines={1}>{topMood[0]}</Text>
                       </View>
                     )}
                     {topLoc && (
-                      <View style={[s.stat, {backgroundColor: T.surface, borderColor: 'transparent'}]}>
+                      <View style={[s.stat, {backgroundColor: T.card, borderColor: T.border}]}>
                         <Text style={{fontSize: fs(9), letterSpacing: 1, textTransform: 'uppercase', color: T.dim, marginBottom: 3}}>{t('history.topLocation')}</Text>
                         <Text style={{fontSize: fs(12), fontWeight: '600', color: T.text}} numberOfLines={1}>{topLoc[0]}</Text>
+                      </View>
+                    )}
+                    {avgEnergy !== null && (
+                      <View style={[s.stat, {backgroundColor: T.card, borderColor: T.border}]}>
+                        <Text style={{fontSize: fs(9), letterSpacing: 1, textTransform: 'uppercase', color: T.dim, marginBottom: 3}}>{t('stats.avgEnergy')}</Text>
+                        <Text style={{fontSize: fs(12), fontWeight: '600', color: T.text}} numberOfLines={1}>{fmtNum(avgEnergy, 1, 1)}/10</Text>
                       </View>
                     )}
                   </View>
@@ -498,19 +623,20 @@ export const HistoryScreen = ({theme: T, history, journal, getMember, members, s
                 data={allMemberEvents}
                 keyExtractor={(event: any, i: number) => `${event.type}-${event.time}-${i}`}
                 getItemType={(event: any) => event.type === 'journal' ? 'journal' : 'entry'}
-                contentContainerStyle={{padding: UI.screenPadding, paddingTop: 8, paddingBottom: 32}}
+                contentContainerStyle={{padding: 16, paddingTop: 8, paddingBottom: 32}}
                 ListEmptyComponent={
-                  <View style={[s.emptyState, {backgroundColor: T.surface, borderColor: 'transparent', paddingVertical: 32}]}>
+                  <View style={{alignItems: 'center', paddingVertical: 32}}>
                     <Text style={{fontSize: fs(13), color: T.dim, textAlign: 'center'}}>
-                      {t('history.noActivity', {name: selectedMember?.name})}
+                      {selectedMember ? t('history.noActivity', {name: selectedMember.name}) : t('history.selectMember')}
                     </Text>
                   </View>
                 }
                 renderItem={({item: event, index: i}: {item: any; index: number}) => {
                     const icon = EVENT_ICONS[event.type] || '◈';
-                    const label = 'entry' in event ? getEventLabel(event.type, event.entry) : getEventLabel(event.type, {} as any);
+                    const details = 'entry' in event && event.entry ? eventDetails(event.type, event.entry) : {};
+                    const label = 'entry' in event ? getEventLabel(event.type, event.entry, details, event.tier) : getEventLabel(event.type, {} as any, {});
                     const color = event.type === 'front'
-                      ? T.accent
+                      ? tierColor(event.tier)
                       : event.type === 'journal'
                       ? T.info
                       : T.dim;
@@ -523,7 +649,7 @@ export const HistoryScreen = ({theme: T, history, journal, getMember, members, s
                           {i < allMemberEvents.length - 1 &&
                             <View style={{flex: 1, width: 1, backgroundColor: T.border, marginTop: 2}} />}
                         </View>
-                        <View style={[s.card, {flex: 1, backgroundColor: T.surface, borderColor: 'transparent'}]}>
+                        <View style={[s.card, {flex: 1, backgroundColor: T.card, borderColor: T.border}]}>
                           <View style={{flexDirection: 'row', alignItems: 'center', marginBottom: 4}}>
                             <Text style={{fontSize: fs(12), color, marginRight: 6, fontWeight: '600',
                               }}>{icon} {label}</Text>
@@ -532,6 +658,7 @@ export const HistoryScreen = ({theme: T, history, journal, getMember, members, s
 
                           {'entry' in event && event.entry && (() => {
                             const e = event.entry;
+                            const d = details;
                             const isOpen = e.endTime === null && event.type === 'front';
                             return (
                               <>
@@ -541,25 +668,31 @@ export const HistoryScreen = ({theme: T, history, journal, getMember, members, s
                                     {'  '}<AccentText T={T} style={{color: T.accent}}>{fmtDur(e.startTime, e.endTime)}</AccentText>
                                   </Text>
                                 )}
-                                {(e.mood || e.location) && (
-                                  <View style={{flexDirection: 'row', gap: 6, flexWrap: 'wrap', marginBottom: e.note ? 4 : 0}}>
-                                    {e.mood && (
-                                      <View style={[s.badge, {backgroundColor: T.card}]}>
+                                {(d.mood || d.location || d.energy !== undefined) && (
+                                  <View style={{flexDirection: 'row', gap: 6, flexWrap: 'wrap', marginBottom: d.note ? 4 : 0}}>
+                                    {d.mood && (
+                                      <View style={[s.badge, {backgroundColor: T.surface}]}>
                                         <Text style={{fontSize: fs(10), color: T.dim}}>{t('history.mood')} </Text>
-                                        <Text style={{fontSize: fs(11), color: T.text, fontWeight: '500'}}>{translateMood(e.mood, t)}</Text>
+                                        <Text style={{fontSize: fs(11), color: T.text, fontWeight: '500'}}>{translateMood(d.mood, t)}</Text>
                                       </View>
                                     )}
-                                    {e.location && (
-                                      <View style={[s.badge, {backgroundColor: T.card}]}>
+                                    {d.location && (
+                                      <View style={[s.badge, {backgroundColor: T.surface}]}>
                                         <Text style={{fontSize: fs(10), color: T.dim}}>{t('history.at')} </Text>
-                                        <Text style={{fontSize: fs(11), color: T.text, fontWeight: '500'}}>{e.location}</Text>
+                                        <Text style={{flexShrink: 1, fontSize: fs(11), color: T.text, fontWeight: '500'}} numberOfLines={1}>{d.location}</Text>
+                                      </View>
+                                    )}
+                                    {d.energy !== undefined && (
+                                      <View style={[s.badge, {backgroundColor: T.surface}]}>
+                                        <Text style={{fontSize: fs(10), color: T.dim}}>{t('energy.label')} </Text>
+                                        <Text style={{fontSize: fs(11), color: T.text, fontWeight: '500'}}>{d.energy}/10</Text>
                                       </View>
                                     )}
                                   </View>
                                 )}
-                                {e.note ? (
-                                  <View style={{backgroundColor: T.card, borderRadius: UI.radiusSm, padding: 8}}>
-                                    <Text style={{fontSize: fs(12), color: T.dim, lineHeight: 17}}>{e.note}</Text>
+                                {d.note ? (
+                                  <View style={{backgroundColor: T.surface, borderRadius: 6, padding: 7}}>
+                                    <Text style={{fontSize: fs(12), color: T.dim, lineHeight: 17}}>{d.note}</Text>
                                   </View>
                                 ) : null}
                               </>
@@ -580,7 +713,7 @@ export const HistoryScreen = ({theme: T, history, journal, getMember, members, s
                                 <View style={{flexDirection: 'row', flexWrap: 'wrap', gap: 5, marginTop: 6}}>
                                   {(event.journalEntry.hashtags || []).map((t: string) => (
                                     <View key={t} style={{paddingHorizontal: 7, paddingVertical: 2, borderRadius: 999,
-                                      backgroundColor: `${T.info}12`, borderWidth: 0, borderColor: 'transparent'}}>
+                                      backgroundColor: `${T.info}12`, borderWidth: 1, borderColor: `${T.info}30`}}>
                                       <Text style={{fontSize: fs(10), color: T.info}}>{t}</Text>
                                     </View>
                                   ))}
@@ -602,34 +735,9 @@ export const HistoryScreen = ({theme: T, history, journal, getMember, members, s
 };
 
 const s = StyleSheet.create({
-  headerCard: {
-    borderRadius: UI.radiusLg,
-    padding: 18,
-    gap: 14,
-  },
-  heading: {fontFamily: Fonts.display, fontSize: 24, fontWeight: '600', marginBottom: 0},
-  segmentWrap: {
-    flexDirection: 'row',
-    borderRadius: UI.radiusMd,
-    padding: 6,
-    gap: 4,
-  },
-  subtab: {
-    flex: 1,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: UI.radiusMd,
-    alignItems: 'center',
-  },
-  card: {borderRadius: UI.radiusLg, borderWidth: 0, padding: 16},
-  badge: {flexDirection: 'row', alignItems: 'center', borderRadius: UI.radiusSm, paddingHorizontal: 8, paddingVertical: 4},
-  stat: {flex: 1, borderRadius: UI.radiusMd, borderWidth: 0, padding: 14},
-  emptyState: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 48,
-    paddingHorizontal: 20,
-    borderRadius: UI.radiusLg,
-    borderWidth: 0,
-  },
+  heading: {fontFamily: Fonts.display, fontSize: 22, fontWeight: '600', fontStyle: 'italic', marginBottom: 0},
+  subtab: {paddingHorizontal: 16, paddingVertical: 10, marginBottom: -1},
+  card: {borderRadius: 12, borderWidth: 1, padding: 12},
+  badge: {flexDirection: 'row', alignItems: 'center', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, maxWidth: '100%'},
+  stat: {flex: 1, borderRadius: 10, borderWidth: 1, padding: 10},
 });

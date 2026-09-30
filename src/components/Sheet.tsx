@@ -1,15 +1,15 @@
-import React, {ReactNode, useEffect, useRef, useState} from 'react';
-import {View, TouchableOpacity, ScrollView, StyleSheet, LayoutChangeEvent, Platform, Keyboard} from 'react-native';
+import React, {ReactNode, useEffect, useRef} from 'react';
+import {View, ScrollView, TouchableOpacity, StyleSheet, Platform} from 'react-native';
 import {Text} from './AppText';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {TrueSheet} from '@lodev09/react-native-true-sheet';
-import {Fonts} from '../theme';
+import {Fonts, ThemeColors} from '../theme';
 import {useTranslation} from 'react-i18next';
 
 interface SheetProps {
   visible: boolean;
   title: string;
-  theme: any;
+  theme: ThemeColors;
   onClose: () => void;
   children: ReactNode;
   footer?: ReactNode;
@@ -23,64 +23,74 @@ const ANDROID_NAV_BAR_FLOOR = 24;
 export const Sheet = ({visible, title, theme: T, onClose, children, footer, headerAction}: SheetProps) => {
   const {t} = useTranslation();
   const sheetRef = useRef<TrueSheet>(null);
-  const scrollRef = useRef<ScrollView>(null);
+  const scrollRef = useRef<any>(null);
   const insets = useSafeAreaInsets();
   const rawBottomInset = isIPad ? 0 : insets.bottom;
   const bottomInset = Platform.OS === 'android'
     ? Math.max(rawBottomInset, ANDROID_NAV_BAR_FLOOR)
     : rawBottomInset;
-  const [footerHeight, setFooterHeight] = useState(0);
-  const onFooterLayout = (e: LayoutChangeEvent) => setFooterHeight(e.nativeEvent.layout.height);
-
-  const [keyboardHeight, setKeyboardHeight] = useState(0);
-  useEffect(() => {
-    const show = Keyboard.addListener('keyboardDidShow', e => setKeyboardHeight(e.endCoordinates.height));
-    const hide = Keyboard.addListener('keyboardDidHide', () => setKeyboardHeight(0));
-    return () => { show.remove(); hide.remove(); };
-  }, []);
-
   const wasVisible = useRef(false);
+  const presentedRef = useRef(false);
+  const visibleRef = useRef(visible);
+  visibleRef.current = visible;
+  const watchdogs = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const clearWatchdogs = () => {
+    for (const w of watchdogs.current) clearTimeout(w);
+    watchdogs.current = [];
+  };
   useEffect(() => {
     if (visible) {
-      Promise.resolve(sheetRef.current?.present()).catch(() => {});
       wasVisible.current = true;
+      presentedRef.current = false;
+      clearWatchdogs();
+      const attempt = () => {
+        Promise.resolve(sheetRef.current?.present())
+          .then(() => {
+            presentedRef.current = true;
+            clearWatchdogs();
+            if (!visibleRef.current) Promise.resolve(sheetRef.current?.dismiss()).catch(() => {});
+          })
+          .catch(() => {});
+      };
+      attempt();
+      watchdogs.current.push(setTimeout(() => {
+        if (!presentedRef.current && visibleRef.current) attempt();
+      }, 3000));
     } else if (wasVisible.current) {
-      Promise.resolve(sheetRef.current?.dismiss()).catch(() => {});
       wasVisible.current = false;
+      clearWatchdogs();
+      const tryDismiss = () => Promise.resolve(sheetRef.current?.dismiss()).catch(() => {});
+      tryDismiss();
+      watchdogs.current.push(setTimeout(() => {
+        if (presentedRef.current && !visibleRef.current) tryDismiss();
+      }, 700));
     }
+    return clearWatchdogs;
   }, [visible]);
 
-  const basePaddingBottom = footer
-    ? (footerHeight > 0 ? footerHeight + 24 : 96)
-    : 56 + bottomInset;
-  const scrollPaddingBottom = basePaddingBottom + keyboardHeight;
+  const scrollPaddingBottom = (footer ? 8 : 56) + bottomInset;
 
   return (
     <TrueSheet
       ref={sheetRef}
       detents={[0.92]}
       cornerRadius={20}
-      backgroundColor={T.bg}
-      onDidDismiss={onClose}
+      backgroundColor={T.card}
+      onDidPresent={() => {
+        presentedRef.current = true;
+        clearWatchdogs();
+        if (!visibleRef.current) Promise.resolve(sheetRef.current?.dismiss()).catch(() => {});
+      }}
+      onDidDismiss={() => { presentedRef.current = false; onClose(); }}
       scrollable
       header={
-        <View style={[s.header, {backgroundColor: T.bg}]}>
+        <View style={[s.header, {borderBottomColor: T.border, backgroundColor: T.card}]}>
           <Text style={[s.title, {color: T.text, flex: 1, marginRight: 8}]} accessibilityRole="header" numberOfLines={1}>{title}</Text>
           {headerAction}
           <TouchableOpacity onPress={onClose} activeOpacity={0.7} accessibilityRole="button" accessibilityLabel={t('common.close')} style={s.closeBtn}>
             <Text style={[s.closeX, {color: T.dim}]} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">✕</Text>
           </TouchableOpacity>
         </View>
-      }
-      footer={
-        footer ? (
-          <View
-            onLayout={onFooterLayout}
-            style={[s.footer, {backgroundColor: T.bg, paddingBottom: 16 + bottomInset}]}
-          >
-            {footer}
-          </View>
-        ) : undefined
       }
     >
       <ScrollView
@@ -92,6 +102,11 @@ export const Sheet = ({visible, title, theme: T, onClose, children, footer, head
         nestedScrollEnabled
       >
         {children}
+        {footer ? (
+          <View style={[s.footer, {borderTopColor: T.border}]}>
+            {footer}
+          </View>
+        ) : null}
       </ScrollView>
     </TrueSheet>
   );
@@ -104,6 +119,7 @@ const s = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 20,
     paddingVertical: 12,
+    borderBottomWidth: 1,
   },
   title: {fontFamily: Fonts.display, fontSize: 22, fontWeight: '600', fontStyle: 'italic'},
   closeBtn: {padding: 4},
@@ -113,7 +129,8 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'flex-end',
     gap: 8,
-    paddingHorizontal: 20,
+    marginTop: 16,
     paddingVertical: 16,
+    borderTopWidth: 1,
   },
 });

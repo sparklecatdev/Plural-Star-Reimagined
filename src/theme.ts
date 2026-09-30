@@ -32,8 +32,10 @@ export interface CustomPalette {
 }
 
 const hexToRgb = (hex: string): [number, number, number] => {
-  const h = hex.replace('#', '');
-  return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
+  const raw = String(hex ?? '').replace('#', '');
+  const h = (raw.length === 3 ? raw.split('').map(c => c + c).join('') : raw).padEnd(6, '0');
+  const n = (s: string) => { const v = parseInt(s, 16); return Number.isFinite(v) ? v : 0; };
+  return [n(h.slice(0, 2)), n(h.slice(2, 4)), n(h.slice(4, 6))];
 };
 
 const rgbToHex = (r: number, g: number, b: number): string =>
@@ -50,30 +52,76 @@ const luminance = (hex: string): number => {
   return 0.299 * r + 0.587 * g + 0.114 * b;
 };
 
+export const initialOn = (bg: string): string =>
+  luminance(bg) > 0.35 ? 'rgba(0,0,0,0.75)' : 'rgba(255,255,255,0.92)';
+
+export const contrastRatio = (hexA: string, hexB: string): number => {
+  const lum = (hex: string): number => {
+    const h = (hex || '').replace('#', '');
+    const full = h.length === 3 ? h.split('').map(c => c + c).join('') : (h + '000000').slice(0, 6);
+    const n = parseInt(full, 16) || 0;
+    const chan = (v: number) => {
+      const s = v / 255;
+      return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
+    };
+    return 0.2126 * chan((n >> 16) & 255) + 0.7152 * chan((n >> 8) & 255) + 0.0722 * chan(n & 255);
+  };
+  const la = lum(hexA);
+  const lb = lum(hexB);
+  const hi = Math.max(la, lb);
+  const lo = Math.min(la, lb);
+  return (hi + 0.05) / (lo + 0.05);
+};
+
+export const ensureReadable = (color: string, bg: string, min: number): string => {
+  if (contrastRatio(color, bg) >= min) return color;
+  const preferred = luminance(color) <= luminance(bg) ? '#000000' : '#FFFFFF';
+  const other = preferred === '#000000' ? '#FFFFFF' : '#000000';
+  const pole = contrastRatio(preferred, bg) >= min
+    ? preferred
+    : contrastRatio(other, bg) >= min
+      ? other
+      : (contrastRatio(preferred, bg) >= contrastRatio(other, bg) ? preferred : other);
+  if (contrastRatio(pole, bg) < min) return pole;
+  let lo = 0;
+  let hi = 1;
+  for (let i = 0; i < 8; i++) {
+    const t = (lo + hi) / 2;
+    if (contrastRatio(mix(color, pole, t), bg) >= min) hi = t;
+    else lo = t;
+  }
+  return mix(color, pole, hi);
+};
+
+export const textFloor = (bg: string): number =>
+  Math.max(contrastRatio('#000000', bg), contrastRatio('#FFFFFF', bg)) >= 7 ? 4.5 : 3;
+
 export const deriveTheme = (bg: string, accent: string, text: string, mid: string): ThemeColors => {
   const lum = luminance(bg);
   const isLight = lum > 0.3;
+  const floor = textFloor(bg);
 
-  const surfaceT = isLight ? 0.01 : 0.024;
-  const cardT = isLight ? 0.022 : 0.05;
-  const borderT = isLight ? 0.035 : 0.075;
-  const borderLtT = isLight ? 0.05 : 0.11;
+  const surfaceT = isLight ? 0.04 : 0.08;
+  const cardT = isLight ? 0.07 : 0.14;
+  const borderT = isLight ? 0.12 : 0.20;
+  const borderLtT = isLight ? 0.18 : 0.30;
 
   const surface = mix(bg, mid, surfaceT);
   const card = mix(bg, mid, cardT);
   const border = mix(bg, mid, borderT);
   const borderLt = mix(bg, mid, borderLtT);
 
-  const dim = mix(text, mid, 0.3);
-  const muted = mix(text, mid, 0.46);
-  const toggleOff = mix(bg, mid, isLight ? 0.11 : 0.18);
+  const effText = ensureReadable(text, bg, floor);
+  const dim = ensureReadable(mix(effText, mid, 0.12), bg, floor);
+  const muted = ensureReadable(mix(effText, mid, 0.30), bg, 3);
+  const toggleOff = mix(bg, mid, 0.22);
 
   const accentRgb = hexToRgb(accent);
   const bgRgb = hexToRgb(bg);
   const accentBg = rgbToHex(
-    bgRgb[0] + (accentRgb[0] - bgRgb[0]) * (isLight ? 0.07 : 0.1),
-    bgRgb[1] + (accentRgb[1] - bgRgb[1]) * (isLight ? 0.07 : 0.1),
-    bgRgb[2] + (accentRgb[2] - bgRgb[2]) * (isLight ? 0.07 : 0.1),
+    bgRgb[0] + (accentRgb[0] - bgRgb[0]) * 0.12,
+    bgRgb[1] + (accentRgb[1] - bgRgb[1]) * 0.12,
+    bgRgb[2] + (accentRgb[2] - bgRgb[2]) * 0.12,
   );
 
   const dangerBase = '#d9534f';
@@ -93,7 +141,7 @@ export const deriveTheme = (bg: string, accent: string, text: string, mid: strin
     borderLt,
     accent,
     accentBg,
-    text,
+    text: effText,
     dim,
     muted,
     toggleOff,
@@ -120,27 +168,59 @@ export const deriveTheme = (bg: string, accent: string, text: string, mid: strin
   };
 };
 
+export const inkOn = (bg: string): string =>
+  contrastRatio('#000000', bg) >= contrastRatio('#FFFFFF', bg) ? '#000000' : '#FFFFFF';
+
+export const profileTheme = (base: ThemeColors, color: string): ThemeColors => {
+  const ink = inkOn(color);
+  const surface = mix(color, ink === '#000000' ? '#FFFFFF' : '#000000', 0.18);
+  const readable = (c: string, min: number) => ensureReadable(ensureReadable(c, surface, min), color, min);
+  return {
+    ...base,
+    bg: color,
+    surface,
+    card: color,
+    border: mix(color, ink, 0.3),
+    borderLt: mix(color, ink, 0.4),
+    accent: readable(base.accent, 4.5),
+    accentBg: surface,
+    text: ink,
+    dim: readable(mix(ink, color, 0.2), 4.5),
+    muted: readable(mix(ink, color, 0.35), 3),
+    toggleOff: mix(color, ink, 0.35),
+    danger: readable(base.danger, 4.5),
+    dangerBg: surface,
+    success: readable(base.success, 4.5),
+    successBg: surface,
+    info: readable(base.info, 4.5),
+    infoBg: surface,
+    isLight: ink === '#000000',
+  };
+};
+
 export const DARK_PALETTE: CustomPalette = {
   id: '__dark__',
-  name: 'Black',
-  bg: '#06080d',
-  accent: '#F3F6FB',
-  text: '#FFFFFF',
-  mid: '#1A212B',
+  name: 'Obsidian',
+  bg: '#0A1F2E',
+  accent: '#DAA520',
+  text: '#C0C0C0',
+  mid: '#7A8A99',
 };
 
 export const LIGHT_PALETTE: CustomPalette = {
   id: '__light__',
-  name: 'White',
-  bg: '#F6F7F9',
-  accent: '#0E1116',
-  text: '#0A0D12',
-  mid: '#CDD4DD',
+  name: 'Steel',
+  bg: '#7A8A99',
+  accent: '#DAA520',
+  text: '#0A1F2E',
+  mid: '#C0C0C0',
 };
 
 export const T: ThemeColors = deriveTheme(DARK_PALETTE.bg, DARK_PALETTE.accent, DARK_PALETTE.text, DARK_PALETTE.mid);
 
 export const BUILTIN_PALETTES: CustomPalette[] = [DARK_PALETTE, LIGHT_PALETTE];
+
+export const MAX_CUSTOM_PALETTES = 20;
 
 export const PALETTE = [
   '#DAA520', '#7B9FE8', '#E87BA8', '#7BE8C4',
@@ -148,26 +228,22 @@ export const PALETTE = [
   '#85B4E8', '#C97BE8', '#B4E885', '#E8C97B',
 ];
 
+export const fontScale = (T: ThemeColors) => (s: number) => Math.round(s * (T?.textScale || 1));
+
+export const readableAccent = (T: ThemeColors): string =>
+  contrastRatio(T.accent, T.bg) >= 3 ? T.accent : T.text;
+
 export const DYSLEXIC_FONT = 'OpenDyslexic';
 
-const fontFam =(android: string, ios: string): string => (Platform.OS === 'android' ? android : ios);
-
 export const Fonts = {
-  display: fontFam('Lexend_700Bold', 'Lexend-Bold'),
+  display: 'OpenDyslexic',
   body: 'System',
   mono: 'monospace',
 };
 
-export const UI = {
-  screenPadding: 16,
-  sectionGap: 20,
-  radiusSm: 14,
-  radiusMd: 22,
-  radiusLg: 30,
-  pill: 999,
-};
-
 export type FontChoice = 'default' | 'opendyslexic' | 'atkinson' | 'lexend' | 'comicneue' | 'cause' | 'gelasio' | 'anton';
+
+const fontFam =(android: string, ios: string): string => (Platform.OS === 'android' ? android : ios);
 
 export const FONT_OPTIONS: {value: FontChoice; label: string; family: string | null}[] = [
   {value: 'default', label: 'Default', family: null},
