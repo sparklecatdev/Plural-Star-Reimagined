@@ -1,0 +1,82 @@
+ENV['RCT_USE_PREBUILT_RNCORE'] = '0'
+ENV['RCT_USE_RN_DEP'] = '0'
+
+# Resolve react_native_pods.rb with node to allow for hoisting
+require Pod::Executable.execute_command('node', ['-p',
+  'require.resolve(
+    "react-native/scripts/react_native_pods.rb",
+    {paths: [process.argv[1]]},
+  )', __dir__]).strip
+
+platform :ios, min_ios_version_supported
+prepare_react_native_project!
+
+linkage = ENV['USE_FRAMEWORKS']
+if linkage != nil
+  Pod::UI.puts "Configuring Pod with #{linkage}ally linked Frameworks".green
+  use_frameworks! :linkage => linkage.to_sym
+end
+
+target 'PluralSpace' do
+  config = use_native_modules!
+
+  use_react_native!(
+    :path => config[:reactNativePath],
+    # An absolute path to your application root.
+    :app_path => "#{Pod::Config.instance.installation_root}/.."
+  )
+
+  post_install do |installer|
+    react_native_post_install(
+      installer,
+      config[:reactNativePath],
+      :mac_catalyst_enabled => false,
+      # :ccache_enabled => true
+    )
+
+    # NOTE: A previous Xcode-26 modulemap workaround for `react-native-document-picker`
+    # (the old, deprecated package) lived here. We have since migrated to
+    # `@react-native-documents/picker`, which publishes a different pod name and
+    # modulemap path, so the gsub no longer matched anything (no-op). Removed
+    # for clarity. If Xcode 26 raises a modulemap-not-found error for the NEW
+    # picker, add a fresh workaround keyed on `@react-native-documents` rather
+    # than restoring this dead block.
+
+    fmt_support_files = [
+      'Target Support Files/fmt/fmt.debug.xcconfig',
+      'Target Support Files/fmt/fmt.release.xcconfig',
+    ]
+
+    fmt_support_files.each do |relative_path|
+      xcconfig_path = File.join(installer.sandbox.root, relative_path)
+      next unless File.exist?(xcconfig_path)
+
+      contents = File.read(xcconfig_path)
+      updated = contents.gsub(
+        'GCC_PREPROCESSOR_DEFINITIONS = $(inherited) COCOAPODS=1',
+        'GCC_PREPROCESSOR_DEFINITIONS = $(inherited) COCOAPODS=1 FMT_USE_CONSTEVAL=0'
+      )
+      File.write(xcconfig_path, updated) if updated != contents
+    end
+
+    fmt_base_header = File.join(installer.sandbox.root, 'fmt/include/fmt/base.h')
+    if File.exist?(fmt_base_header)
+      contents = File.read(fmt_base_header)
+      updated = contents.gsub(
+        "// Detect consteval, C++20 constexpr extensions and std::is_constant_evaluated.\n#if !defined(__cpp_lib_is_constant_evaluated)",
+        "// Detect consteval, C++20 constexpr extensions and std::is_constant_evaluated.\n#ifdef FMT_USE_CONSTEVAL\n// Use the provided definition.\n#elif !defined(__cpp_lib_is_constant_evaluated)"
+      )
+      File.write(fmt_base_header, updated) if updated != contents
+    end
+
+    pods_project_path = File.join(installer.sandbox.root, 'Pods.xcodeproj/project.pbxproj')
+    if File.exist?(pods_project_path)
+      contents = File.read(pods_project_path)
+      updated = contents.gsub(
+        '/bin/sh -c "$WITH_ENVIRONMENT $SCRIPT_PHASES_SCRIPT"',
+        '"$WITH_ENVIRONMENT" "$SCRIPT_PHASES_SCRIPT"'
+      )
+      File.write(pods_project_path, updated) if updated != contents
+    end
+  end
+end

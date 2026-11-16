@@ -1,0 +1,877 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		056028A5A7B4412BB5E3045E /* OpenDyslexic-BoldItalic.otf in Resources */ = {isa = PBXBuildFile; fileRef = A227CA61F3C14D04BA763C23 /* OpenDyslexic-BoldItalic.otf */; };
+		0978B2376E754D0B97AE80DB /* Gelasio_400Regular_Italic.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 3F69D9175E474AAF81DC79CC /* Gelasio_400Regular_Italic.ttf */; };
+		09CDA2242BEA26CFB97DE3C0 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */; };
+		0B13441F4701EF9014AA38D1 /* PluralSpaceLiveActivityBundle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4605282D958AB70F61A5B68C /* PluralSpaceLiveActivityBundle.swift */; };
+		0C80B921A6F3F58F76C31292 /* libPods-PluralSpace.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 5DCACB8F33CDC322A6C60F78 /* libPods-PluralSpace.a */; };
+		0EE4CC9E3485DAC9917CE413 /* PluralSpaceLiveActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99AB2AED1AB4AFCD278085D4 /* PluralSpaceLiveActivity.swift */; };
+		0FA2E5DC2E774891B1E95BA7 /* AtkinsonHyperlegible_400Regular_Italic.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 031BC308F0854534AF236A3C /* AtkinsonHyperlegible_400Regular_Italic.ttf */; };
+		0FA321251DFD45B3A2667D20 /* Anton_400Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = E819BCF398EA453FB2F45637 /* Anton_400Regular.ttf */; };
+		10EC3EFF8676455C86C870EA /* Gelasio_400Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 4BF016BFDC154F269B3333E2 /* Gelasio_400Regular.ttf */; };
+		124CA1342C8947D59AFB971E /* AtkinsonHyperlegible_700Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = B243CA7D3F8E41BA961E8DB6 /* AtkinsonHyperlegible_700Bold.ttf */; };
+		1325C930A37C48B9913AED68 /* ComicNeue_400Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = F8AF75B04F6F45D097C79416 /* ComicNeue_400Regular.ttf */; };
+		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
+		142A2269135D4E908BD84C8E /* ComicNeue_700Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 919C8A6DD3DE437F87B7423B /* ComicNeue_700Bold.ttf */; };
+		1E9443815D2942FBBB6AA16B /* Cause_700Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 78A48CEDA6554E97986778D2 /* Cause_700Bold.ttf */; };
+		1FC6F41220C140CB90D910D5 /* OpenDyslexic-Bold.otf in Resources */ = {isa = PBXBuildFile; fileRef = E09551C0D34C41D0BB99D396 /* OpenDyslexic-Bold.otf */; };
+		2F1EDDCC2F3D4E5BA241E84D /* Gelasio_700Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 4A79EF2ED1704E7B94116A8F /* Gelasio_700Bold.ttf */; };
+		36F9340EADFF41CA9F902B1D /* AtkinsonHyperlegible_400Regular_Italic.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 031BC308F0854534AF236A3C /* AtkinsonHyperlegible_400Regular_Italic.ttf */; };
+		3D65336D33E445868519F6B5 /* AtkinsonHyperlegible_700Bold_Italic.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 3DCD5C7F8A3D4D46A81E0532 /* AtkinsonHyperlegible_700Bold_Italic.ttf */; };
+		4042B0C9A0524DA4BE43D454 /* OpenDyslexic-Bold.otf in Resources */ = {isa = PBXBuildFile; fileRef = E09551C0D34C41D0BB99D396 /* OpenDyslexic-Bold.otf */; };
+		41D0EACF28174F90A868ABFB /* Lexend_600SemiBold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 245209B552544899BDB0071C /* Lexend_600SemiBold.ttf */; };
+		42B71C86B81B4160A1F0D806 /* Gelasio_700Bold_Italic.ttf in Resources */ = {isa = PBXBuildFile; fileRef = B6AEC1720E7148D39FD23521 /* Gelasio_700Bold_Italic.ttf */; };
+		436604BAD66B5A568792EB70 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 171CF3BC2C212C0118685EAA /* Foundation.framework */; };
+		48F2AA0BCF19416885A5DC30 /* Lexend_400Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = CF491EB4C55D4428B4E68E3F /* Lexend_400Regular.ttf */; };
+		4BFB2D398917462C8C3708F8 /* ComicNeue_700Bold_Italic.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 23AE195E453A42DF80AB6954 /* ComicNeue_700Bold_Italic.ttf */; };
+		50114BA6F6D842769AC0A216 /* OpenDyslexic-Regular.otf in Resources */ = {isa = PBXBuildFile; fileRef = 9FEF50231CC24203882CB356 /* OpenDyslexic-Regular.otf */; };
+		50C9C13A525A478ABFE86FBE /* Gelasio_700Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 4A79EF2ED1704E7B94116A8F /* Gelasio_700Bold.ttf */; };
+		5B9AC4AA9C6A4D89A708263B /* ComicNeue_400Regular_Italic.ttf in Resources */ = {isa = PBXBuildFile; fileRef = E964520B528E4D9F85AA3914 /* ComicNeue_400Regular_Italic.ttf */; };
+		5CAFE8FA024245F695C123AF /* Cause_400Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 71710086E4F2445D8D21D4FF /* Cause_400Regular.ttf */; };
+		63BE732294414DDBB9875868 /* LICENSE.txt in Resources */ = {isa = PBXBuildFile; fileRef = 47DE890732B74E2095A3BE0A /* LICENSE.txt */; };
+		65FDB53047E64D3BB4A42998 /* ComicNeue_700Bold_Italic.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 23AE195E453A42DF80AB6954 /* ComicNeue_700Bold_Italic.ttf */; };
+		6700192B47744DCA8C502A8A /* LICENSE.txt in Resources */ = {isa = PBXBuildFile; fileRef = 47DE890732B74E2095A3BE0A /* LICENSE.txt */; };
+		761780ED2CA45674006654EE /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 761780EC2CA45674006654EE /* AppDelegate.swift */; };
+		925B05BD3F044F88838BBAB1 /* Cause_700Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 78A48CEDA6554E97986778D2 /* Cause_700Bold.ttf */; };
+		9732CC66F77F86B3F12184DD /* PluralSpaceActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5BC37ADB4B861E32C7E6AD19 /* PluralSpaceActivityAttributes.swift */; };
+		991FB1EF631FFEBE784C4D31 /* PluralSpaceLiveActivityModule.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A46517188F14DF726053A65 /* PluralSpaceLiveActivityModule.swift */; };
+		9962228AA35D40C4B7E8E801 /* AtkinsonHyperlegible_400Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = F7E7569BEDC440AD8BD752AF /* AtkinsonHyperlegible_400Regular.ttf */; };
+		9D0AAC3151124332BE8F67E1 /* Lexend_400Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = CF491EB4C55D4428B4E68E3F /* Lexend_400Regular.ttf */; };
+		9DACBE484268444EADA3F6F7 /* Gelasio_700Bold_Italic.ttf in Resources */ = {isa = PBXBuildFile; fileRef = B6AEC1720E7148D39FD23521 /* Gelasio_700Bold_Italic.ttf */; };
+		A670B6F9D9EB448B83033112 /* AtkinsonHyperlegible_700Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = B243CA7D3F8E41BA961E8DB6 /* AtkinsonHyperlegible_700Bold.ttf */; };
+		A79044EC743541EEB693FC75 /* OpenDyslexic-Regular.otf in Resources */ = {isa = PBXBuildFile; fileRef = 9FEF50231CC24203882CB356 /* OpenDyslexic-Regular.otf */; };
+		A908F9F267CC0EF24F960549 /* PluralSpaceLiveActivityModuleBridge.m in Sources */ = {isa = PBXBuildFile; fileRef = 4D023936EF11A1DA15547DB5 /* PluralSpaceLiveActivityModuleBridge.m */; };
+		AA6C18114B78407F9A2413CD /* Cause_400Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 71710086E4F2445D8D21D4FF /* Cause_400Regular.ttf */; };
+		AAF6C1E5C0174EEDB4737398 /* Lexend_600SemiBold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 245209B552544899BDB0071C /* Lexend_600SemiBold.ttf */; };
+		AD2E8B993F0740069B3855B8 /* Anton_400Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = E819BCF398EA453FB2F45637 /* Anton_400Regular.ttf */; };
+		AF92152339CD7860F1606A29 /* PluralSpaceLiveActivity.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = EAEAB9CA942AA204BFC89C78 /* PluralSpaceLiveActivity.appex */; };
+		B535D0230C9543E981D760C8 /* Lexend_700Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = C2081FD0C693461F85D0D245 /* Lexend_700Bold.ttf */; };
+		B64C9045B9EB43298A2166CC /* OpenDyslexic-Italic.otf in Resources */ = {isa = PBXBuildFile; fileRef = B4D1C63B0F88405A90E504A4 /* OpenDyslexic-Italic.otf */; };
+		B6CFE064AA03C39FF3704286 /* PluralSpaceActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5BC37ADB4B861E32C7E6AD19 /* PluralSpaceActivityAttributes.swift */; };
+		BB10626AF3324D628B4A5661 /* OpenDyslexic-Italic.otf in Resources */ = {isa = PBXBuildFile; fileRef = B4D1C63B0F88405A90E504A4 /* OpenDyslexic-Italic.otf */; };
+		BC59DC376C3740EABE928CCA /* AtkinsonHyperlegible_700Bold_Italic.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 3DCD5C7F8A3D4D46A81E0532 /* AtkinsonHyperlegible_700Bold_Italic.ttf */; };
+		C1345847AAAD4DEC8B05C75E /* ComicNeue_400Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = F8AF75B04F6F45D097C79416 /* ComicNeue_400Regular.ttf */; };
+		D03869A4BDCA490FB75356B2 /* Lexend_500Medium.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 630AA8DAC0AF4CEC84C72C3B /* Lexend_500Medium.ttf */; };
+		D4BD3F861A4741EA8A6EAFF2 /* ComicNeue_400Regular_Italic.ttf in Resources */ = {isa = PBXBuildFile; fileRef = E964520B528E4D9F85AA3914 /* ComicNeue_400Regular_Italic.ttf */; };
+		D877C28531034064B680A3E8 /* ComicNeue_700Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 919C8A6DD3DE437F87B7423B /* ComicNeue_700Bold.ttf */; };
+		DB5412B95B8B4A1ABA9D988E /* Gelasio_400Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 4BF016BFDC154F269B3333E2 /* Gelasio_400Regular.ttf */; };
+		DC1DC711CE2143D1A5B444F5 /* Lexend_500Medium.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 630AA8DAC0AF4CEC84C72C3B /* Lexend_500Medium.ttf */; };
+		E2B63146611A4CEDA0ABAB14 /* Lexend_700Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = C2081FD0C693461F85D0D245 /* Lexend_700Bold.ttf */; };
+		E401128B92D8434F9531E2B6 /* AtkinsonHyperlegible_400Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = F7E7569BEDC440AD8BD752AF /* AtkinsonHyperlegible_400Regular.ttf */; };
+		E73E89A7D70442D2B928C62F /* Gelasio_400Regular_Italic.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 3F69D9175E474AAF81DC79CC /* Gelasio_400Regular_Italic.ttf */; };
+		F9B775274EE0486799563A20 /* OpenDyslexic-BoldItalic.otf in Resources */ = {isa = PBXBuildFile; fileRef = A227CA61F3C14D04BA763C23 /* OpenDyslexic-BoldItalic.otf */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		D5A18470B29B6744B32D51EA /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 83CBB9F71A601CBA00E9B192 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = B667964569649A427BF502B3;
+			remoteInfo = PluralSpaceLiveActivity;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		B28F1116B2DF26847C9CAB2D /* Embed App Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				AF92152339CD7860F1606A29 /* PluralSpaceLiveActivity.appex in Embed App Extensions */,
+			);
+			name = "Embed App Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
+/* Begin PBXFileReference section */
+		031BC308F0854534AF236A3C /* AtkinsonHyperlegible_400Regular_Italic.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 9; includeInIndex = 0; lastKnownFileType = unknown; name = AtkinsonHyperlegible_400Regular_Italic.ttf; path = ../src/assets/fonts/AtkinsonHyperlegible_400Regular_Italic.ttf; sourceTree = "<group>"; };
+		13B07F961A680F5B00A75B9A /* PluralSpace.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PluralSpace.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		13B07FB51A68108700A75B9A /* Images.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Images.xcassets; path = PluralSpace/Images.xcassets; sourceTree = "<group>"; };
+		13B07FB61A68108700A75B9A /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = Info.plist; path = PluralSpace/Info.plist; sourceTree = "<group>"; };
+		13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = PrivacyInfo.xcprivacy; path = PluralSpace/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		171CF3BC2C212C0118685EAA /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS14.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
+		18BC4A2B2FF8BBDC003C976F /* PluralSpace.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; name = PluralSpace.entitlements; path = PluralSpace/PluralSpace.entitlements; sourceTree = "<group>"; };
+		23AE195E453A42DF80AB6954 /* ComicNeue_700Bold_Italic.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 9; includeInIndex = 0; lastKnownFileType = unknown; name = ComicNeue_700Bold_Italic.ttf; path = ../src/assets/fonts/ComicNeue_700Bold_Italic.ttf; sourceTree = "<group>"; };
+		245209B552544899BDB0071C /* Lexend_600SemiBold.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 9; includeInIndex = 0; lastKnownFileType = unknown; name = Lexend_600SemiBold.ttf; path = ../src/assets/fonts/Lexend_600SemiBold.ttf; sourceTree = "<group>"; };
+		3B4392A12AC88292D35C810B /* Pods-PluralSpace.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-PluralSpace.debug.xcconfig"; path = "Pods/Target Support Files/Pods-PluralSpace/Pods-PluralSpace.debug.xcconfig"; sourceTree = SOURCE_ROOT; };
+		3DCD5C7F8A3D4D46A81E0532 /* AtkinsonHyperlegible_700Bold_Italic.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 9; includeInIndex = 0; lastKnownFileType = unknown; name = AtkinsonHyperlegible_700Bold_Italic.ttf; path = ../src/assets/fonts/AtkinsonHyperlegible_700Bold_Italic.ttf; sourceTree = "<group>"; };
+		3F69D9175E474AAF81DC79CC /* Gelasio_400Regular_Italic.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 9; includeInIndex = 0; lastKnownFileType = unknown; name = Gelasio_400Regular_Italic.ttf; path = ../src/assets/fonts/Gelasio_400Regular_Italic.ttf; sourceTree = "<group>"; };
+		4605282D958AB70F61A5B68C /* PluralSpaceLiveActivityBundle.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PluralSpaceLiveActivityBundle.swift; sourceTree = "<group>"; };
+		47DE890732B74E2095A3BE0A /* LICENSE.txt */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 9; includeInIndex = 0; lastKnownFileType = unknown; name = LICENSE.txt; path = ../src/assets/fonts/LICENSE.txt; sourceTree = "<group>"; };
+		4A79EF2ED1704E7B94116A8F /* Gelasio_700Bold.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 9; includeInIndex = 0; lastKnownFileType = unknown; name = Gelasio_700Bold.ttf; path = ../src/assets/fonts/Gelasio_700Bold.ttf; sourceTree = "<group>"; };
+		4BF016BFDC154F269B3333E2 /* Gelasio_400Regular.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 9; includeInIndex = 0; lastKnownFileType = unknown; name = Gelasio_400Regular.ttf; path = ../src/assets/fonts/Gelasio_400Regular.ttf; sourceTree = "<group>"; };
+		4D023936EF11A1DA15547DB5 /* PluralSpaceLiveActivityModuleBridge.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = PluralSpace/PluralSpaceLiveActivityModuleBridge.m; sourceTree = "<group>"; };
+		56D7C2A857A6220210390CB7 /* Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		5709B34CF0A7D63546082F79 /* Pods-PluralSpace.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-PluralSpace.release.xcconfig"; path = "Pods/Target Support Files/Pods-PluralSpace/Pods-PluralSpace.release.xcconfig"; sourceTree = SOURCE_ROOT; };
+		5BC37ADB4B861E32C7E6AD19 /* PluralSpaceActivityAttributes.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PluralSpaceActivityAttributes.swift; sourceTree = "<group>"; };
+		5DCACB8F33CDC322A6C60F78 /* libPods-PluralSpace.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-PluralSpace.a"; sourceTree = BUILT_PRODUCTS_DIR; };
+		630AA8DAC0AF4CEC84C72C3B /* Lexend_500Medium.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 9; includeInIndex = 0; lastKnownFileType = unknown; name = Lexend_500Medium.ttf; path = ../src/assets/fonts/Lexend_500Medium.ttf; sourceTree = "<group>"; };
+		71710086E4F2445D8D21D4FF /* Cause_400Regular.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 9; includeInIndex = 0; lastKnownFileType = unknown; name = Cause_400Regular.ttf; path = ../src/assets/fonts/Cause_400Regular.ttf; sourceTree = "<group>"; };
+		761780EC2CA45674006654EE /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = PluralSpace/AppDelegate.swift; sourceTree = "<group>"; };
+		78A48CEDA6554E97986778D2 /* Cause_700Bold.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 9; includeInIndex = 0; lastKnownFileType = unknown; name = Cause_700Bold.ttf; path = ../src/assets/fonts/Cause_700Bold.ttf; sourceTree = "<group>"; };
+		7A46517188F14DF726053A65 /* PluralSpaceLiveActivityModule.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PluralSpace/PluralSpaceLiveActivityModule.swift; sourceTree = "<group>"; };
+		919C8A6DD3DE437F87B7423B /* ComicNeue_700Bold.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 9; includeInIndex = 0; lastKnownFileType = unknown; name = ComicNeue_700Bold.ttf; path = ../src/assets/fonts/ComicNeue_700Bold.ttf; sourceTree = "<group>"; };
+		99AB2AED1AB4AFCD278085D4 /* PluralSpaceLiveActivity.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PluralSpaceLiveActivity.swift; sourceTree = "<group>"; };
+		9FEF50231CC24203882CB356 /* OpenDyslexic-Regular.otf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 9; includeInIndex = 0; lastKnownFileType = unknown; name = "OpenDyslexic-Regular.otf"; path = "../src/assets/fonts/OpenDyslexic-Regular.otf"; sourceTree = "<group>"; };
+		A227CA61F3C14D04BA763C23 /* OpenDyslexic-BoldItalic.otf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 9; includeInIndex = 0; lastKnownFileType = unknown; name = "OpenDyslexic-BoldItalic.otf"; path = "../src/assets/fonts/OpenDyslexic-BoldItalic.otf"; sourceTree = "<group>"; };
+		B243CA7D3F8E41BA961E8DB6 /* AtkinsonHyperlegible_700Bold.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 9; includeInIndex = 0; lastKnownFileType = unknown; name = AtkinsonHyperlegible_700Bold.ttf; path = ../src/assets/fonts/AtkinsonHyperlegible_700Bold.ttf; sourceTree = "<group>"; };
+		B4D1C63B0F88405A90E504A4 /* OpenDyslexic-Italic.otf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 9; includeInIndex = 0; lastKnownFileType = unknown; name = "OpenDyslexic-Italic.otf"; path = "../src/assets/fonts/OpenDyslexic-Italic.otf"; sourceTree = "<group>"; };
+		B6AEC1720E7148D39FD23521 /* Gelasio_700Bold_Italic.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 9; includeInIndex = 0; lastKnownFileType = unknown; name = Gelasio_700Bold_Italic.ttf; path = ../src/assets/fonts/Gelasio_700Bold_Italic.ttf; sourceTree = "<group>"; };
+		C2081FD0C693461F85D0D245 /* Lexend_700Bold.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 9; includeInIndex = 0; lastKnownFileType = unknown; name = Lexend_700Bold.ttf; path = ../src/assets/fonts/Lexend_700Bold.ttf; sourceTree = "<group>"; };
+		CF491EB4C55D4428B4E68E3F /* Lexend_400Regular.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 9; includeInIndex = 0; lastKnownFileType = unknown; name = Lexend_400Regular.ttf; path = ../src/assets/fonts/Lexend_400Regular.ttf; sourceTree = "<group>"; };
+		E09551C0D34C41D0BB99D396 /* OpenDyslexic-Bold.otf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 9; includeInIndex = 0; lastKnownFileType = unknown; name = "OpenDyslexic-Bold.otf"; path = "../src/assets/fonts/OpenDyslexic-Bold.otf"; sourceTree = "<group>"; };
+		E819BCF398EA453FB2F45637 /* Anton_400Regular.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 9; includeInIndex = 0; lastKnownFileType = unknown; name = Anton_400Regular.ttf; path = ../src/assets/fonts/Anton_400Regular.ttf; sourceTree = "<group>"; };
+		E964520B528E4D9F85AA3914 /* ComicNeue_400Regular_Italic.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 9; includeInIndex = 0; lastKnownFileType = unknown; name = ComicNeue_400Regular_Italic.ttf; path = ../src/assets/fonts/ComicNeue_400Regular_Italic.ttf; sourceTree = "<group>"; };
+		EAEAB9CA942AA204BFC89C78 /* PluralSpaceLiveActivity.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = PluralSpaceLiveActivity.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
+		F7E7569BEDC440AD8BD752AF /* AtkinsonHyperlegible_400Regular.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 9; includeInIndex = 0; lastKnownFileType = unknown; name = AtkinsonHyperlegible_400Regular.ttf; path = ../src/assets/fonts/AtkinsonHyperlegible_400Regular.ttf; sourceTree = "<group>"; };
+		F8AF75B04F6F45D097C79416 /* ComicNeue_400Regular.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 9; includeInIndex = 0; lastKnownFileType = unknown; name = ComicNeue_400Regular.ttf; path = ../src/assets/fonts/ComicNeue_400Regular.ttf; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		13B07F8C1A680F5B00A75B9A /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				0C80B921A6F3F58F76C31292 /* libPods-PluralSpace.a in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		F8D158B93035451FEA293A71 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				436604BAD66B5A568792EB70 /* Foundation.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		13B07FAE1A68108700A75B9A /* PluralSpace */ = {
+			isa = PBXGroup;
+			children = (
+				18BC4A2B2FF8BBDC003C976F /* PluralSpace.entitlements */,
+				13B07FB51A68108700A75B9A /* Images.xcassets */,
+				761780EC2CA45674006654EE /* AppDelegate.swift */,
+				13B07FB61A68108700A75B9A /* Info.plist */,
+				13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */,
+				7A46517188F14DF726053A65 /* PluralSpaceLiveActivityModule.swift */,
+				4D023936EF11A1DA15547DB5 /* PluralSpaceLiveActivityModuleBridge.m */,
+			);
+			name = PluralSpace;
+			sourceTree = "<group>";
+		};
+		2018849F7DC34773B8713840 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				E09551C0D34C41D0BB99D396 /* OpenDyslexic-Bold.otf */,
+				A227CA61F3C14D04BA763C23 /* OpenDyslexic-BoldItalic.otf */,
+				B4D1C63B0F88405A90E504A4 /* OpenDyslexic-Italic.otf */,
+				9FEF50231CC24203882CB356 /* OpenDyslexic-Regular.otf */,
+				E819BCF398EA453FB2F45637 /* Anton_400Regular.ttf */,
+				F7E7569BEDC440AD8BD752AF /* AtkinsonHyperlegible_400Regular.ttf */,
+				031BC308F0854534AF236A3C /* AtkinsonHyperlegible_400Regular_Italic.ttf */,
+				B243CA7D3F8E41BA961E8DB6 /* AtkinsonHyperlegible_700Bold.ttf */,
+				3DCD5C7F8A3D4D46A81E0532 /* AtkinsonHyperlegible_700Bold_Italic.ttf */,
+				71710086E4F2445D8D21D4FF /* Cause_400Regular.ttf */,
+				78A48CEDA6554E97986778D2 /* Cause_700Bold.ttf */,
+				F8AF75B04F6F45D097C79416 /* ComicNeue_400Regular.ttf */,
+				E964520B528E4D9F85AA3914 /* ComicNeue_400Regular_Italic.ttf */,
+				919C8A6DD3DE437F87B7423B /* ComicNeue_700Bold.ttf */,
+				23AE195E453A42DF80AB6954 /* ComicNeue_700Bold_Italic.ttf */,
+				4BF016BFDC154F269B3333E2 /* Gelasio_400Regular.ttf */,
+				3F69D9175E474AAF81DC79CC /* Gelasio_400Regular_Italic.ttf */,
+				4A79EF2ED1704E7B94116A8F /* Gelasio_700Bold.ttf */,
+				B6AEC1720E7148D39FD23521 /* Gelasio_700Bold_Italic.ttf */,
+				CF491EB4C55D4428B4E68E3F /* Lexend_400Regular.ttf */,
+				630AA8DAC0AF4CEC84C72C3B /* Lexend_500Medium.ttf */,
+				245209B552544899BDB0071C /* Lexend_600SemiBold.ttf */,
+				C2081FD0C693461F85D0D245 /* Lexend_700Bold.ttf */,
+				47DE890732B74E2095A3BE0A /* LICENSE.txt */,
+			);
+			name = Resources;
+			sourceTree = "<group>";
+		};
+		2D16E6871FA4F8E400B85C8A /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				ED297162215061F000B7C4FE /* JavaScriptCore.framework */,
+				5DCACB8F33CDC322A6C60F78 /* libPods-PluralSpace.a */,
+				B20B8C8778A97FE8788AEDBC /* iOS */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		832341AE1AAA6A7D00B99B32 /* Libraries */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = Libraries;
+			sourceTree = "<group>";
+		};
+		83CBB9F61A601CBA00E9B192 = {
+			isa = PBXGroup;
+			children = (
+				13B07FAE1A68108700A75B9A /* PluralSpace */,
+				832341AE1AAA6A7D00B99B32 /* Libraries */,
+				83CBBA001A601CBA00E9B192 /* Products */,
+				2D16E6871FA4F8E400B85C8A /* Frameworks */,
+				BBD78D7AC51CEA395F1C20DB /* Pods */,
+				9DF64525B370FC40A12CEFBF /* PluralSpaceShared */,
+				F960E8A05869D0D399B3D3B3 /* PluralSpaceLiveActivity */,
+				2018849F7DC34773B8713840 /* Resources */,
+			);
+			indentWidth = 2;
+			sourceTree = "<group>";
+			tabWidth = 2;
+			usesTabs = 0;
+		};
+		83CBBA001A601CBA00E9B192 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				13B07F961A680F5B00A75B9A /* PluralSpace.app */,
+				EAEAB9CA942AA204BFC89C78 /* PluralSpaceLiveActivity.appex */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		9DF64525B370FC40A12CEFBF /* PluralSpaceShared */ = {
+			isa = PBXGroup;
+			children = (
+				5BC37ADB4B861E32C7E6AD19 /* PluralSpaceActivityAttributes.swift */,
+			);
+			path = PluralSpaceShared;
+			sourceTree = "<group>";
+		};
+		B20B8C8778A97FE8788AEDBC /* iOS */ = {
+			isa = PBXGroup;
+			children = (
+				171CF3BC2C212C0118685EAA /* Foundation.framework */,
+			);
+			name = iOS;
+			sourceTree = "<group>";
+		};
+		BBD78D7AC51CEA395F1C20DB /* Pods */ = {
+			isa = PBXGroup;
+			children = (
+				3B4392A12AC88292D35C810B /* Pods-PluralSpace.debug.xcconfig */,
+				5709B34CF0A7D63546082F79 /* Pods-PluralSpace.release.xcconfig */,
+			);
+			path = Pods;
+			sourceTree = "<group>";
+		};
+		F960E8A05869D0D399B3D3B3 /* PluralSpaceLiveActivity */ = {
+			isa = PBXGroup;
+			children = (
+				99AB2AED1AB4AFCD278085D4 /* PluralSpaceLiveActivity.swift */,
+				4605282D958AB70F61A5B68C /* PluralSpaceLiveActivityBundle.swift */,
+				56D7C2A857A6220210390CB7 /* Info.plist */,
+			);
+			path = PluralSpaceLiveActivity;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		13B07F861A680F5B00A75B9A /* PluralSpace */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 13B07F931A680F5B00A75B9A /* Build configuration list for PBXNativeTarget "PluralSpace" */;
+			buildPhases = (
+				C38B50BA6285516D6DCD4F65 /* [CP] Check Pods Manifest.lock */,
+				13B07F871A680F5B00A75B9A /* Sources */,
+				13B07F8C1A680F5B00A75B9A /* Frameworks */,
+				13B07F8E1A680F5B00A75B9A /* Resources */,
+				00DD1BFF1BD5951E006B06BC /* Bundle React Native code and images */,
+				00EEFC60759A1932668264C0 /* [CP] Embed Pods Frameworks */,
+				E235C05ADACE081382539298 /* [CP] Copy Pods Resources */,
+				B28F1116B2DF26847C9CAB2D /* Embed App Extensions */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				F15D687ADABA21F0CE0474EF /* PBXTargetDependency */,
+			);
+			name = PluralSpace;
+			productName = PluralSpace;
+			productReference = 13B07F961A680F5B00A75B9A /* PluralSpace.app */;
+			productType = "com.apple.product-type.application";
+		};
+		B667964569649A427BF502B3 /* PluralSpaceLiveActivity */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = DFF7955D99654699ADB62B72 /* Build configuration list for PBXNativeTarget "PluralSpaceLiveActivity" */;
+			buildPhases = (
+				B26523AF48692778DE581C14 /* Sources */,
+				F8D158B93035451FEA293A71 /* Frameworks */,
+				F7168C55AE6EED91A72A0354 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = PluralSpaceLiveActivity;
+			productName = PluralSpaceLiveActivity;
+			productReference = EAEAB9CA942AA204BFC89C78 /* PluralSpaceLiveActivity.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		83CBB9F71A601CBA00E9B192 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				LastUpgradeCheck = 1210;
+				TargetAttributes = {
+					13B07F861A680F5B00A75B9A = {
+						LastSwiftMigration = 1120;
+					};
+				};
+			};
+			buildConfigurationList = 83CBB9FA1A601CBA00E9B192 /* Build configuration list for PBXProject "PluralSpace" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = 83CBB9F61A601CBA00E9B192;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 83CBBA001A601CBA00E9B192 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				13B07F861A680F5B00A75B9A /* PluralSpace */,
+				B667964569649A427BF502B3 /* PluralSpaceLiveActivity */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		13B07F8E1A680F5B00A75B9A /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */,
+				09CDA2242BEA26CFB97DE3C0 /* PrivacyInfo.xcprivacy in Resources */,
+				4042B0C9A0524DA4BE43D454 /* OpenDyslexic-Bold.otf in Resources */,
+				056028A5A7B4412BB5E3045E /* OpenDyslexic-BoldItalic.otf in Resources */,
+				B64C9045B9EB43298A2166CC /* OpenDyslexic-Italic.otf in Resources */,
+				50114BA6F6D842769AC0A216 /* OpenDyslexic-Regular.otf in Resources */,
+				AD2E8B993F0740069B3855B8 /* Anton_400Regular.ttf in Resources */,
+				9962228AA35D40C4B7E8E801 /* AtkinsonHyperlegible_400Regular.ttf in Resources */,
+				36F9340EADFF41CA9F902B1D /* AtkinsonHyperlegible_400Regular_Italic.ttf in Resources */,
+				124CA1342C8947D59AFB971E /* AtkinsonHyperlegible_700Bold.ttf in Resources */,
+				3D65336D33E445868519F6B5 /* AtkinsonHyperlegible_700Bold_Italic.ttf in Resources */,
+				5CAFE8FA024245F695C123AF /* Cause_400Regular.ttf in Resources */,
+				925B05BD3F044F88838BBAB1 /* Cause_700Bold.ttf in Resources */,
+				1325C930A37C48B9913AED68 /* ComicNeue_400Regular.ttf in Resources */,
+				D4BD3F861A4741EA8A6EAFF2 /* ComicNeue_400Regular_Italic.ttf in Resources */,
+				D877C28531034064B680A3E8 /* ComicNeue_700Bold.ttf in Resources */,
+				4BFB2D398917462C8C3708F8 /* ComicNeue_700Bold_Italic.ttf in Resources */,
+				DB5412B95B8B4A1ABA9D988E /* Gelasio_400Regular.ttf in Resources */,
+				0978B2376E754D0B97AE80DB /* Gelasio_400Regular_Italic.ttf in Resources */,
+				50C9C13A525A478ABFE86FBE /* Gelasio_700Bold.ttf in Resources */,
+				9DACBE484268444EADA3F6F7 /* Gelasio_700Bold_Italic.ttf in Resources */,
+				48F2AA0BCF19416885A5DC30 /* Lexend_400Regular.ttf in Resources */,
+				D03869A4BDCA490FB75356B2 /* Lexend_500Medium.ttf in Resources */,
+				AAF6C1E5C0174EEDB4737398 /* Lexend_600SemiBold.ttf in Resources */,
+				B535D0230C9543E981D760C8 /* Lexend_700Bold.ttf in Resources */,
+				63BE732294414DDBB9875868 /* LICENSE.txt in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		F7168C55AE6EED91A72A0354 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				1FC6F41220C140CB90D910D5 /* OpenDyslexic-Bold.otf in Resources */,
+				F9B775274EE0486799563A20 /* OpenDyslexic-BoldItalic.otf in Resources */,
+				BB10626AF3324D628B4A5661 /* OpenDyslexic-Italic.otf in Resources */,
+				A79044EC743541EEB693FC75 /* OpenDyslexic-Regular.otf in Resources */,
+				0FA321251DFD45B3A2667D20 /* Anton_400Regular.ttf in Resources */,
+				E401128B92D8434F9531E2B6 /* AtkinsonHyperlegible_400Regular.ttf in Resources */,
+				0FA2E5DC2E774891B1E95BA7 /* AtkinsonHyperlegible_400Regular_Italic.ttf in Resources */,
+				A670B6F9D9EB448B83033112 /* AtkinsonHyperlegible_700Bold.ttf in Resources */,
+				BC59DC376C3740EABE928CCA /* AtkinsonHyperlegible_700Bold_Italic.ttf in Resources */,
+				AA6C18114B78407F9A2413CD /* Cause_400Regular.ttf in Resources */,
+				1E9443815D2942FBBB6AA16B /* Cause_700Bold.ttf in Resources */,
+				C1345847AAAD4DEC8B05C75E /* ComicNeue_400Regular.ttf in Resources */,
+				5B9AC4AA9C6A4D89A708263B /* ComicNeue_400Regular_Italic.ttf in Resources */,
+				142A2269135D4E908BD84C8E /* ComicNeue_700Bold.ttf in Resources */,
+				65FDB53047E64D3BB4A42998 /* ComicNeue_700Bold_Italic.ttf in Resources */,
+				10EC3EFF8676455C86C870EA /* Gelasio_400Regular.ttf in Resources */,
+				E73E89A7D70442D2B928C62F /* Gelasio_400Regular_Italic.ttf in Resources */,
+				2F1EDDCC2F3D4E5BA241E84D /* Gelasio_700Bold.ttf in Resources */,
+				42B71C86B81B4160A1F0D806 /* Gelasio_700Bold_Italic.ttf in Resources */,
+				9D0AAC3151124332BE8F67E1 /* Lexend_400Regular.ttf in Resources */,
+				DC1DC711CE2143D1A5B444F5 /* Lexend_500Medium.ttf in Resources */,
+				41D0EACF28174F90A868ABFB /* Lexend_600SemiBold.ttf in Resources */,
+				E2B63146611A4CEDA0ABAB14 /* Lexend_700Bold.ttf in Resources */,
+				6700192B47744DCA8C502A8A /* LICENSE.txt in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		00DD1BFF1BD5951E006B06BC /* Bundle React Native code and images */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"$(SRCROOT)/.xcode.env.local",
+				"$(SRCROOT)/.xcode.env",
+			);
+			name = "Bundle React Native code and images";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "set -e\n\nWITH_ENVIRONMENT=\"$REACT_NATIVE_PATH/scripts/xcode/with-environment.sh\"\nREACT_NATIVE_XCODE=\"$REACT_NATIVE_PATH/scripts/react-native-xcode.sh\"\nexport CONFIG_JSON=\"{\\\"root\\\":\\\"$PROJECT_DIR/..\\\",\\\"reactNativePath\\\":\\\"$PROJECT_DIR/../node_modules/react-native\\\",\\\"platforms\\\":{\\\"ios\\\":{},\\\"android\\\":{}}}\"\n\n\"$WITH_ENVIRONMENT\" \"$REACT_NATIVE_XCODE\"\n";
+		};
+		00EEFC60759A1932668264C0 /* [CP] Embed Pods Frameworks */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+				"${PODS_ROOT}/Target Support Files/Pods-PluralSpace/Pods-PluralSpace-frameworks-${CONFIGURATION}-input-files.xcfilelist",
+			);
+			name = "[CP] Embed Pods Frameworks";
+			outputFileListPaths = (
+				"${PODS_ROOT}/Target Support Files/Pods-PluralSpace/Pods-PluralSpace-frameworks-${CONFIGURATION}-output-files.xcfilelist",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-PluralSpace/Pods-PluralSpace-frameworks.sh\"\n";
+			showEnvVarsInLog = 0;
+		};
+		C38B50BA6285516D6DCD4F65 /* [CP] Check Pods Manifest.lock */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"${PODS_PODFILE_DIR_PATH}/Podfile.lock",
+				"${PODS_ROOT}/Manifest.lock",
+			);
+			name = "[CP] Check Pods Manifest.lock";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(DERIVED_FILE_DIR)/Pods-PluralSpace-checkManifestLockResult.txt",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
+			showEnvVarsInLog = 0;
+		};
+		E235C05ADACE081382539298 /* [CP] Copy Pods Resources */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+				"${PODS_ROOT}/Target Support Files/Pods-PluralSpace/Pods-PluralSpace-resources-${CONFIGURATION}-input-files.xcfilelist",
+			);
+			name = "[CP] Copy Pods Resources";
+			outputFileListPaths = (
+				"${PODS_ROOT}/Target Support Files/Pods-PluralSpace/Pods-PluralSpace-resources-${CONFIGURATION}-output-files.xcfilelist",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-PluralSpace/Pods-PluralSpace-resources.sh\"\n";
+			showEnvVarsInLog = 0;
+		};
+/* End PBXShellScriptBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		13B07F871A680F5B00A75B9A /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				761780ED2CA45674006654EE /* AppDelegate.swift in Sources */,
+				B6CFE064AA03C39FF3704286 /* PluralSpaceActivityAttributes.swift in Sources */,
+				991FB1EF631FFEBE784C4D31 /* PluralSpaceLiveActivityModule.swift in Sources */,
+				A908F9F267CC0EF24F960549 /* PluralSpaceLiveActivityModuleBridge.m in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B26523AF48692778DE581C14 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				9732CC66F77F86B3F12184DD /* PluralSpaceActivityAttributes.swift in Sources */,
+				0EE4CC9E3485DAC9917CE413 /* PluralSpaceLiveActivity.swift in Sources */,
+				0B13441F4701EF9014AA38D1 /* PluralSpaceLiveActivityBundle.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		F15D687ADABA21F0CE0474EF /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = PluralSpaceLiveActivity;
+			target = B667964569649A427BF502B3 /* PluralSpaceLiveActivity */;
+			targetProxy = D5A18470B29B6744B32D51EA /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		13B07F941A680F5B00A75B9A /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 3B4392A12AC88292D35C810B /* Pods-PluralSpace.debug.xcconfig */;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_ENTITLEMENTS = PluralSpace/PluralSpace.entitlements;
+				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Distribution";
+				CODE_SIGN_STYLE = Manual;
+				CURRENT_PROJECT_VERSION = 84;
+				DEVELOPMENT_TEAM = "";
+				"DEVELOPMENT_TEAM[sdk=iphoneos*]" = CKAA876673;
+				ENABLE_BITCODE = NO;
+				INFOPLIST_FILE = PluralSpace/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Plural Star";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
+				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.22.0;
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-ObjC",
+					"-lc++",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.sparklecatdev.pluralstarreimagined;
+				PRODUCT_NAME = PluralSpace;
+				PROVISIONING_PROFILE_SPECIFIER = "";
+				"PROVISIONING_PROFILE_SPECIFIER[sdk=iphoneos*]" = "Plural Star(CKAA876673.com.pluralstar.app)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_ENABLE_EXPLICIT_MODULES = NO;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VERSIONING_SYSTEM = "apple-generic";
+			};
+			name = Debug;
+		};
+		13B07F951A680F5B00A75B9A /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 5709B34CF0A7D63546082F79 /* Pods-PluralSpace.release.xcconfig */;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_ENTITLEMENTS = PluralSpace/PluralSpace.entitlements;
+				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Distribution";
+				CODE_SIGN_STYLE = Manual;
+				CURRENT_PROJECT_VERSION = 84;
+				DEVELOPMENT_TEAM = "";
+				"DEVELOPMENT_TEAM[sdk=iphoneos*]" = CKAA876673;
+				INFOPLIST_FILE = PluralSpace/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Plural Star";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
+				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.22.0;
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-ObjC",
+					"-lc++",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.sparklecatdev.pluralstarreimagined;
+				PRODUCT_NAME = PluralSpace;
+				PROVISIONING_PROFILE_SPECIFIER = "";
+				"PROVISIONING_PROFILE_SPECIFIER[sdk=iphoneos*]" = "Plural Star(CKAA876673.com.pluralstar.app)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_ENABLE_EXPLICIT_MODULES = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VERSIONING_SYSTEM = "apple-generic";
+			};
+			name = Release;
+		};
+		83CBBA201A601CBA00E9B192 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_LOCALIZABILITY_NONLOCALIZED = YES;
+				CLANG_CXX_LANGUAGE_STANDARD = "c++20";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				"EXCLUDED_ARCHS[sdk=iphonesimulator*]" = "";
+				GCC_C_LANGUAGE_STANDARD = gnu99;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
+				LD_RUNPATH_SEARCH_PATHS = (
+					/usr/lib/swift,
+					"$(inherited)",
+				);
+				LIBRARY_SEARCH_PATHS = (
+					"\"$(SDKROOT)/usr/lib/swift\"",
+					"\"$(TOOLCHAIN_DIR)/usr/lib/swift/$(PLATFORM_NAME)\"",
+					"\"$(inherited)\"",
+				);
+				MTL_ENABLE_DEBUG_INFO = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				OTHER_CFLAGS = (
+					"$(inherited)",
+					"-DRCT_REMOVE_LEGACY_ARCH=1",
+				);
+				OTHER_CPLUSPLUSFLAGS = (
+					"$(OTHER_CFLAGS)",
+					"-DFOLLY_NO_CONFIG",
+					"-DFOLLY_MOBILE=1",
+					"-DFOLLY_USE_LIBCPP=1",
+					"-DFOLLY_CFG_NO_COROUTINES=1",
+					"-DFOLLY_HAVE_CLOCK_GETTIME=1",
+					"-DRCT_REMOVE_LEGACY_ARCH=1",
+				);
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					" ",
+				);
+				PODFILE_DIR = "$(SRCROOT)";
+				REACT_NATIVE_PATH = "${PODS_ROOT}/../../node_modules/react-native";
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) DEBUG";
+				SWIFT_ENABLE_EXPLICIT_MODULES = NO;
+				USE_HERMES = true;
+			};
+			name = Debug;
+		};
+		83CBBA211A601CBA00E9B192 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_LOCALIZABILITY_NONLOCALIZED = YES;
+				CLANG_CXX_LANGUAGE_STANDARD = "c++20";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = YES;
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				"EXCLUDED_ARCHS[sdk=iphonesimulator*]" = "";
+				GCC_C_LANGUAGE_STANDARD = gnu99;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
+				LD_RUNPATH_SEARCH_PATHS = (
+					/usr/lib/swift,
+					"$(inherited)",
+				);
+				LIBRARY_SEARCH_PATHS = (
+					"\"$(SDKROOT)/usr/lib/swift\"",
+					"\"$(TOOLCHAIN_DIR)/usr/lib/swift/$(PLATFORM_NAME)\"",
+					"\"$(inherited)\"",
+				);
+				MTL_ENABLE_DEBUG_INFO = NO;
+				OTHER_CFLAGS = (
+					"$(inherited)",
+					"-DRCT_REMOVE_LEGACY_ARCH=1",
+				);
+				OTHER_CPLUSPLUSFLAGS = (
+					"$(OTHER_CFLAGS)",
+					"-DFOLLY_NO_CONFIG",
+					"-DFOLLY_MOBILE=1",
+					"-DFOLLY_USE_LIBCPP=1",
+					"-DFOLLY_CFG_NO_COROUTINES=1",
+					"-DFOLLY_HAVE_CLOCK_GETTIME=1",
+					"-DRCT_REMOVE_LEGACY_ARCH=1",
+				);
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					" ",
+				);
+				PODFILE_DIR = "$(SRCROOT)";
+				REACT_NATIVE_PATH = "${PODS_ROOT}/../../node_modules/react-native";
+				SDKROOT = iphoneos;
+				SWIFT_ENABLE_EXPLICIT_MODULES = NO;
+				USE_HERMES = true;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		8814AC5BA7DD2A8EEA95B1F7 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Distribution";
+				CODE_SIGN_STYLE = Manual;
+				CURRENT_PROJECT_VERSION = 84;
+				DEVELOPMENT_TEAM = "";
+				"DEVELOPMENT_TEAM[sdk=iphoneos*]" = CKAA876673;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = PluralSpaceLiveActivity/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.1;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.22.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.sparklecatdev.pluralstarreimagined.liveactivity;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
+				"PROVISIONING_PROFILE_SPECIFIER[sdk=iphoneos*]" = "Plural Star Live Activity(CKAA876673.com.pluralsta";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		E77B5F51C99914C61BA1B3A0 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Distribution";
+				CODE_SIGN_STYLE = Manual;
+				CURRENT_PROJECT_VERSION = 84;
+				DEVELOPMENT_TEAM = "";
+				"DEVELOPMENT_TEAM[sdk=iphoneos*]" = CKAA876673;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = PluralSpaceLiveActivity/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.1;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.22.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.sparklecatdev.pluralstarreimagined.liveactivity;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
+				"PROVISIONING_PROFILE_SPECIFIER[sdk=iphoneos*]" = "Plural Star Live Activity(CKAA876673.com.pluralsta";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		13B07F931A680F5B00A75B9A /* Build configuration list for PBXNativeTarget "PluralSpace" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				13B07F941A680F5B00A75B9A /* Debug */,
+				13B07F951A680F5B00A75B9A /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		83CBB9FA1A601CBA00E9B192 /* Build configuration list for PBXProject "PluralSpace" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				83CBBA201A601CBA00E9B192 /* Debug */,
+				83CBBA211A601CBA00E9B192 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		DFF7955D99654699ADB62B72 /* Build configuration list for PBXNativeTarget "PluralSpaceLiveActivity" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				E77B5F51C99914C61BA1B3A0 /* Release */,
+				8814AC5BA7DD2A8EEA95B1F7 /* Debug */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 83CBB9F71A601CBA00E9B192 /* Project object */;
+}
